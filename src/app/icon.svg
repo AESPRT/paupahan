@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <rect width="512" height="512" rx="120" fill="#153730"/>
+  <!-- House Roof accent (Rounded Triangle) -->
+  <path d="M 256 85 L 406 205 H 106 Z" fill="#E15B4E" stroke="#E15B4E" stroke-width="26" stroke-linejoin="round" stroke-linecap="round"/>
+  <!-- Playful Rounded Vector Letter P -->
+  <path d="M 195 410 V 230 H 270 C 335 230 335 325 270 325 H 195" fill="none" stroke="#F0A93A" stroke-width="48" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Small receipt check badge -->
+  <circle cx="390" cy="390" r="56" fill="#F0A93A" stroke="#153730" stroke-width="8"/>
+  <path d="M 368 390 L 384 406 L 414 374" stroke="#153730" stroke-width="14" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+</svg>
