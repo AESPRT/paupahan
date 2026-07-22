@@ -35,7 +35,7 @@ export function Navbar() {
       <div className="mx-auto max-w-[1140px] px-4 sm:px-6">
         <nav className="flex items-center justify-between py-4">
           {/* Logo */}
-          <Link href="#" className="flex items-center gap-2.5 font-display text-[20px] font-extrabold text-forest-deep sm:text-[22px]">
+          <Link href="/" className="flex items-center gap-2.5 font-display text-[20px] font-extrabold text-forest-deep sm:text-[22px]">
             <PaupahanLogo className="w-8 h-8" />
             Paupahan
           </Link>
@@ -51,10 +51,10 @@ export function Navbar() {
 
           {/* Desktop CTA buttons — hidden below lg */}
           <div className="hidden items-center gap-3 lg:flex">
-            <Button href="/admin-login" variant="ghost" className="!px-5 !py-2.5 !text-sm">
+            <Button href="/admin/login" variant="ghost" className="!px-5 !py-2.5 !text-sm">
               Mag-login
             </Button>
-            <Button href="/admin-register" variant="primary" className="!px-5 !py-2.5 !text-sm">
+            <Button href="/admin/register" variant="primary" className="!px-5 !py-2.5 !text-sm">
               Simulan Ngayon
             </Button>
           </div>
@@ -98,10 +98,10 @@ export function Navbar() {
             </a>
           ))}
           <div className="flex flex-col gap-2.5 px-5 py-4 sm:px-6">
-            <Button href="/admin-login" variant="ghost" onClick={() => setOpen(false)} className="!py-3 !text-sm">
+            <Button href="/admin/login" variant="ghost" onClick={() => setOpen(false)} className="!py-3 !text-sm">
               Mag-login
             </Button>
-            <Button href="/admin-register" variant="primary" onClick={() => setOpen(false)} className="!py-3 !text-sm">
+            <Button href="/admin/register" variant="primary" onClick={() => setOpen(false)} className="!py-3 !text-sm">
               Simulan Ngayon
             </Button>
           </div>

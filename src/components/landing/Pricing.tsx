@@ -1,3 +1,6 @@
+"use client";
+
+import { useState } from "react";
 import { Button } from "./Button";
 
 const PLANS = [
@@ -135,6 +138,8 @@ function CardDots({ featured, free }: { featured: boolean; free: boolean }) {
 }
 
 export function Pricing() {
+  const [showAll, setShowAll] = useState(false);
+
   return (
     <section className="py-13 sm:py-16 lg:py-[84px]" id="pricing">
       <div className="mx-auto max-w-[1200px] px-4 sm:px-6">
@@ -150,90 +155,179 @@ export function Pricing() {
           </p>
         </div>
 
-        {/* Cards grid: 1→2→3→5 cols */}
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3 lg:gap-5 xl:grid-cols-5 xl:gap-4">
-          {PLANS.map((plan, i) => (
-            <div
-              key={plan.name}
-              className={`relative flex flex-col rounded-2xl border-[1.5px] p-5 pb-6 sm:p-[22px] sm:pb-6 xl:p-5 xl:pb-6 ${plan.featured
-                  ? "border-forest bg-forest text-white shadow-[0_20px_44px_rgba(31,75,63,0.30)] sm:col-span-2 lg:col-span-1 lg:-translate-y-2"
-                  : plan.free
+        {/* Cards grid */}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3 lg:gap-6">
+          {PLANS.map((plan, i) => {
+            // Hide 4th & 5th cards on desktop (lg:) unless showAll is true
+            const isHiddenOnDesktop = !showAll && i >= 3;
+
+            return (
+              <div
+                key={plan.name}
+                className={`relative flex flex-col rounded-2xl border-[1.5px] p-5 pb-6 sm:p-[22px] sm:pb-6 ${
+                  isHiddenOnDesktop ? "flex lg:hidden" : "flex"
+                } ${
+                  plan.featured
+                    ? "border-forest bg-forest text-white shadow-[0_20px_44px_rgba(31,75,63,0.30)] lg:-translate-y-2"
+                    : plan.free
                     ? "border-dashed border-line bg-paper-card/60 shadow-none"
                     : "border-line bg-paper-card shadow-[0_8px_24px_rgba(27,58,52,0.08)]"
-                } ${i === 3 ? "lg:col-start-2 xl:col-start-auto" : ""}`}
-            >
-              {/* Decorative dots */}
-              <CardDots featured={plan.featured} free={plan.free} />
+                }`}
+              >
+                {/* Decorative dots */}
+                <CardDots featured={plan.featured} free={plan.free} />
 
-              {/* Badge */}
-              {plan.badge && (
-                <span className="absolute -top-0 left-1/2 -translate-x-1/2 rounded-b-full bg-marigold px-3 py-1 font-mono-brand text-[10.5px] font-semibold uppercase tracking-[0.05em] text-forest-deep">
-                  {plan.badge}
-                </span>
-              )}
-
-              {/* Tag + Name */}
-              <div className={`mt-4 font-mono-brand text-[11px] uppercase tracking-[0.09em] ${plan.featured ? "text-marigold" : plan.free ? "text-muted" : "text-coral-deep"}`}>
-                {plan.tag}
-              </div>
-              <div className={`mt-1 font-display text-[20px] font-bold leading-tight ${plan.featured ? "text-white" : "text-forest-deep"}`}>
-                {plan.name}
-              </div>
-              <div className={`mt-1 text-[12.5px] leading-snug ${plan.featured ? "text-white/65" : "text-muted"}`}>
-                {plan.tagline}
-              </div>
-
-              {/* Price */}
-              <div className="mt-4 flex items-baseline gap-1 font-mono-brand">
-                <span className={`text-[32px] font-semibold leading-none ${plan.featured ? "text-white" : plan.free ? "text-forest" : "text-forest-deep"}`}>
-                  {plan.price}
-                </span>
-                {plan.per && (
-                  <span className={`text-[13px] ${plan.featured ? "text-white/60" : "text-muted"}`}>
-                    {plan.per}
+                {/* Badge */}
+                {plan.badge && (
+                  <span className="absolute -top-0 left-1/2 -translate-x-1/2 rounded-b-full bg-marigold px-3 py-1 font-mono-brand text-[10.5px] font-semibold uppercase tracking-[0.05em] text-forest-deep">
+                    {plan.badge}
                   </span>
                 )}
-              </div>
-              <div className={`mt-1.5 text-[12px] font-semibold ${plan.featured ? "text-marigold/90" : plan.free ? "text-muted" : "text-coral-deep"}`}>
-                {plan.note}
-              </div>
 
-              {/* Feature list */}
-              <ul className={`mt-4 mb-5 flex flex-1 flex-col gap-2 border-t-[1.5px] border-dashed pt-4 ${plan.featured ? "border-white/20" : "border-line"}`}>
-                {plan.perks.map((perk) => (
-                  <li key={perk} className={`flex gap-2 text-[13px] leading-snug ${plan.featured ? "text-white/85" : "text-ink"}`}>
-                    <span className={`shrink-0 font-bold ${plan.featured ? "text-marigold" : "text-forest"}`}>✓</span>
-                    {perk}
-                  </li>
-                ))}
-                {plan.missing.map((miss) => (
-                  <li key={miss} className="flex gap-2 text-[13px] leading-snug text-muted/60 line-through">
-                    <span className="shrink-0 text-muted/40">✕</span>
-                    {miss}
-                  </li>
-                ))}
-              </ul>
+                {/* Tag + Name */}
+                <div
+                  className={`mt-4 font-mono-brand text-[11px] uppercase tracking-[0.09em] ${
+                    plan.featured
+                      ? "text-marigold"
+                      : plan.free
+                      ? "text-muted"
+                      : "text-coral-deep"
+                  }`}
+                >
+                  {plan.tag}
+                </div>
+                <div
+                  className={`mt-1 font-display text-[20px] font-bold leading-tight ${
+                    plan.featured ? "text-white" : "text-forest-deep"
+                  }`}
+                >
+                  {plan.name}
+                </div>
+                <div
+                  className={`mt-1 text-[12.5px] leading-snug ${
+                    plan.featured ? "text-white/65" : "text-muted"
+                  }`}
+                >
+                  {plan.tagline}
+                </div>
 
-              <Button
-                href={plan.free ? "/admin-register" : "/admin-register"}
-                variant={plan.featured ? "primary" : "ghost"}
-                block
-                className={
-                  plan.featured
-                    ? "!bg-white !text-coral-deep !shadow-none"
-                    : plan.free
+                {/* Price */}
+                <div className="mt-4 flex items-baseline gap-1 font-mono-brand">
+                  <span
+                    className={`text-[32px] font-semibold leading-none ${
+                      plan.featured
+                        ? "text-white"
+                        : plan.free
+                        ? "text-forest"
+                        : "text-forest-deep"
+                    }`}
+                  >
+                    {plan.price}
+                  </span>
+                  {plan.per && (
+                    <span
+                      className={`text-[13px] ${
+                        plan.featured ? "text-white/60" : "text-muted"
+                      }`}
+                    >
+                      {plan.per}
+                    </span>
+                  )}
+                </div>
+                <div
+                  className={`mt-1.5 text-[12px] font-semibold ${
+                    plan.featured
+                      ? "text-marigold/90"
+                      : plan.free
+                      ? "text-muted"
+                      : "text-coral-deep"
+                  }`}
+                >
+                  {plan.note}
+                </div>
+
+                {/* Feature list */}
+                <ul
+                  className={`mt-4 mb-5 flex flex-1 flex-col gap-2 border-t-[1.5px] border-dashed pt-4 ${
+                    plan.featured ? "border-white/20" : "border-line"
+                  }`}
+                >
+                  {plan.perks.map((perk) => (
+                    <li
+                      key={perk}
+                      className={`flex gap-2 text-[13px] leading-snug ${
+                        plan.featured ? "text-white/85" : "text-ink"
+                      }`}
+                    >
+                      <span
+                        className={`shrink-0 font-bold ${
+                          plan.featured ? "text-marigold" : "text-forest"
+                        }`}
+                      >
+                        ✓
+                      </span>
+                      {perk}
+                    </li>
+                  ))}
+                  {plan.missing.map((miss) => (
+                    <li
+                      key={miss}
+                      className="flex gap-2 text-[13px] leading-snug text-muted/60 line-through"
+                    >
+                      <span className="shrink-0 text-muted/40">✕</span>
+                      {miss}
+                    </li>
+                  ))}
+                </ul>
+
+                <Button
+                  href="/admin/register"
+                  variant={plan.featured ? "primary" : "ghost"}
+                  block
+                  className={
+                    plan.featured
+                      ? "!bg-white !text-coral-deep !shadow-none"
+                      : plan.free
                       ? "!border-line !text-muted hover:!bg-forest/[0.04]"
                       : ""
-                }
-              >
-                {plan.cta}
-              </Button>
-            </div>
-          ))}
+                  }
+                >
+                  {plan.cta}
+                </Button>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Load More Button (Desktop Only) */}
+        <div className="mt-8 hidden justify-center lg:flex">
+          <button
+            onClick={() => setShowAll(!showAll)}
+            className="inline-flex items-center gap-2 rounded-full border border-line bg-paper-card px-6 py-3 font-mono-brand text-[13px] font-semibold text-forest-deep shadow-[0_4px_12px_rgba(27,58,52,0.06)] transition-all hover:-translate-y-0.5 hover:border-forest/30 active:translate-y-0"
+          >
+            <span>
+              {showAll ? "Ipakita ang Mas Kakaunting Plano" : "Ipakita ang Iba Pang Plano (Business & Custom)"}
+            </span>
+            <svg
+              className={`h-4 w-4 transition-transform duration-200 ${
+                showAll ? "rotate-180" : ""
+              }`}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M19 9l-7 7-7-7"
+              />
+            </svg>
+          </button>
         </div>
 
         <p className="mt-8 text-center text-[13px] text-muted">
-          Lahat ng bayad-plano may <strong>14-day free trial</strong>. Pwede mag-cancel anumang oras.
+          Pwede mag-cancel anumang oras.
         </p>
       </div>
     </section>

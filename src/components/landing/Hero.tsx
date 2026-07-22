@@ -2,7 +2,7 @@ import { Button } from "./Button";
 
 export function Hero() {
   return (
-    <section className="overflow-hidden py-10 sm:py-16 lg:py-[76px]">
+    <section className="overflow-hidden py-10 sm:py-16 lg:py-[76px]"  id="hero">
       <div className="mx-auto max-w-[1140px] px-4 sm:px-6">
         <div className="grid grid-cols-1 items-center gap-10 lg:grid-cols-[1.05fr_0.95fr] lg:gap-14">
           <div className="text-center lg:text-left">
@@ -17,12 +17,12 @@ export function Hero() {
               kahit isang unit lang ang bahay-paupahan mo, o limampu.
             </p>
             <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:justify-center lg:justify-start">
-              <Button href="/admin-register" variant="primary">Simulan Nang Libre</Button>
+              <Button href="/admin/register" variant="primary">Simulan Nang Libre</Button>
               <Button href="#how" variant="ghost">Tingnan Paano Gumagana</Button>
             </div>
             <div className="mt-6 flex items-center justify-center gap-2.5 text-[13px] font-semibold text-muted lg:justify-start">
               <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-marigold-deep" />
-              Walang credit card kailangan sa 14-day trial
+              Walang credit card kailangan!
             </div>
           </div>
 
