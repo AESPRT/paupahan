@@ -20,19 +20,27 @@ export function PendingApprovals() {
   };
 
   return (
-    <div className="rounded-2xl border border-line bg-paper-card p-4 sm:p-5 shadow-sm">
+    <div className="rounded-2xl border border-line bg-paper-card p-4 sm:p-5 shadow-sm space-y-4">
       {/* Component Header */}
-      <div className="flex items-center justify-between gap-2">
-        <h3 className="font-display text-base sm:text-lg font-bold text-forest-deep flex items-center gap-2">
-          <span>⏳</span> Aprubahang Readings & Bayad
-        </h3>
+      <div className="flex items-center justify-between gap-2 border-b border-line pb-3">
+        <div className="flex items-center gap-2.5">
+          {/* Clock / Hourglass Pending SVG Icon */}
+          <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-forest/10 text-forest shrink-0">
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <h3 className="font-display text-base sm:text-lg font-bold text-forest-deep">
+            Aprubahang Readings & Bayad
+          </h3>
+        </div>
         <span className="shrink-0 rounded-full bg-marigold/20 px-2.5 py-0.5 font-mono-brand text-[11px] sm:text-xs font-bold text-forest-deep">
           {PENDING_READINGS.length} Pending
         </span>
       </div>
 
       {/* Pending Items List */}
-      <div className="mt-4 space-y-3">
+      <div className="space-y-3">
         {PENDING_READINGS.map((item) => (
           <div
             key={item.id}
@@ -51,12 +59,16 @@ export function PendingApprovals() {
                 {item.unitName} • <span className="font-bold text-ink">{item.readingOrAmount}</span>
               </p>
 
-              <span className="block text-[10px] text-muted font-mono-brand">
-                📅 {item.dateSubmitted}
-              </span>
+              {/* Calendar SVG with Date Submitted */}
+              <div className="flex items-center gap-1.5 text-[10px] text-muted font-mono-brand pt-0.5">
+                <svg className="h-3.5 w-3.5 shrink-0 text-muted/70" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                <span>{item.dateSubmitted}</span>
+              </div>
             </div>
 
-            {/* Right Action Buttons (Full width sa mobile, auto width sa desktop) */}
+            {/* Right Action Buttons */}
             <div className="grid grid-cols-2 gap-2 pt-1 border-t border-line/40 sm:flex sm:items-center sm:pt-0 sm:border-0 shrink-0">
               <button 
                 onClick={() => alert(`Tinanggihan: ${item.tenantName}`)}

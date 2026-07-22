@@ -23,7 +23,11 @@ export function TenantsHeader({
         <div className="relative z-10 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <div className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-marigold backdrop-blur-md">
-              <span>👥</span> Tenant Management
+              {/* Users / Tenants SVG Icon */}
+              <svg className="h-3.5 w-3.5 shrink-0 text-marigold" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+              </svg>
+              <span>Tenant Management</span>
             </div>
             <h1 className="mt-2 font-display text-2xl font-black sm:text-3xl lg:text-4xl">
               Mga Tenant at Sakop na Kwarto
@@ -37,7 +41,11 @@ export function TenantsHeader({
             onClick={onAddTenant}
             className="inline-flex shrink-0 items-center gap-2 rounded-full bg-coral px-5 py-3 font-mono-brand text-xs font-bold text-white shadow-md transition-all hover:-translate-y-0.5 hover:bg-coral-deep active:translate-y-0"
           >
-            <span className="text-base font-black">+</span> Magdagdag ng Tenant
+            {/* Plus / Add SVG Icon */}
+            <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+            </svg>
+            <span>Magdagdag ng Tenant</span>
           </button>
         </div>
       </div>

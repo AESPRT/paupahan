@@ -27,16 +27,25 @@ export function UnitCard({ unit, onOpenAddRoom }: UnitCardProps) {
           <h3 className="font-display text-lg font-bold text-forest-deep">
             {unit.name}
           </h3>
-          <p className="text-xs text-muted flex items-center gap-1 mt-0.5">
-            <span>📍</span> {unit.address}
-          </p>
+          {/* Location / Address with Pin SVG Icon */}
+          <div className="flex items-center gap-1.5 text-xs text-muted mt-0.5">
+            <svg className="h-3.5 w-3.5 shrink-0 text-muted/70" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+            <span>{unit.address}</span>
+          </div>
         </div>
 
         <button
           onClick={() => onOpenAddRoom(unit)}
           className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-forest/30 bg-forest/5 px-3.5 py-2 font-mono-brand text-xs font-bold text-forest hover:bg-forest hover:text-white transition-all self-start sm:self-auto"
         >
-          <span>+</span> Magdagdag ng Kwarto
+          {/* Plus / Add SVG Icon */}
+          <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+          </svg>
+          <span>Magdagdag ng Kwarto</span>
         </button>
       </div>
 
@@ -71,9 +80,19 @@ export function UnitCard({ unit, onOpenAddRoom }: UnitCardProps) {
                 </div>
 
                 <div className="flex items-center justify-between text-xs pt-1 border-t border-line/40">
-                  <span className="text-muted text-[11px]">
-                    {room.tenantName ? `👤 ${room.tenantName}` : "Walang Tenant"}
-                  </span>
+                  <div className="flex items-center gap-1.5 text-muted text-[11px]">
+                    {room.tenantName ? (
+                      <>
+                        {/* User SVG Icon */}
+                        <svg className="h-3.5 w-3.5 shrink-0 text-muted/70" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                        </svg>
+                        <span>{room.tenantName}</span>
+                      </>
+                    ) : (
+                      <span>Walang Tenant</span>
+                    )}
+                  </div>
                   <span className="font-bold text-forest-deep">
                     ₱{room.monthlyRent.toLocaleString()}/mo
                   </span>
