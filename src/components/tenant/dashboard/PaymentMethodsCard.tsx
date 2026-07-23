@@ -1,6 +1,6 @@
 "use client";
 
-import { TenantDashboardData } from "@/src/types/tenant-dashboard";
+import { TenantDashboardData } from "@/src/types/tenant/tenant-dashboard";
 
 interface PaymentMethodsCardProps {
   payments: TenantDashboardData["landlordPayments"];

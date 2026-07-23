@@ -20,7 +20,7 @@ export function UnitsHeader({
         <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-marigold/20 blur-2xl" />
         <div className="pointer-events-none absolute -bottom-10 right-20 h-32 w-32 rounded-full bg-coral/20 blur-xl" />
 
-        <div className="relative z-10 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="relative z-10 flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <div className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-marigold backdrop-blur-md">
               {/* Building / Property Management SVG Icon */}
@@ -37,16 +37,19 @@ export function UnitsHeader({
             </p>
           </div>
 
-          <button
-            onClick={onAddUnit}
-            className="inline-flex shrink-0 items-center gap-2 rounded-full bg-coral px-5 py-3 font-mono-brand text-xs font-bold text-white shadow-md transition-all hover:-translate-y-0.5 hover:bg-coral-deep active:translate-y-0"
-          >
-            {/* Plus / Add SVG Icon */}
-            <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
-            </svg>
-            <span>Bagong Unit</span>
-          </button>
+          {/* Button Container (Full width sa mobile, nakasentro ang icon at text sa loob) */}
+          <div className="flex w-full sm:w-auto sm:justify-end">
+            <button
+              onClick={onAddUnit}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-coral px-5 py-3 font-mono-brand text-xs font-bold text-white shadow-md transition-all hover:-translate-y-0.5 hover:bg-coral-deep active:translate-y-0 sm:w-auto"
+            >
+              {/* Plus / Add SVG Icon */}
+              <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+              </svg>
+              <span>Bagong Unit</span>
+            </button>
+          </div>
         </div>
       </div>
 

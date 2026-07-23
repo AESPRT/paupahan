@@ -1,4 +1,4 @@
-import { UtilityRate } from "@/src/types/tenant-utilities";
+import { UtilityRate } from "@/src/types/tenant/tenant-utilities";
 
 interface UtilityRateCardProps {
   rate: UtilityRate;

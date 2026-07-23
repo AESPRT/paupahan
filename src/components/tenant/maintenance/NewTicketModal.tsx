@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { MaintenanceCategory, MaintenancePriority, MaintenanceTicket } from "@/src/types/tenant-maintenance";
+import { MaintenanceCategory, MaintenancePriority, MaintenanceTicket } from "@/src/types/tenant/tenant-maintenance";
 
 interface NewTicketModalProps {
   isOpen: boolean;

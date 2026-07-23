@@ -2,116 +2,7 @@
 
 import { useState } from "react";
 import { Button } from "./Button";
-
-const PLANS = [
-  {
-    tag: "Libre",
-    name: "Panimula",
-    tagline: "Para sa gustong subukan muna",
-    price: "₱0",
-    per: "/buwan",
-    note: "Libre habambuhay, walang credit card",
-    perks: [
-      "Hanggang 2 units na may 3-5 rooms bawat unit",
-      "Pwedeng mag rehistro ng tenant",
-      "Manual na record ng bayad",
-      "Email notifications",
-    ],
-    missing: [
-      "Auto-billing",
-      "SMS reminders",
-      "Analytics dashboard",
-    ],
-    featured: false,
-    free: true,
-    badge: null,
-    cta: "Magsimula nang Libre",
-    ctaVariant: "ghost" as const,
-  },
-  {
-    tag: "Basic",
-    name: "Bahay-Upa",
-    tagline: "Para sa baguhang may-ari",
-    price: "₱199",
-    per: "/buwan",
-    note: "Perpekto para sa 1–5 units na",
-    perks: [
-      "Hanggang 5 units na may 5-10 rooms bawat unit",
-      "Auto-billing bawat buwan",
-      "Email at SMS reminders",
-      "Basic analytics dashboard",
-    ],
-    missing: [],
-    featured: false,
-    free: false,
-    badge: null,
-    cta: "Piliin ang Bahay-Upa",
-    ctaVariant: "ghost" as const,
-  },
-  {
-    tag: "Premium",
-    name: "Maalam",
-    tagline: "Para sa lumalago na negosyo",
-    price: "₱399",
-    per: "/buwan",
-    note: "Pinakasikat sa mga aktibong may-ari",
-    perks: [
-      "Hanggang 20 units na may 10-15 rooms bawat unit",
-      "Auto-billing at reminders",
-      "Email, SMS, at in-app notifications",
-      "Full analytics + revenue trends",
-      "Booking requests module",
-    ],
-    missing: [],
-    featured: true,
-    free: false,
-    badge: "Pinaka-sikat",
-    cta: "Piliin ang Maalam",
-    ctaVariant: "primary" as const,
-  },
-  {
-    tag: "Business",
-    name: "Negosyante",
-    tagline: "Para sa malaking portfolio",
-    price: "₱799",
-    per: "/buwan",
-    note: "Para sa 50+ units na portfolio",
-    perks: [
-      "Hanggang 50 units na may 15-20 rooms bawat unit",
-      "Lahat ng nasa Maalam",
-      "Maintenance request tracking",
-      "Booking + turnover management",
-      "Priority support",
-    ],
-    missing: [],
-    featured: false,
-    free: false,
-    badge: null,
-    cta: "Piliin ang Negosyante",
-    ctaVariant: "ghost" as const,
-  },
-  {
-    tag: "Custom",
-    name: "Ayon sa'yo",
-    tagline: "Para sa enterprise at developer",
-    price: "Custom",
-    per: "",
-    note: "Unlimited — sariling setup ang tawag",
-    perks: [
-      "Unlimited units",
-      "Lahat ng nasa Negosyante",
-      "Custom integrations at API access",
-      "Dedicated account manager",
-      "SLA at advanced security",
-    ],
-    missing: [],
-    featured: false,
-    free: false,
-    badge: null,
-    cta: "Makipag-usap sa Amin",
-    ctaVariant: "ghost" as const,
-  },
-];
+import { PLANS } from "@/src/data/subscription";
 
 /** Single decorative circle on left and right edge of each card — ticket stub style */
 function CardDots({ featured, free }: { featured: boolean; free: boolean }) {
@@ -160,26 +51,27 @@ export function Pricing() {
           {PLANS.map((plan, i) => {
             // Hide 4th & 5th cards on desktop (lg:) unless showAll is true
             const isHiddenOnDesktop = !showAll && i >= 3;
+            const isFree = plan.priceMonthly === 0 && plan.priceDisplay === "₱0";
 
             return (
               <div
                 key={plan.name}
                 className={`relative flex flex-col rounded-2xl border-[1.5px] p-5 pb-6 sm:p-[22px] sm:pb-6 ${
-                  isHiddenOnDesktop ? "flex lg:hidden" : "flex"
+                  isHiddenOnDesktop ? "hidden lg:hidden" : "flex"
                 } ${
-                  plan.featured
+                  plan.isPopular
                     ? "border-forest bg-forest text-white shadow-[0_20px_44px_rgba(31,75,63,0.30)] lg:-translate-y-2"
-                    : plan.free
+                    : isFree
                     ? "border-dashed border-line bg-paper-card/60 shadow-none"
                     : "border-line bg-paper-card shadow-[0_8px_24px_rgba(27,58,52,0.08)]"
                 }`}
               >
                 {/* Decorative dots */}
-                <CardDots featured={plan.featured} free={plan.free} />
+                <CardDots featured={plan.isPopular ?? false} free={isFree} />
 
                 {/* Badge */}
                 {plan.badge && (
-                  <span className="absolute -top-0 left-1/2 -translate-x-1/2 rounded-b-full bg-marigold px-3 py-1 font-mono-brand text-[10.5px] font-semibold uppercase tracking-[0.05em] text-forest-deep">
+                  <span className="absolute -top-0 left-1/2 -translate-x-1/2 rounded-b-full bg-marigold px-3 py-1 font-mono-brand text-[10.5px] font-semibold uppercase tracking-[0.05em] text-forest-deep shadow-sm">
                     {plan.badge}
                   </span>
                 )}
@@ -187,9 +79,9 @@ export function Pricing() {
                 {/* Tag + Name */}
                 <div
                   className={`mt-4 font-mono-brand text-[11px] uppercase tracking-[0.09em] ${
-                    plan.featured
+                    plan.isPopular
                       ? "text-marigold"
-                      : plan.free
+                      : isFree
                       ? "text-muted"
                       : "text-coral-deep"
                   }`}
@@ -198,14 +90,14 @@ export function Pricing() {
                 </div>
                 <div
                   className={`mt-1 font-display text-[20px] font-bold leading-tight ${
-                    plan.featured ? "text-white" : "text-forest-deep"
+                    plan.isPopular ? "text-white" : "text-forest-deep"
                   }`}
                 >
                   {plan.name}
                 </div>
                 <div
                   className={`mt-1 text-[12.5px] leading-snug ${
-                    plan.featured ? "text-white/65" : "text-muted"
+                    plan.isPopular ? "text-white/65" : "text-muted"
                   }`}
                 >
                   {plan.tagline}
@@ -215,19 +107,19 @@ export function Pricing() {
                 <div className="mt-4 flex items-baseline gap-1 font-mono-brand">
                   <span
                     className={`text-[32px] font-semibold leading-none ${
-                      plan.featured
+                      plan.isPopular
                         ? "text-white"
-                        : plan.free
+                        : isFree
                         ? "text-forest"
                         : "text-forest-deep"
                     }`}
                   >
-                    {plan.price}
+                    {plan.priceDisplay}
                   </span>
                   {plan.per && (
                     <span
                       className={`text-[13px] ${
-                        plan.featured ? "text-white/60" : "text-muted"
+                        plan.isPopular ? "text-white/60" : "text-muted"
                       }`}
                     >
                       {plan.per}
@@ -236,9 +128,9 @@ export function Pricing() {
                 </div>
                 <div
                   className={`mt-1.5 text-[12px] font-semibold ${
-                    plan.featured
+                    plan.isPopular
                       ? "text-marigold/90"
-                      : plan.free
+                      : isFree
                       ? "text-muted"
                       : "text-coral-deep"
                   }`}
@@ -249,19 +141,19 @@ export function Pricing() {
                 {/* Feature list */}
                 <ul
                   className={`mt-4 mb-5 flex flex-1 flex-col gap-2 border-t-[1.5px] border-dashed pt-4 ${
-                    plan.featured ? "border-white/20" : "border-line"
+                    plan.isPopular ? "border-white/20" : "border-line"
                   }`}
                 >
-                  {plan.perks.map((perk) => (
+                  {plan.features.map((perk) => (
                     <li
                       key={perk}
                       className={`flex gap-2 text-[13px] leading-snug ${
-                        plan.featured ? "text-white/85" : "text-ink"
+                        plan.isPopular ? "text-white/85" : "text-ink"
                       }`}
                     >
                       <span
                         className={`shrink-0 font-bold ${
-                          plan.featured ? "text-marigold" : "text-forest"
+                          plan.isPopular ? "text-marigold" : "text-forest"
                         }`}
                       >
                         ✓
@@ -269,7 +161,7 @@ export function Pricing() {
                       {perk}
                     </li>
                   ))}
-                  {plan.missing.map((miss) => (
+                  {plan.missing && plan.missing.map((miss) => (
                     <li
                       key={miss}
                       className="flex gap-2 text-[13px] leading-snug text-muted/60 line-through"
@@ -282,12 +174,12 @@ export function Pricing() {
 
                 <Button
                   href="/admin/register"
-                  variant={plan.featured ? "primary" : "ghost"}
+                  variant={plan.isPopular ? "primary" : "ghost"}
                   block
                   className={
-                    plan.featured
+                    plan.isPopular
                       ? "!bg-white !text-coral-deep !shadow-none"
-                      : plan.free
+                      : isFree
                       ? "!border-line !text-muted hover:!bg-forest/[0.04]"
                       : ""
                   }

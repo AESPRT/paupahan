@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { PropertySettings } from "@/src/types/settings";
+import { PropertySettings } from "@/src/types/admin/settings";
 
 interface PropertySettingsProps {
   initialData: PropertySettings;
@@ -12,7 +12,7 @@ export function PropertySettingsForm({ initialData, onSave }: PropertySettingsPr
   const [formData, setFormData] = useState<PropertySettings>(initialData);
   const [saved, setSaved] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.SubmitEvent) => {
     e.preventDefault();
     onSave(formData);
     setSaved(true);

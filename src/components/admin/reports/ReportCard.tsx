@@ -1,6 +1,6 @@
 "use client";
 
-import { ReportCategory, ExportFormat } from "@/src/types/report";
+import { ReportCategory, ExportFormat } from "@/src/types/admin/report";
 
 interface ReportCardProps {
   report: ReportCategory;
@@ -13,8 +13,10 @@ export function ReportCard({ report, onDownload }: ReportCardProps) {
       <div>
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-3">
-            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-paper text-2xl border border-line/60">
-              {report.icon}
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-paper text-forest-deep border border-line/60">
+              <svg className="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
             </span>
             <div>
               <h3 className="font-display text-base font-bold text-forest-deep">
@@ -41,23 +43,32 @@ export function ReportCard({ report, onDownload }: ReportCardProps) {
         <div className="grid grid-cols-3 gap-2">
           <button
             onClick={() => onDownload(report.id, "pdf")}
-            className="flex items-center justify-center gap-1 rounded-xl border border-coral/30 bg-coral/10 py-2 font-mono-brand text-[11px] font-bold text-coral-deep transition-all hover:bg-coral hover:text-white active:scale-95"
+            className="flex items-center justify-center gap-1.5 rounded-xl border border-coral/30 bg-coral/10 py-2 font-mono-brand text-[11px] font-bold text-coral-deep transition-all hover:bg-coral hover:text-white active:scale-95"
           >
-            <span>📄</span> PDF
+            <svg className="h-3.5 w-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+            </svg>
+            <span>PDF</span>
           </button>
 
           <button
             onClick={() => onDownload(report.id, "docs")}
-            className="flex items-center justify-center gap-1 rounded-xl border border-blue-200 bg-blue-50 py-2 font-mono-brand text-[11px] font-bold text-blue-700 transition-all hover:bg-blue-600 hover:text-white active:scale-95"
+            className="flex items-center justify-center gap-1.5 rounded-xl border border-blue-200 bg-blue-50 py-2 font-mono-brand text-[11px] font-bold text-blue-700 transition-all hover:bg-blue-600 hover:text-white active:scale-95"
           >
-            <span>📝</span> DOCS
+            <svg className="h-3.5 w-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+            </svg>
+            <span>DOCS</span>
           </button>
 
           <button
             onClick={() => onDownload(report.id, "csv")}
-            className="flex items-center justify-center gap-1 rounded-xl border border-emerald-200 bg-emerald-50 py-2 font-mono-brand text-[11px] font-bold text-emerald-700 transition-all hover:bg-emerald-600 hover:text-white active:scale-95"
+            className="flex items-center justify-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 py-2 font-mono-brand text-[11px] font-bold text-emerald-700 transition-all hover:bg-emerald-600 hover:text-white active:scale-95"
           >
-            <span>📊</span> CSV
+            <svg className="h-3.5 w-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3v18h18M9 17V9m4 8V5m4 12v-4" />
+            </svg>
+            <span>CSV</span>
           </button>
         </div>
       </div>

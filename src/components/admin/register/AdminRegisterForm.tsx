@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Input } from "@/src/components/ui/Input";
+import { registerLandlord } from "@/src/actions/landlord-actions";
 
 export function AdminRegisterForm() {
   const router = useRouter();
@@ -28,7 +29,7 @@ export function AdminRegisterForm() {
     }));
   };
 
-  const handleSubmit = (e: React.SubmitEvent<HTMLFormElement>) => {
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setErrorMessage("");
 
@@ -48,11 +49,23 @@ export function AdminRegisterForm() {
     }
 
     startTransition(async () => {
-      // Simulating registration logic
-      await new Promise((resolve) => setTimeout(resolve, 800));
+      const data = new FormData();
+      data.append("fullName", formData.fullName);
+      data.append("propertyName", formData.propertyName);
+      data.append("email", formData.email);
+      data.append("phone", formData.phone);
+      data.append("password", formData.password);
 
-      // Redirect to admin dashboard on successful registration
-      router.push("/admin/dashboard");
+      const result = await registerLandlord(data);
+
+      if (!result.success) {
+        setErrorMessage(result.message);
+        return;
+      }
+
+      // I-refresh ang router para masigurong nabasa ang bagong cookie, pagkatapos ay i-redirect sa dashboard
+      router.refresh();
+      router.push("/admin/dashboard/home");
     });
   };
 
@@ -156,7 +169,7 @@ export function AdminRegisterForm() {
       <button
         type="submit"
         disabled={isPending}
-        className="mt-3 flex w-full items-center justify-center rounded-full bg-coral px-6 py-3.5 font-bold text-white shadow-[0_8px_20px_rgba(225,91,78,0.35)] transition-all hover:-translate-y-0.5 hover:shadow-[0_12px_26px_rgba(225,91,78,0.42)] active:translate-y-0 disabled:opacity-70 disabled:hover:translate-y-0"
+        className="mt-3 flex w-full items-center justify-center rounded-full bg-coral px-6 py-3.5 font-bold text-white shadow-[0_8px_20px_rgba(225,91,78,0.35)] transition-all hover:-translate-y-0.5 hover:shadow-[0_12px_26px_rgba(225,91,78,0.42)] active:translate-y-0 disabled:opacity-70 disabled:hover:translate-y-0 cursor-pointer"
       >
         {isPending ? (
           <span className="inline-flex items-center gap-2">

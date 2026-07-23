@@ -24,9 +24,11 @@ export function BillingSettings() {
 
         <div className="flex items-center justify-between rounded-2xl border border-line/80 bg-paper p-4">
           <div className="flex items-center gap-3">
-            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-100 text-xl font-bold text-blue-600">
-              📱
-            </span>
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-100 text-blue-600">
+              <svg className="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+              </svg>
+            </div>
             <div>
               <h4 className="font-bold text-forest-deep text-xs sm:text-sm">GCash Auto-Debit</h4>
               <p className="text-[11px] text-muted font-mono-brand">•••• •••• 0917</p>
@@ -63,7 +65,12 @@ export function BillingSettings() {
                 <span className="font-mono-brand font-bold text-forest-deep">
                   ₱{item.amount.toLocaleString()}
                 </span>
-                <span className="block text-[10px] font-bold text-forest">✓ {item.status}</span>
+                <div className="flex items-center justify-end gap-1 text-[10px] font-bold text-forest mt-0.5">
+                  <svg className="h-3 w-3 shrink-0 text-forest" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                  </svg>
+                  <span>{item.status}</span>
+                </div>
               </div>
             </div>
           ))}

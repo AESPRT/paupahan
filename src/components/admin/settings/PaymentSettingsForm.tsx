@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { PaymentGatewaySettings } from "@/src/types/settings";
+import { PaymentGatewaySettings } from "@/src/types/admin/settings";
 
 interface PaymentSettingsProps {
   initialData: PaymentGatewaySettings;
@@ -12,7 +12,7 @@ export function PaymentSettingsForm({ initialData, onSave }: PaymentSettingsProp
   const [formData, setFormData] = useState<PaymentGatewaySettings>(initialData);
   const [saved, setSaved] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.SubmitEvent) => {
     e.preventDefault();
     onSave(formData);
     setSaved(true);
@@ -33,7 +33,12 @@ export function PaymentSettingsForm({ initialData, onSave }: PaymentSettingsProp
       {/* GCash Section */}
       <div className="space-y-3 rounded-2xl border border-line/80 bg-paper p-4">
         <div className="flex items-center justify-between">
-          <span className="font-display text-xs font-bold text-blue-600">📱 GCash Payment</span>
+          <div className="flex items-center gap-2">
+            <svg className="h-4 w-4 shrink-0 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+            </svg>
+            <span className="font-display text-xs font-bold text-blue-600">GCash Payment</span>
+          </div>
           <label className="relative inline-flex items-center cursor-pointer">
             <input
               type="checkbox"
@@ -68,7 +73,12 @@ export function PaymentSettingsForm({ initialData, onSave }: PaymentSettingsProp
       {/* Maya Section */}
       <div className="space-y-3 rounded-2xl border border-line/80 bg-paper p-4">
         <div className="flex items-center justify-between">
-          <span className="font-display text-xs font-bold text-emerald-600">💚 Maya Payment</span>
+          <div className="flex items-center gap-2">
+            <svg className="h-4 w-4 shrink-0 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+            <span className="font-display text-xs font-bold text-emerald-600">Maya Payment</span>
+          </div>
           <label className="relative inline-flex items-center cursor-pointer">
             <input
               type="checkbox"
@@ -103,7 +113,12 @@ export function PaymentSettingsForm({ initialData, onSave }: PaymentSettingsProp
       {/* Bank Transfer Section */}
       <div className="space-y-3 rounded-2xl border border-line/80 bg-paper p-4">
         <div className="flex items-center justify-between">
-          <span className="font-display text-xs font-bold text-forest-deep">🏦 Bank Transfer</span>
+          <div className="flex items-center gap-2">
+            <svg className="h-4 w-4 shrink-0 text-forest-deep" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 14v3m4-3v3m4-3v3M3 21h18M3 10h18M3 7l9-4 9 4M4 10h16v11H4V10z" />
+            </svg>
+            <span className="font-display text-xs font-bold text-forest-deep">Bank Transfer</span>
+          </div>
           <label className="relative inline-flex items-center cursor-pointer">
             <input
               type="checkbox"
@@ -144,7 +159,12 @@ export function PaymentSettingsForm({ initialData, onSave }: PaymentSettingsProp
 
       <div className="flex items-center justify-between border-t border-line/60 pt-4">
         {saved ? (
-          <span className="text-xs font-bold text-forest">✓ Naitabi na ang payment channels!</span>
+          <span className="inline-flex items-center gap-1.5 text-xs font-bold text-forest">
+            <svg className="h-4 w-4 shrink-0 text-forest" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+            Naitabi na ang payment channels!
+          </span>
         ) : <div />}
         <button
           type="submit"

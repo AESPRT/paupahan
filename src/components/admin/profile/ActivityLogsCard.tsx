@@ -1,6 +1,6 @@
 "use client";
 
-import { ActivityLog } from "@/src/types/profile";
+import { ActivityLog } from "@/src/types/admin/profile";
 
 interface ActivityLogsCardProps {
   logs: ActivityLog[];

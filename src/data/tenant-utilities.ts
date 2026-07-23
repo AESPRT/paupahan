@@ -1,4 +1,4 @@
-import { TenantUtilitiesData } from "@/src/types/tenant-utilities";
+import { TenantUtilitiesData } from "@/src/types/tenant/tenant-utilities";
 
 export const MOCK_UTILITIES_DATA: TenantUtilitiesData = {
   rates: [

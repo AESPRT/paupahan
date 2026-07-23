@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { RoomUtilityBill, UtilityType } from "@/src/types/utility";
+import { RoomUtilityBill, UtilityType } from "@/src/types/admin/utility";
 
 interface AssignBillModalProps {
   isOpen: boolean;
@@ -52,9 +52,12 @@ export function AssignBillModal({
           </h2>
           <button
             onClick={onClose}
-            className="rounded-full p-1 text-muted hover:bg-paper hover:text-ink"
+            className="flex h-8 w-8 items-center justify-center rounded-full text-muted transition-colors hover:bg-paper hover:text-ink"
+            aria-label="Close modal"
           >
-            ✕
+            <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
           </button>
         </div>
 
@@ -115,10 +118,10 @@ export function AssignBillModal({
                 onChange={(e) => setType(e.target.value as UtilityType)}
                 className="w-full rounded-xl border border-line bg-paper px-3 py-2 text-xs font-medium text-ink outline-none"
               >
-                <option value="electricity">⚡ Kuryente</option>
-                <option value="water">💧 Tubig</option>
-                <option value="internet">🌐 Internet</option>
-                <option value="amenities">🧹 Amenities</option>
+                <option value="electricity">Kuryente</option>
+                <option value="water">Tubig</option>
+                <option value="internet">Internet</option>
+                <option value="amenities">Amenities</option>
               </select>
             </div>
 

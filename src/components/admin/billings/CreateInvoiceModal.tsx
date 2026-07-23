@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Invoice } from "@/src/types/billing";
+import { Invoice } from "@/src/types/admin/billing";
 
 interface CreateInvoiceModalProps {
   isOpen: boolean;

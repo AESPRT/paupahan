@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Room } from "@/src/types/unit";
+import { Room } from "@/src/types/admin/unit";
 
 interface AddRoomModalProps {
   isOpen: boolean;

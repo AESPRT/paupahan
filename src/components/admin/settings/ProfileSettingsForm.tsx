@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ProfileSettings } from "@/src/types/settings";
+import { ProfileSettings } from "@/src/types/admin/settings";
 
 interface ProfileSettingsProps {
   initialData: ProfileSettings;
@@ -12,7 +12,7 @@ export function ProfileSettingsForm({ initialData, onSave }: ProfileSettingsProp
   const [formData, setFormData] = useState<ProfileSettings>(initialData);
   const [saved, setSaved] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.SubmitEvent) => {
     e.preventDefault();
     onSave(formData);
     setSaved(true);

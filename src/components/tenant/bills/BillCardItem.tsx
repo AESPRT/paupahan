@@ -1,4 +1,4 @@
-import { TenantBill } from "@/src/types/tenant-bill";
+import { TenantBill } from "@/src/types/tenant/tenant-bill";
 
 interface BillCardItemProps {
   bill: TenantBill;

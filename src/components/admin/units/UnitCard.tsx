@@ -1,6 +1,6 @@
 "use client";
 
-import { Unit, Room } from "@/src/types/unit";
+import { Unit, Room } from "@/src/types/admin/unit";
 
 interface UnitCardProps {
   unit: Unit;

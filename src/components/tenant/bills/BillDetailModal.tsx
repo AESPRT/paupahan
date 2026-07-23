@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { TenantBill } from "@/src/types/tenant-bill";
+import { TenantBill } from "@/src/types/tenant/tenant-bill";
 import { ReadingUploadModal } from "./ReadingUploadModal";
 
 interface BillDetailModalProps {

@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { DASHBOARD_NAV_ITEMS } from "./nav-data";
 import { NavRailItem } from "./NavRailItem";
-import { PaupahanLogo } from "../../ui/PaupahanLogo";
+import { PaupahanLogo } from "@/src/components/ui/PaupahanLogo";
 
 export function NavRail() {
   const [isOpen, setIsOpen] = useState(false);
@@ -16,7 +16,7 @@ export function NavRail() {
       {/* ---------------------------------------------------- */}
       <header className="sticky top-0 z-40 flex h-16 w-full items-center justify-between border-b border-line bg-paper-card px-4 shadow-sm md:hidden">
         <Link
-          href="/admin/dashboard"
+          href="/admin/dashboard/home"
           className="flex items-center gap-2.5 font-display text-lg font-bold text-forest-deep"
         >
           <PaupahanLogo size={38}/>
@@ -56,7 +56,7 @@ export function NavRail() {
             {/* Drawer Header (Fixed) */}
             <div className="flex items-center justify-between border-b border-line pb-4">
               <Link
-                href="/admin/dashboard"
+                href="/admin/dashboard/home"
                 onClick={() => setIsOpen(false)}
                 className="flex items-center gap-2.5 font-display text-lg font-bold text-forest-deep"
               >
@@ -89,7 +89,7 @@ export function NavRail() {
             {/* Drawer Footer (Fixed) */}
             <div className="border-t border-line pt-4">
               <Link
-                href="/admin/profile"
+                href="/admin/dashboard/profile"
                 onClick={() => setIsOpen(false)}
                 className="flex items-center gap-3 rounded-xl p-2 transition-colors hover:bg-paper"
               >
@@ -113,7 +113,7 @@ export function NavRail() {
         {/* Top Logo (Fixed) */}
         <div className="flex shrink-0 flex-col items-center gap-3">
           <Link
-            href="/admin/dashboard"
+            href="/admin/dashboard/home"
             className="flex items-center gap-2.5 font-display text-lg font-bold text-forest-deep"
           >
             <PaupahanLogo size={42}/>
@@ -133,7 +133,7 @@ export function NavRail() {
         <div className="flex shrink-0 flex-col items-center gap-3">
           <div className="h-[1px] w-8 bg-line" />
           <Link
-            href="/admin/profile"
+            href="/admin/dashboard/profile"
             className="group relative flex h-10 w-10 items-center justify-center rounded-full border-2 border-forest/30 bg-coral/10 font-mono-brand text-xs font-bold text-coral-deep shadow-sm transition-all hover:scale-105 hover:border-coral"
           >
             JD

@@ -1,4 +1,4 @@
-import { MaintenanceTicket } from "@/src/types/tenant-maintenance";
+import { MaintenanceTicket } from "@/src/types/tenant/tenant-maintenance";
 
 interface TicketCardProps {
   ticket: MaintenanceTicket;

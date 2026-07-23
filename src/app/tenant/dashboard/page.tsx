@@ -5,7 +5,7 @@ import { BillingSummaryCards } from "@/src/components/tenant/dashboard/BillingSu
 import { UtilityUsageCard } from "@/src/components/tenant/dashboard/UtilityUsageCard";
 import { ActiveMaintenanceCard } from "@/src/components/tenant/dashboard/ActiveMaintenanceCard";
 import { PaymentMethodsCard } from "@/src/components/tenant/dashboard/PaymentMethodsCard";
-import { TenantDashboardData } from "@/src/types/tenant-dashboard";
+import { TenantDashboardData } from "@/src/types/tenant/tenant-dashboard";
 import { Footer } from "@/src/components/landing/Footer";
 
 const MOCK_TENANT_DATA: TenantDashboardData = {

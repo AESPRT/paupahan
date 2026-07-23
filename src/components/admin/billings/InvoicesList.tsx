@@ -1,6 +1,6 @@
 "use client";
 
-import { Invoice } from "@/src/types/billing";
+import { Invoice } from "@/src/types/admin/billing";
 
 interface InvoicesListProps {
   invoices: Invoice[];
@@ -42,8 +42,11 @@ export function InvoicesList({
                     <div className="mt-1 font-display text-[15px] font-bold text-forest-deep">
                       {inv.unitRoom}
                     </div>
-                    <div className="text-[12px] font-medium text-muted">
-                      👤 {inv.tenantName}
+                    <div className="flex items-center gap-1.5 text-[12px] font-medium text-muted mt-0.5">
+                      <svg className="h-3.5 w-3.5 shrink-0 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                      </svg>
+                      <span>{inv.tenantName}</span>
                     </div>
                   </div>
                   <div className="font-mono-brand text-[10px] font-bold text-muted text-right">
@@ -79,13 +82,13 @@ export function InvoicesList({
               {/* Dynamic Animated Stamp Badge */}
               {isPaid && (
                 <div className="stamp-anim pointer-events-none absolute right-[10px] top-[35%] rotate-[-8deg] rounded-[10px] border-[3px] border-coral bg-paper-card/95 px-3 py-1 font-display text-[16px] font-extrabold tracking-wide text-coral shadow-sm sm:text-[18px]">
-                  BAYAD NA
+                  BAYAD NA!
                 </div>
               )}
 
               {isOverdue && (
-                <div className="stamp-anim pointer-events-none absolute right-[10px] top-[35%] rotate-[6deg] rounded-[10px] border-[3px] border-coral-deep bg-coral-deep/10 px-3 py-1 font-display text-[15px] font-extrabold tracking-wide text-coral-deep shadow-sm sm:text-[17px]">
-                  OVERDUE
+                <div className="stamp-anim pointer-events-none absolute right-[10px] top-[35%] rotate-[6deg] rounded-[10px] border-[3px] border-coral bg-paper-card/95 px-3 py-1 font-display text-[15px] font-extrabold tracking-wide text-coral-deep shadow-sm sm:text-[17px]">
+                  OVERDUE!
                 </div>
               )}
 
@@ -95,9 +98,12 @@ export function InvoicesList({
                   <div className="grid grid-cols-2 gap-2">
                     <button
                       onClick={() => onSendReminder(inv)}
-                      className="rounded-xl border border-line bg-paper py-2 font-mono-brand text-[11px] font-bold text-forest-deep transition-colors hover:bg-line/40 active:scale-95"
+                      className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-line bg-paper py-2 font-mono-brand text-[11px] font-bold text-forest-deep transition-colors hover:bg-line/40 active:scale-95"
                     >
-                      🔔 I-remind
+                      <svg className="h-3.5 w-3.5 shrink-0 text-marigold" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                      </svg>
+                      <span>I-remind</span>
                     </button>
                     <button
                       onClick={() => onMarkAsPaid(inv.id)}
@@ -108,7 +114,10 @@ export function InvoicesList({
                   </div>
                 ) : (
                   <div className="flex items-center justify-center gap-1.5 text-center font-mono-brand text-[11px] font-bold text-forest">
-                    <span>✓</span> Kumpleto na ang bayad
+                    <svg className="h-4 w-4 shrink-0 text-forest" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span>Kumpleto na ang bayad</span>
                   </div>
                 )}
               </div>

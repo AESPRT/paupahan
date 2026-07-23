@@ -2,7 +2,7 @@
 
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
-import { NavItem } from "@/src/types/navigation";
+import { NavItem } from "@/src/types/admin/navigation";
 
 // SVG Icons Definition (Inline SVGs for performance and zero external dependencies)
 const Icons = {

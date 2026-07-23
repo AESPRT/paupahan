@@ -2,12 +2,10 @@
 
 interface DashboardHeaderProps {
   adminName?: string;
-  onAddAction?: () => void;
 }
 
 export function DashboardHeader({
   adminName = "Admin",
-  onAddAction,
 }: DashboardHeaderProps) {
   return (
     <div className="relative overflow-hidden rounded-3xl border border-forest/20 bg-gradient-to-r from-forest via-forest-deep to-forest p-6 text-white shadow-[0_10px_30px_rgba(31,75,63,0.18)] sm:p-8">
@@ -43,20 +41,6 @@ export function DashboardHeader({
           <p className="max-w-xl text-xs font-medium text-white/80 sm:text-sm">
             Narito ang buod at status ng iyong mga paupahan, koleksyon, at pending approvals ngayong araw.
           </p>
-        </div>
-
-        {/* Action Button Section */}
-        <div className="shrink-0">
-          <button
-            onClick={onAddAction}
-            className="inline-flex items-center gap-2 rounded-full bg-coral px-5 py-3 font-mono-brand text-xs font-bold text-white shadow-[0_6px_20px_rgba(225,91,78,0.4)] transition-all hover:-translate-y-0.5 hover:bg-coral-deep hover:shadow-[0_8px_25px_rgba(225,91,78,0.5)] active:translate-y-0"
-          >
-            {/* Plus / Add SVG Icon */}
-            <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
-            </svg>
-            <span>Bagong Tenant / Room</span>
-          </button>
         </div>
       </div>
     </div>

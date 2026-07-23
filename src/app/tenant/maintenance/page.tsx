@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { MaintenanceTicket } from "@/src/types/tenant-maintenance";
+import { MaintenanceTicket } from "@/src/types/tenant/tenant-maintenance";
 import { MOCK_MAINTENANCE_TICKETS } from "@/src/data/tenant-maintenance";
 import { MaintenanceHeader } from "@/src/components/tenant/maintenance/MaintenanceHeader";
 import { TicketCard } from "@/src/components/tenant/maintenance/TicketCard";

@@ -1,4 +1,4 @@
-import { MaintenanceTicket } from "@/src/types/tenant-maintenance";
+import { MaintenanceTicket } from "@/src/types/tenant/tenant-maintenance";
 
 export const MOCK_MAINTENANCE_TICKETS: MaintenanceTicket[] = [
   {

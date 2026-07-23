@@ -32,9 +32,14 @@ export function ExportHistory() {
               </span>
               <span className="text-xs font-bold text-forest-deep">{log.name}</span>
             </div>
-            <span className="font-mono-brand text-[10px] text-muted self-end sm:self-auto">
-              📅 {log.date}
-            </span>
+            
+            {/* Date with SVG Calendar Icon */}
+            <div className="flex items-center gap-1 font-mono-brand text-[10px] text-muted self-end sm:self-auto">
+              <svg className="h-3.5 w-3.5 shrink-0 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              <span>{log.date}</span>
+            </div>
           </div>
         ))}
       </div>

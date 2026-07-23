@@ -1,6 +1,5 @@
 // Paupahan — Prisma schema
-// Mirrors the PostgreSQL design from the implementation plan.
-// Run `npx prisma migrate dev --name init` after setting DATABASE_URL in .env
+// Aligned with frontend/backend TypeScript types
 
 generator client {
   provider = "prisma-client-js"
@@ -8,7 +7,6 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 enum UserRole {
@@ -17,26 +15,24 @@ enum UserRole {
   tenant
 }
 
-enum UnitStatus {
+enum RoomStatus {
   vacant
   occupied
   maintenance
-  reserved
 }
 
 enum LeaseStatus {
   active
-  ended
-  terminated
   pending
+  moving_out
+  inactive
 }
 
 enum BillStatus {
+  draft
   pending
-  partial
   paid
   overdue
-  void
 }
 
 enum NotificationChannel {
@@ -52,46 +48,75 @@ enum NotificationStatus {
   failed
 }
 
-enum BookingStatus {
-  requested
-  confirmed
-  cancelled
-  completed
-}
-
-enum MaintenanceStatus {
-  open
-  in_progress
-  resolved
-  cancelled
-}
-
 enum MaintenancePriority {
   low
   medium
   high
-  urgent
+  emergency
+}
+
+enum MaintenanceStatus {
+  pending
+  in_progress
+  resolved
+  rejected
+}
+
+enum MaintenanceCategory {
+  plumbing
+  electrical
+  appliance
+  structural
+  others
+}
+
+enum UtilityType {
+  electricity
+  water
+  internet
+  amenities
+}
+
+enum PlanTier {
+  panimula
+  bahay_upa
+  maalam
+  negosyante
+  custom
+}
+
+enum SubscriptionStatus {
+  active
+  past_due
+  trialing
+  canceled
 }
 
 model User {
-  id             String   @id @default(uuid())
-  email          String   @unique
-  passwordHash   String   @map("password_hash")
-  fullName       String   @map("full_name")
-  phone          String?
-  role           UserRole @default(tenant)
-  isActive       Boolean  @default(true) @map("is_active")
-  emailVerified  Boolean  @default(false) @map("email_verified")
-  createdAt      DateTime @default(now()) @map("created_at")
-  updatedAt      DateTime @updatedAt @map("updated_at")
+  id            String   @id @default(uuid())
+  email         String   @unique
+  passwordHash  String   @map("password_hash")
+  fullName      String   @map("full_name")
+  phone         String?
+  role          UserRole @default(tenant)
+  avatarUrl     String?  @map("avatar_url") 
+  isActive      Boolean  @default(true) @map("is_active")
+  emailVerified Boolean  @default(false) @map("email_verified")
+  
+  paymentSettings      Json? @map("payment_settings") 
+  notificationSettings Json? @map("notification_settings") 
 
-  properties        Property[]
-  staffLinks        LandlordStaff[]     @relation("LandlordLinks")
-  staffOf           LandlordStaff[]     @relation("StaffLinks")
-  notifications     Notification[]
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  properties         Property[]
+  staffLinks         LandlordStaff[]      @relation("LandlordLinks")
+  staffOf            LandlordStaff[]      @relation("StaffLinks")
+  notifications      Notification[]
   analyticsSnapshots AnalyticsSnapshot[]
-  auditLogs         AuditLog[]
-  tenant            Tenant?
+  auditLogs          AuditLog[]
+  tenant             Tenant?
+  subscription       Subscription?
 
   @@map("users")
 }
@@ -111,127 +136,145 @@ model LandlordStaff {
 }
 
 model Property {
-  id             String   @id @default(uuid())
-  landlordId     String   @map("landlord_id")
-  name           String
-  addressLine    String   @map("address_line")
-  city           String
-  province       String?
-  postalCode     String?  @map("postal_code")
-  latitude       Decimal? @db.Decimal(10, 7)
-  longitude      Decimal? @db.Decimal(10, 7)
-  propertyType   String   @default("apartment") @map("property_type")
-  amenities      Json     @default("[]")
-  coverPhotoUrl  String?  @map("cover_photo_url")
-  createdAt      DateTime @default(now()) @map("created_at")
-  updatedAt      DateTime @updatedAt @map("updated_at")
+  id               String   @id @default(uuid())
+  landlordId       String   @map("landlord_id")
+  name             String
+  addressLine      String   @map("address_line")
+  city             String
+  province         String?
+  postalCode       String?  @map("postal_code")
+  propertySettings Json?    @map("property_settings")
+  coverPhotoUrl    String?  @map("cover_photo_url")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
 
   landlord           User                @relation(fields: [landlordId], references: [id], onDelete: Cascade)
-  units              Unit[]
+  units              Unit[]              // Mga Building / Floor / Section
   analyticsSnapshots AnalyticsSnapshot[]
 
   @@map("properties")
 }
 
 model Unit {
-  id            String     @id @default(uuid())
-  propertyId    String     @map("property_id")
-  unitNumber    String     @map("unit_number")
-  floor         String?
-  unitType      String?    @map("unit_type")
-  monthlyRent   Decimal    @map("monthly_rent") @db.Decimal(12, 2)
-  maxOccupants  Int        @default(1) @map("max_occupants")
-  status        UnitStatus @default(vacant)
-  amenities     Json       @default("[]")
-  photos        Json       @default("[]")
-  createdAt     DateTime   @default(now()) @map("created_at")
-  updatedAt     DateTime   @updatedAt @map("updated_at")
+  id           String   @id @default(uuid())
+  propertyId   String   @map("property_id")
+  name         String   // Halimbawa: "Building A" o "2nd Floor"
+  description  String?
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
 
-  property             Property             @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  leases               Lease[]
-  bookings             Booking[]
-  maintenanceRequests  MaintenanceRequest[]
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  rooms    Room[]   // Mga kuwarto/pintuan sa loob ng unit na ito
 
-  @@unique([propertyId, unitNumber])
-  @@index([propertyId, status])
   @@map("units")
 }
 
-model Tenant {
-  id                String   @id @default(uuid())
-  userId            String?  @unique @map("user_id")
-  fullName          String   @map("full_name")
-  email             String?
-  phone             String
-  idNumber          String?  @map("id_number")
-  emergencyContact  Json?    @map("emergency_contact")
-  createdAt         DateTime @default(now()) @map("created_at")
-  updatedAt         DateTime @updatedAt @map("updated_at")
+model Room {
+  id           String     @id @default(uuid())
+  unitId       String     @map("unit_id")
+  roomNumber   String     @map("room_number") 
+  status       RoomStatus @default(vacant)
+  monthlyRent  Decimal    @map("monthly_rent") @db.Decimal(12, 2) 
+  maxOccupants Int        @default(1) @map("max_occupants")
+  amenities    Json       @default("[]")
+  photos       Json       @default("[]")
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @updatedAt @map("updated_at")
 
-  user                 User?                 @relation(fields: [userId], references: [id])
-  leases               Lease[]
-  bills                Bill[]
-  payments             Payment[]
-  maintenanceRequests  MaintenanceRequest[]
+  unit                Unit                 @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  leases              Lease[]
+  maintenanceRequests MaintenanceRequest[]
+
+  @@unique([unitId, roomNumber])
+  @@index([unitId, status])
+  @@map("rooms")
+}
+
+model Tenant {
+  id                    String   @id @default(uuid())
+  userId                String?  @unique @map("user_id")
+  loginCode             String   @unique @map("login_code") 
+  fullName              String   @map("full_name") 
+  email                 String?
+  phone                 String?
+  emergencyContactName  String?  @map("emergency_contact_name") 
+  emergencyContactPhone String?  @map("emergency_contact_phone") 
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  user                User?                @relation(fields: [userId], references: [id])
+  leases              Lease[]
+  bills               Bill[]
+  payments            Payment[]
+  maintenanceRequests MaintenanceRequest[]
 
   @@map("tenants")
 }
 
 model Lease {
-  id             String      @id @default(uuid())
-  tenantId       String      @map("tenant_id")
-  unitId         String      @map("unit_id")
-  startDate      DateTime    @map("start_date") @db.Date
-  endDate        DateTime?   @map("end_date") @db.Date
-  monthlyRent    Decimal     @map("monthly_rent") @db.Decimal(12, 2)
-  depositAmount  Decimal     @default(0) @map("deposit_amount") @db.Decimal(12, 2)
-  billingDay     Int         @default(1) @map("billing_day")
-  status         LeaseStatus @default(active)
-  utilityConfig  Json        @default("{}") @map("utility_config")
-  createdAt      DateTime    @default(now()) @map("created_at")
-  updatedAt      DateTime    @updatedAt @map("updated_at")
+  id            String      @id @default(uuid())
+  tenantId      String      @map("tenant_id")
+  roomId        String      @map("room_id")
+  startDate     DateTime    @map("start_date") @db.Date
+  endDate       DateTime?   @map("end_date") @db.Date
+  monthlyRent   Decimal     @map("monthly_rent") @db.Decimal(12, 2)
+  
+  // 👈 Mga bagong fields para sa Advance at Deposit months at total amounts
+  advanceMonths Decimal     @default(1) @map("advance_months") @db.Decimal(4, 2)
+  advanceAmount Decimal     @default(0) @map("advance_amount") @db.Decimal(12, 2)
+  depositMonths Decimal     @default(1) @map("deposit_months") @db.Decimal(4, 2)
+  depositAmount Decimal     @default(0) @map("deposit_amount") @db.Decimal(12, 2)
+
+  status        LeaseStatus @default(active) 
+  utilityConfig Json        @default("{}") @map("utility_config")
+  createdAt     DateTime    @default(now()) @map("created_at")
+  updatedAt     DateTime    @updatedAt @map("updated_at")
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  unit   Unit   @relation(fields: [unitId], references: [id])
+  room   Room   @relation(fields: [roomId], references: [id])
   bills  Bill[]
 
   @@index([tenantId])
-  @@index([unitId, status])
+  @@index([roomId, status])
   @@map("leases")
 }
 
 model Bill {
-  id             String     @id @default(uuid())
-  leaseId        String     @map("lease_id")
-  tenantId       String     @map("tenant_id")
-  billingPeriod  DateTime   @map("billing_period") @db.Date
-  dueDate        DateTime   @map("due_date") @db.Date
-  subtotal       Decimal    @default(0) @db.Decimal(12, 2)
-  totalAmount    Decimal    @default(0) @map("total_amount") @db.Decimal(12, 2)
-  amountPaid     Decimal    @default(0) @map("amount_paid") @db.Decimal(12, 2)
-  status         BillStatus @default(pending)
-  generatedAt    DateTime   @default(now()) @map("generated_at")
-  updatedAt      DateTime   @updatedAt @map("updated_at")
+  id                String     @id @default(uuid())
+  leaseId           String     @map("lease_id")
+  tenantId          String     @map("tenant_id")
+  billingMonthYear  String     @map("billing_month_year") 
+  dueDate           DateTime   @map("due_date") @db.Date
+  rentAmount        Decimal    @default(0) @map("rent_amount") @db.Decimal(12, 2) 
+  amenitiesFee      Decimal    @default(0) @map("amenities_fee") @db.Decimal(12, 2) 
+  totalAmount       Decimal    @default(0) @map("total_amount") @db.Decimal(12, 2) 
+  status            BillStatus @default(draft)
+  paymentReceiptUrl String?    @map("payment_receipt_url") 
+  paidAt            DateTime?  @map("paid_at") 
+  generatedAt       DateTime   @default(now()) @map("generated_at")
+  updatedAt         DateTime   @updatedAt @map("updated_at")
 
   lease    Lease       @relation(fields: [leaseId], references: [id], onDelete: Cascade)
   tenant   Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   items    BillItem[]
   payments Payment[]
 
-  @@unique([leaseId, billingPeriod])
+  @@unique([leaseId, billingMonthYear])
   @@index([status, dueDate])
   @@index([tenantId])
   @@map("bills")
 }
 
 model BillItem {
-  id          String  @id @default(uuid())
-  billId      String  @map("bill_id")
-  itemType    String  @map("item_type")
-  description String?
-  quantity    Decimal @default(1) @db.Decimal(10, 2)
-  unitPrice   Decimal @map("unit_price") @db.Decimal(12, 2)
-  amount      Decimal @db.Decimal(12, 2)
+  id              String      @id @default(uuid())
+  billId          String      @map("bill_id")
+  type            UtilityType 
+  previousReading Decimal?    @map("previous_reading") @db.Decimal(10, 2) 
+  currentReading  Decimal?    @map("current_reading") @db.Decimal(10, 2) 
+  ratePerUnit     Decimal     @map("rate_per_unit") @db.Decimal(12, 2) 
+  unitLabel       String      @map("unit_label") 
+  proofPhotoUrl   String?     @map("proof_photo_url") 
+  amount          Decimal     @db.Decimal(12, 2)
 
   bill Bill @relation(fields: [billId], references: [id], onDelete: Cascade)
 
@@ -239,15 +282,14 @@ model BillItem {
 }
 
 model Payment {
-  id             String   @id @default(uuid())
-  billId         String   @map("bill_id")
-  tenantId       String   @map("tenant_id")
-  amount         Decimal  @db.Decimal(12, 2)
-  paymentMethod  String   @map("payment_method")
-  referenceNo    String?  @map("reference_no")
-  paidAt         DateTime @default(now()) @map("paid_at")
-  recordedBy     String?  @map("recorded_by")
-  createdAt      DateTime @default(now()) @map("created_at")
+  id            String   @id @default(uuid())
+  billId        String   @map("bill_id")
+  tenantId      String   @map("tenant_id")
+  amount        Decimal  @db.Decimal(12, 2)
+  paymentMethod String   @map("payment_method")
+  referenceNo   String?  @map("reference_no")
+  paidAt        DateTime @default(now()) @map("paid_at")
+  createdAt     DateTime @default(now()) @map("created_at")
 
   bill   Bill   @relation(fields: [billId], references: [id], onDelete: Cascade)
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -257,82 +299,40 @@ model Payment {
   @@map("payments")
 }
 
-model NotificationTemplate {
-  id      String  @id @default(uuid())
-  type    String  @unique
-  subject String?
-  body    String
-
-  @@map("notification_templates")
-}
-
-model Notification {
-  id                 String               @id @default(uuid())
-  recipientUserId    String?              @map("recipient_user_id")
-  type               String
-  channel            NotificationChannel
-  title              String?
-  message            String
-  relatedEntityType  String?              @map("related_entity_type")
-  relatedEntityId    String?              @map("related_entity_id")
-  status             NotificationStatus   @default(pending)
-  sentAt             DateTime?            @map("sent_at")
-  createdAt          DateTime             @default(now()) @map("created_at")
-
-  recipient User? @relation(fields: [recipientUserId], references: [id], onDelete: Cascade)
-
-  @@index([recipientUserId, status])
-  @@map("notifications")
-}
-
-model Booking {
-  id             String        @id @default(uuid())
-  unitId         String        @map("unit_id")
-  prospectName   String        @map("prospect_name")
-  prospectEmail  String?       @map("prospect_email")
-  prospectPhone  String        @map("prospect_phone")
-  requestedAt    DateTime      @map("requested_at")
-  status         BookingStatus @default(requested)
-  notes          String?
-  createdAt      DateTime      @default(now()) @map("created_at")
-
-  unit Unit @relation(fields: [unitId], references: [id], onDelete: Cascade)
-
-  @@index([unitId, status])
-  @@map("bookings")
-}
-
 model MaintenanceRequest {
-  id          String              @id @default(uuid())
-  unitId      String              @map("unit_id")
-  tenantId    String?             @map("tenant_id")
-  category    String
-  description String
-  priority    MaintenancePriority @default(medium)
-  status      MaintenanceStatus   @default(open)
-  photos      Json                @default("[]")
-  createdAt   DateTime            @default(now()) @map("created_at")
-  resolvedAt  DateTime?           @map("resolved_at")
+  id           String              @id @default(uuid())
+  ticketNumber String?             @map("ticket_number") 
+  roomId       String              @map("room_id") // Pinalitan mula unitId patungong roomId
+  tenantId     String?             @map("tenant_id")
+  title        String 
+  category     MaintenanceCategory 
+  description  String
+  priority     MaintenancePriority @default(medium) 
+  status       MaintenanceStatus   @default(pending) 
+  photoUrl     String?             @map("photo_url") 
+  adminRemark  String?             @map("admin_remark") 
+  createdAt    DateTime            @default(now()) @map("created_at")
+  updatedAt    DateTime            @updatedAt @map("updated_at")
 
-  unit   Unit    @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  room   Room    @relation(fields: [roomId], references: [id], onDelete: Cascade)
   tenant Tenant? @relation(fields: [tenantId], references: [id])
 
   @@map("maintenance_requests")
 }
 
 model AnalyticsSnapshot {
-  id                 String   @id @default(uuid())
-  landlordId         String   @map("landlord_id")
-  propertyId         String?  @map("property_id")
-  period             DateTime @db.Date
-  totalUnits         Int      @default(0) @map("total_units")
-  occupiedUnits      Int      @default(0) @map("occupied_units")
-  occupancyRate      Decimal  @default(0) @map("occupancy_rate") @db.Decimal(5, 2)
-  totalBilled        Decimal  @default(0) @map("total_billed") @db.Decimal(14, 2)
-  totalCollected     Decimal  @default(0) @map("total_collected") @db.Decimal(14, 2)
-  totalOutstanding   Decimal  @default(0) @map("total_outstanding") @db.Decimal(14, 2)
-  collectionRate     Decimal  @default(0) @map("collection_rate") @db.Decimal(5, 2)
-  generatedAt        DateTime @default(now()) @map("generated_at")
+  id               String   @id @default(uuid())
+  landlordId       String   @map("landlord_id")
+  propertyId       String?  @map("property_id")
+  period           DateTime @db.Date
+  totalUnits       Int      @default(0) @map("total_units")
+  occupiedUnits    Int      @default(0) @map("occupied_units")
+  occupancyRate    Decimal  @default(0) @map("occupancy_rate") @db.Decimal(5, 2)
+  totalBilled      Decimal  @default(0) @map("total_billed") @db.Decimal(14, 2)
+  totalCollected   Decimal  @default(0) @map("total_collected") @db.Decimal(14, 2)
+  totalOutstanding Decimal  @default(0) @map("total_outstanding") @db.Decimal(14, 2)
+  collectionRate   Decimal  @default(0) @map("collection_rate") @db.Decimal(5, 2)
+  generatedAt      DateTime @default(now()) @map("generated_at")
 
   landlord User      @relation(fields: [landlordId], references: [id], onDelete: Cascade)
   property Property? @relation(fields: [propertyId], references: [id], onDelete: Cascade)
@@ -345,7 +345,7 @@ model AuditLog {
   id         String   @id @default(uuid())
   actorId    String?  @map("actor_id")
   action     String
-  entityType String   @map("entity_type")
+  entityType String   @map("entity_type") 
   entityId   String   @map("entity_id")
   metadata   Json     @default("{}")
   createdAt  DateTime @default(now()) @map("created_at")
@@ -353,4 +353,39 @@ model AuditLog {
   actor User? @relation(fields: [actorId], references: [id])
 
   @@map("audit_logs")
+}
+
+model Subscription {
+  id            String             @id @default(uuid())
+  landlordId    String             @unique @map("landlord_id")
+  planTier      PlanTier           @default(panimula) @map("plan_tier")
+  status        SubscriptionStatus @default(trialing)
+  renewsOn      DateTime?          @map("renews_on")
+  paymentMethod String?            @map("payment_method")
+  maxUnitsLimit Int                @default(5) @map("max_units_limit")
+  createdAt     DateTime           @default(now()) @map("created_at")
+  updatedAt     DateTime           @updatedAt @map("updated_at")
+
+  landlord      User               @relation(fields: [landlordId], references: [id], onDelete: Cascade)
+
+  @@map("subscriptions")
+}
+
+model Notification {
+  id                String              @id @default(uuid())
+  recipientUserId   String?             @map("recipient_user_id")
+  type              String
+  channel           NotificationChannel
+  title             String?
+  message           String
+  relatedEntityType String?             @map("related_entity_type")
+  relatedEntityId   String?             @map("related_entity_id")
+  status            NotificationStatus  @default(pending)
+  sentAt            DateTime?           @map("sent_at")
+  createdAt         DateTime            @default(now()) @map("created_at")
+
+  recipient User? @relation(fields: [recipientUserId], references: [id], onDelete: Cascade)
+
+  @@index([recipientUserId, status])
+  @@map("notifications")
 }

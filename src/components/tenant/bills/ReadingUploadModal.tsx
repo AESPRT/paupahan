@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { UtilityItem } from "@/src/types/tenant-bill";
+import { UtilityItem } from "@/src/types/tenant/tenant-bill";
 
 interface ReadingUploadModalProps {
   isOpen: boolean;

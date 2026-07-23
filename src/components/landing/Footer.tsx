@@ -6,14 +6,18 @@ interface FooterProps {
 
 export function Footer({ showNavLinks = true }: FooterProps) {
   return (
-    <footer className="border-t border-line py-9">
+    <footer className="border-t border-line py-10 sm:py-12">
       <div className="mx-auto max-w-[1140px] px-4 sm:px-6">
-        <div className="flex flex-col items-center gap-4 text-center sm:flex-row sm:justify-between sm:text-left">
-          <PaupahanLogo size={38} />
+        <div className="flex flex-col items-center text-center gap-6">
+          
+          {/* Logo Section (Nasa taas, mas malaki sa desktop) */}
+          <div className="flex justify-center transform scale-110 sm:scale-125 transition-transform">
+            <PaupahanLogo size={42} />
+          </div>
 
           {/* Conditional Navigation Links */}
           {showNavLinks && (
-            <div className="flex flex-wrap items-center justify-center gap-4 text-[13.5px] font-semibold text-muted sm:gap-[26px]">
+            <nav className="flex flex-wrap items-center justify-center gap-6 text-[13.5px] font-semibold text-muted">
               <a href="#features" className="transition-colors hover:text-forest-deep">
                 Features
               </a>
@@ -23,12 +27,14 @@ export function Footer({ showNavLinks = true }: FooterProps) {
               <a href="#faq" className="transition-colors hover:text-forest-deep">
                 FAQ
               </a>
-            </div>
+            </nav>
           )}
 
-          <div className="max-w-[220px] text-center text-[12.5px] text-muted sm:max-w-none sm:text-left sm:text-[13px]">
+          {/* Copyright Text */}
+          <div className="text-[12.5px] text-muted sm:text-[13px]">
             © 2026 Paupahan. Ginawa para sa mga may-ari ng paupahan sa Pilipinas.
           </div>
+
         </div>
       </div>
     </footer>

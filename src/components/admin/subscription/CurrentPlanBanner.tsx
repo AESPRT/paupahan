@@ -1,6 +1,6 @@
 "use client";
 
-import { CurrentSubscription } from "@/src/types/subscription";
+import { CurrentSubscription } from "@/src/types/admin/subscription";
 
 interface CurrentPlanBannerProps {
   subscription: CurrentSubscription;

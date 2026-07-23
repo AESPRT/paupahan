@@ -1,6 +1,6 @@
 "use client";
 
-import { AdminProfileData } from "@/src/types/profile";
+import { AdminProfileData } from "@/src/types/admin/profile";
 
 interface ProfileOverviewCardProps {
   profile: AdminProfileData;

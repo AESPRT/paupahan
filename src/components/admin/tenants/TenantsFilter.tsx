@@ -1,14 +1,14 @@
 "use client";
 
-import { TenantStatus, PaymentStatus } from "@/src/types/tenant";
+import { LeaseStatus, BillStatus } from "@/src/types/tenant/tenant";
 
 interface TenantsFilterProps {
   searchTerm: string;
   onSearchChange: (value: string) => void;
-  statusFilter: TenantStatus | "All";
-  onStatusFilterChange: (status: TenantStatus | "All") => void;
-  paymentFilter: PaymentStatus | "All";
-  onPaymentFilterChange: (status: PaymentStatus | "All") => void;
+  statusFilter: LeaseStatus | "All";
+  onStatusFilterChange: (status: LeaseStatus | "All") => void;
+  paymentFilter: BillStatus | "All";
+  onPaymentFilterChange: (status: BillStatus | "All") => void;
 }
 
 export function TenantsFilter({
@@ -60,7 +60,7 @@ export function TenantsFilter({
           <button
             type="button"
             onClick={() => onSearchChange("")}
-            className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-0.5 text-muted hover:bg-line/50 hover:text-ink"
+            className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-0.5 text-muted hover:bg-line/50 hover:text-ink cursor-pointer"
             aria-label="Clear search"
           >
             <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -73,20 +73,20 @@ export function TenantsFilter({
       {/* 2. Filter Dropdowns Section */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
         <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center">
-          {/* Tenant Status Filter */}
+          {/* Tenant Status Filter (Gamit ang LeaseStatus lowercase values) */}
           <div className="relative">
             <select
               value={statusFilter}
               onChange={(e) =>
-                onStatusFilterChange(e.target.value as TenantStatus | "All")
+                onStatusFilterChange(e.target.value as LeaseStatus | "All")
               }
-              className="w-full appearance-none rounded-xl border border-line bg-paper py-2.5 pl-3 pr-8 text-xs font-semibold text-forest-deep outline-none transition-all focus:border-forest sm:w-auto"
+              className="w-full appearance-none rounded-xl border border-line bg-paper py-2.5 pl-3 pr-8 text-xs font-semibold text-forest-deep outline-none transition-all focus:border-forest sm:w-auto cursor-pointer capitalize"
             >
               <option value="All">Lahat ng Status</option>
-              <option value="Active">Active</option>
-              <option value="Pending">Pending</option>
-              <option value="Moving Out">Moving Out</option>
-              <option value="Inactive">Inactive</option>
+              <option value="active">Active</option>
+              <option value="pending">Pending</option>
+              <option value="moving_out">Moving Out</option>
+              <option value="inactive">Inactive</option>
             </select>
             {/* Custom Arrow Down Icon */}
             <div className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-muted">
@@ -96,19 +96,20 @@ export function TenantsFilter({
             </div>
           </div>
 
-          {/* Payment Status Filter */}
+          {/* Payment Status Filter (Gamit ang BillStatus lowercase values) */}
           <div className="relative">
             <select
               value={paymentFilter}
               onChange={(e) =>
-                onPaymentFilterChange(e.target.value as PaymentStatus | "All")
+                onPaymentFilterChange(e.target.value as BillStatus | "All")
               }
-              className="w-full appearance-none rounded-xl border border-line bg-paper py-2.5 pl-3 pr-8 text-xs font-semibold text-forest-deep outline-none transition-all focus:border-forest sm:w-auto"
+              className="w-full appearance-none rounded-xl border border-line bg-paper py-2.5 pl-3 pr-8 text-xs font-semibold text-forest-deep outline-none transition-all focus:border-forest sm:w-auto cursor-pointer capitalize"
             >
               <option value="All">Lahat ng Bayad</option>
-              <option value="Paid">Paid</option>
-              <option value="Pending">Pending</option>
-              <option value="Overdue">Overdue</option>
+              <option value="paid">Paid</option>
+              <option value="pending">Pending</option>
+              <option value="overdue">Overdue</option>
+              <option value="draft">Draft</option>
             </select>
             {/* Custom Arrow Down Icon */}
             <div className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-muted">
@@ -123,7 +124,7 @@ export function TenantsFilter({
         {hasActiveFilters && (
           <button
             onClick={handleReset}
-            className="flex items-center justify-center gap-1 rounded-xl border border-dashed border-line bg-paper px-3 py-2 text-[11px] font-semibold text-muted transition-colors hover:border-coral hover:text-coral-deep"
+            className="flex items-center justify-center gap-1 rounded-xl border border-dashed border-line bg-paper px-3 py-2 text-[11px] font-semibold text-muted transition-colors hover:border-coral hover:text-coral-deep cursor-pointer"
           >
             <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />

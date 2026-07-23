@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { UtilityRate } from "@/src/types/tenant-utilities";
+import { UtilityRate } from "@/src/types/tenant/tenant-utilities";
 
 interface UtilityCalculatorProps {
   rates: UtilityRate[];

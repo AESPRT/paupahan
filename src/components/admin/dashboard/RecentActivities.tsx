@@ -1,14 +1,20 @@
 "use client";
 
-import { ActivityNotification } from "@/src/types/dashboard";
+import { ActivityNotification } from "@/src/types/admin/dashboard";
+import { useState, useEffect } from "react";
 
-const ACTIVITIES: ActivityNotification[] = [
-  { id: "1", title: "Bagong Bayad Natanggap", description: "Nagbayad si Maria Clara ng ₱7,200 via GCash.", time: "10 mins ago", type: "payment" },
-  { id: "2", title: "Bagong Tenant Registered", description: "Naidagdag si Ben Santos sa Unit 204.", time: "1 hr ago", type: "tenant" },
-  { id: "3", title: "Maintenance Request", description: "Nasirang Gripo sa Unit 102.", time: "3 hrs ago", type: "maintenance" },
-];
+interface RecentActivitiesProps {
+  activities?: ActivityNotification[];
+}
 
-export function RecentActivities() {
+export function RecentActivities({ activities = [] }: RecentActivitiesProps) {
+  const [items, setItems] = useState<ActivityNotification[]>(activities);
+
+  // I-sync ang state kapag nag-bago ang props mula sa server
+  useEffect(() => {
+    setItems(activities);
+  }, [activities]);
+
   const getActivityIcon = (type: ActivityNotification["type"]) => {
     switch (type) {
       case "payment":
@@ -54,16 +60,20 @@ export function RecentActivities() {
       </div>
 
       <div className="space-y-3">
-        {ACTIVITIES.map((act) => (
-          <div key={act.id} className="flex items-start gap-3 border-b border-line/40 pb-3 last:border-none last:pb-0">
-            {getActivityIcon(act.type)}
-            <div>
-              <p className="text-xs font-bold text-forest-deep">{act.title}</p>
-              <p className="text-xs text-muted">{act.description}</p>
-              <span className="mt-1 inline-block font-mono-brand text-[10px] text-muted/70">{act.time}</span>
+        {items.length > 0 ? (
+          items.map((act) => (
+            <div key={act.id} className="flex items-start gap-3 border-b border-line/40 pb-3 last:border-none last:pb-0">
+              {getActivityIcon(act.type)}
+              <div>
+                <p className="text-xs font-bold text-forest-deep">{act.title}</p>
+                <p className="text-xs text-muted">{act.description}</p>
+                <span className="mt-1 inline-block font-mono-brand text-[10px] text-muted/70">{act.time}</span>
+              </div>
             </div>
-          </div>
-        ))}
+          ))
+        ) : (
+          <p className="py-4 text-center text-xs text-muted">Walang kamakailang mga aktibidad.</p>
+        )}
       </div>
     </div>
   );

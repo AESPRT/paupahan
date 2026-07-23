@@ -1,4 +1,4 @@
-import { AmenityFee } from "@/src/types/tenant-utilities";
+import { AmenityFee } from "@/src/types/tenant/tenant-utilities";
 
 interface AmenityCardProps {
   amenity: AmenityFee;

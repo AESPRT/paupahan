@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { NotificationSettings } from "@/src/types/settings";
+import { NotificationSettings } from "@/src/types/admin/settings";
 
 interface SecuritySettingsProps {
   initialData: NotificationSettings;
@@ -13,14 +13,14 @@ export function SecuritySettingsForm({ initialData, onSave }: SecuritySettingsPr
   const [passwords, setPasswords] = useState({ current: "", newPass: "", confirmPass: "" });
   const [saved, setSaved] = useState(false);
 
-  const handleSubmitNotifications = (e: React.FormEvent) => {
+  const handleSubmitNotifications = (e: React.SubmitEvent) => {
     e.preventDefault();
     onSave(formData);
     setSaved(true);
     setTimeout(() => setSaved(false), 3000);
   };
 
-  const handleChangePassword = (e: React.FormEvent) => {
+  const handleChangePassword = (e: React.SubmitEvent) => {
     e.preventDefault();
     if (passwords.newPass !== passwords.confirmPass) {
       alert("Hindi magkatugma ang bagong password!");

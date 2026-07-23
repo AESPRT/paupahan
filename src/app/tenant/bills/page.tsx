@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { TenantBill } from "@/src/types/tenant-bill";
+import { TenantBill } from "@/src/types/tenant/tenant-bill";
 import { TenantBillsPageHeader } from "@/src/components/tenant/bills/TenantBillsPageHeader";
 import { BillCardItem } from "@/src/components/tenant/bills/BillCardItem";
 import { BillDetailModal } from "@/src/components/tenant/bills/BillDetailModal";
