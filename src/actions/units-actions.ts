@@ -62,7 +62,6 @@ export async function addUnitAction(name: string) {
 
     // 2. Kung walang property, kailangan nating kumuha ng Landlord para maikonekta ito
     if (!property) {
-      // Hanapin muna kung may existing user/landlord sa database
       const landlordUser = await prisma.user.findFirst({
         where: { 
           OR: [
@@ -76,14 +75,13 @@ export async function addUnitAction(name: string) {
         return { success: false, error: 'Walang nahanap na Landlord o Admin account sa database para magmay-ari ng Property.' };
       }
 
-      // Gumawa ng Property gamit ang Unchecked Create para mailagay ang landlordId nang direkta
       property = await prisma.property.create({
         data: {
           name: "Pangunahing Gusali",
           addressLine: "Main Address",
           city: "Manila",
           landlordId: landlordUser.id,
-        } as any, // Ginagamit ang 'as any' para maiwasan ang strict type mismatch ng Prisma relations kung kinakailangan
+        } as any,
       });
     }
 
@@ -98,7 +96,7 @@ export async function addUnitAction(name: string) {
     revalidatePath('/admin/dashboard/units')
     return { success: true }
   } catch (error) {
-    console.error('Error adding unit:', error)
+    console.error('Error adding unit:', error);
     return { success: false, error: 'May naganap na error sa pagdagdag ng unit/building.' }
   }
 }
@@ -107,15 +105,27 @@ export async function addRoomAction(propertyOrUnitId: string, roomNumber: string
   try {
     let targetUnitId = propertyOrUnitId;
 
+    // 1. Suriin muna kung ang ID na ipinasa ay direktang isang Unit ID
     const unitExists = await prisma.unit.findUnique({
       where: { id: propertyOrUnitId },
     });
 
+    // 2. Kung HINDI unit ang ID na ito, baka ito ay isang Property ID
     if (!unitExists) {
+      const propertyExists = await prisma.property.findUnique({
+        where: { id: propertyOrUnitId },
+      });
+
+      if (!propertyExists) {
+        return { success: false, error: 'Hindi natagpuan ang Unit o Property na ito.' };
+      }
+
+      // Hanapin kung mayroon nang Unit sa ilalim ng Property na ito
       let unit = await prisma.unit.findFirst({
         where: { propertyId: propertyOrUnitId },
       });
 
+      // Kung wala pang Unit sa ilalim ng property na ito, gumawa muna tayo ng default unit
       if (!unit) {
         unit = await prisma.unit.create({
           data: {
@@ -128,6 +138,7 @@ export async function addRoomAction(propertyOrUnitId: string, roomNumber: string
       targetUnitId = unit.id;
     }
 
+    // 3. I-create na ang Room gamit ang tamang targetUnitId
     await prisma.room.create({
       data: {
         unitId: targetUnitId,
@@ -140,7 +151,7 @@ export async function addRoomAction(propertyOrUnitId: string, roomNumber: string
     revalidatePath('/admin/dashboard/units')
     return { success: true }
   } catch (error) {
-    console.error('Error adding room:', error)
-    return { success: false, error: 'May naganap na error sa pagdagdag ng kwarto. Baka pareho ang numero ng kwarto.' }
+    console.error('Error adding room:', error);
+    return { success: false, error: 'May naganap na error sa pagdagdag ng kwarto. Baka pareho ang numero ng kwarto sa unit na ito.' }
   }
 }

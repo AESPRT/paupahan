@@ -4,6 +4,7 @@ import prisma from '@/src/lib/prisma'
 import { revalidatePath } from 'next/cache'
 import bcrypt from 'bcryptjs'
 import { cookies } from 'next/headers'
+import { createAuditLog } from '@/src/actions/audit-actions' // 👈 I-import ang createAuditLog
 
 export type ActionResponse = {
   success: boolean
@@ -66,8 +67,16 @@ export async function registerLandlord(formData: FormData): Promise<ActionRespon
       })
     }
 
-    // 4. Gumawa ng sesyon / i-set ang cookie para awtomatikong maging logged-in
-    // (Dito natin iniimbak ang user ID o session token)
+    // ✨ 4. I-record sa Audit Log ang pagrerehistro ng bagong landlord account
+    await createAuditLog({
+      actorId: newUser.id,
+      action: `Nilikha ang bagong Landlord account at property (${propertyName || 'Walang Pangalan'})`,
+      entityType: 'AUTH',
+      entityId: newUser.id,
+      metadata: { email: newUser.email, propertyName, actionType: 'REGISTER_LANDLORD' },
+    })
+
+    // 5. Gumawa ng sesyon / i-set ang cookie para awtomatikong maging logged-in
     const cookieStore = await cookies()
     cookieStore.set('session_user_id', newUser.id, {
       httpOnly: true,
