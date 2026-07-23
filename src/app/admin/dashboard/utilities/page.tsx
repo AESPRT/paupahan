@@ -1,72 +1,88 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useTransition } from "react";
 import { UtilitiesHeader } from "@/src/components/admin/utilities/UtilitiesHeader";
 import { AssignBillModal } from "@/src/components/admin/utilities/AssignBillModal";
 import { UtilityBillsList } from "@/src/components/admin/utilities/UtilityBillsList";
-import { UtilityRate, RoomUtilityBill } from "@/src/types/admin/utility";
+import { UtilityRate } from "@/src/types/admin/utility";
 import { Footer } from "@/src/components/landing/Footer";
-
-const INITIAL_RATES: UtilityRate[] = [
-  { id: "r1", type: "electricity", name: "Kuryente", ratePerUnit: 14, unitLabel: "kWh" },
-  { id: "r2", type: "water", name: "Tubig", ratePerUnit: 35, unitLabel: "m³" },
-  { id: "r3", type: "internet", name: "WiFi", ratePerUnit: 300, unitLabel: "Flat / Room" },
-  { id: "r4", type: "amenities", name: "Trash / Maint.", ratePerUnit: 150, unitLabel: "Flat / Month" },
-];
-
-const INITIAL_BILLS: RoomUtilityBill[] = [
-  { id: "b1", unitName: "Building A", roomNumber: "Room 101", tenantName: "Juan Dela Cruz", type: "electricity", totalAmount: 1420, dueDate: "2026-08-05", status: "Pending" },
-  { id: "b2", unitName: "Building A", roomNumber: "Room 102", tenantName: "Maria Clara", type: "water", totalAmount: 380, dueDate: "2026-08-05", status: "Paid" },
-  { id: "b3", unitName: "Building B", roomNumber: "Room 201", tenantName: "Pedro Penduko", type: "internet", totalAmount: 300, dueDate: "2026-08-01", status: "Overdue" },
-];
+import { 
+  getUtilitiesData, 
+  updateUtilityRateAction 
+} from "@/src/actions/utilities-actions";
 
 export default function UtilitiesPage() {
-  const [rates, setRates] = useState<UtilityRate[]>(INITIAL_RATES);
-  const [bills, setBills] = useState<RoomUtilityBill[]>(INITIAL_BILLS);
+  const [rates, setRates] = useState<UtilityRate[]>([]);
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [isPending, startTransition] = useTransition();
 
-  // Update Rate Handler
-  const handleUpdateRate = (id: string, newRate: number) => {
+  // Load data mula sa database kapag binuksan ang pahina (Rates na lang ang kinukuha)
+  useEffect(() => {
+    getUtilitiesData().then((data) => {
+      setRates(data.rates as UtilityRate[]);
+      setLoading(false);
+    });
+  }, []);
+
+  // Update Rate Handler (Dynamic)
+  const handleUpdateRate = async (id: string, newRate: number) => {
+    // Optimistic UI update
     setRates((prev) =>
       prev.map((r) => (r.id === id ? { ...r, ratePerUnit: newRate } : r))
     );
+    
+    startTransition(async () => {
+      const result = await updateUtilityRateAction(id, newRate);
+      if (!result.success) {
+        alert(result.error);
+        // Refresh para ibalik sa huling tamang data kung nagka-error
+        const data = await getUtilitiesData();
+        setRates(data.rates as UtilityRate[]);
+      }
+    });
   };
 
-  // Add Bill Handler
-  const handleAssignBill = (newBill: Omit<RoomUtilityBill, "id">) => {
-    setBills((prev) => [
-      { ...newBill, id: `b-${Date.now()}` },
-      ...prev,
-    ]);
+  // Handler kapag nag-submit mula sa rate update modal
+  const handleSaveRateModal = async (dataPayload: { id: string; ratePerUnit: number }) => {
+    await handleUpdateRate(dataPayload.id, dataPayload.ratePerUnit);
+    setIsAssignModalOpen(false);
   };
 
-  // Mark as Paid
-  const handleMarkAsPaid = (id: string) => {
-    setBills((prev) =>
-      prev.map((b) => (b.id === id ? { ...b, status: "Paid" } : b))
+  if (loading) {
+    return (
+      <div className="flex h-[60vh] items-center justify-center">
+        <span className="text-sm font-medium text-muted">Nag-a-load ng utilities...</span>
+      </div>
     );
-  };
+  }
 
   return (
-    <div className="space-y-6 p-4 sm:p-6 lg:p-8">
-      {/* Header & Global Rates */}
+    <div className={`space-y-6 p-4 sm:p-6 lg:p-8 ${isPending ? 'opacity-75 transition-opacity' : ''}`}>
+      {/* Header & Global Rates - Pinalitan ang onAssignBill ng onOpenRateModal */}
       <UtilitiesHeader
         rates={rates}
         onUpdateRate={handleUpdateRate}
-        onAssignBill={() => setIsAssignModalOpen(true)}
+        onOpenRateModal={() => setIsAssignModalOpen(true)}
       />
 
-      {/* Utility Bills List */}
-      <UtilityBillsList bills={bills} onMarkAsPaid={handleMarkAsPaid} />
+      {/* Utility Rates List */}
+      <UtilityBillsList 
+        rates={rates} 
+        onEditRate={(rate) => {
+          setIsAssignModalOpen(true);
+        }} 
+      />
 
-      {/* Assign Bill Modal */}
+      {/* Rate Update Modal */}
       <AssignBillModal
         isOpen={isAssignModalOpen}
         onClose={() => setIsAssignModalOpen(false)}
-        onAssign={handleAssignBill}
+        onAssign={handleSaveRateModal}
+        currentRates={rates}
       />
 
-      <Footer showNavLinks = {false} />
+      <Footer showNavLinks={false} />
     </div>
   );
 }

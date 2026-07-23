@@ -1,25 +1,14 @@
 "use client";
 
-import { RoomUtilityBill } from "@/src/types/admin/utility";
+import { UtilityRate } from "@/src/types/admin/utility";
 
-interface UtilityBillsListProps {
-  bills: RoomUtilityBill[];
-  onMarkAsPaid: (id: string) => void;
+interface UtilityRatesListProps {
+  rates: UtilityRate[];
+  onEditRate: (rate: UtilityRate) => void;
 }
 
-export function UtilityBillsList({ bills, onMarkAsPaid }: UtilityBillsListProps) {
-  const getBadge = (status: RoomUtilityBill["status"]) => {
-    switch (status) {
-      case "Paid":
-        return "bg-forest/10 text-forest border-forest/20";
-      case "Pending":
-        return "bg-marigold/20 text-forest-deep border-marigold/30";
-      case "Overdue":
-        return "bg-coral/15 text-coral-deep border-coral/30 font-bold";
-    }
-  };
-
-  const getIcon = (type: RoomUtilityBill["type"]) => {
+export function UtilityBillsList({ rates, onEditRate }: UtilityRatesListProps) {
+  const getIcon = (type: UtilityRate["type"]) => {
     switch (type) {
       case "electricity":
         return (
@@ -51,104 +40,96 @@ export function UtilityBillsList({ bills, onMarkAsPaid }: UtilityBillsListProps)
   return (
     <div className="space-y-4">
       <h2 className="font-mono-brand text-xs font-bold uppercase tracking-wider text-muted">
-        Naka-assign na Utility Bills
+        Mga Rate ng Utility (Standard Rates)
       </h2>
 
-      {/* 1. Mobile Cards (< md screens) */}
-      <div className="grid grid-cols-1 gap-3 md:hidden">
-        {bills.map((bill) => (
-          <div
-            key={bill.id}
-            className="flex flex-col gap-3 rounded-2xl border border-line bg-paper-card p-4 shadow-sm"
-          >
-            <div className="flex items-center justify-between border-b border-line/60 pb-2.5">
-              <div className="flex items-center gap-2.5">
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-forest/5 border border-forest/10">
-                  {getIcon(bill.type)}
-                </div>
-                <div>
-                  <h3 className="font-bold text-forest-deep text-xs">{bill.tenantName}</h3>
-                  <p className="text-[10px] text-muted">{bill.unitName} • {bill.roomNumber}</p>
-                </div>
-              </div>
-              <span className={`rounded-md border px-2 py-0.5 font-mono-brand text-[10px] ${getBadge(bill.status)}`}>
-                {bill.status}
-              </span>
-            </div>
-
-            <div className="flex items-center justify-between text-xs">
-              <div>
-                <span className="text-[10px] text-muted block font-mono-brand">DUE DATE</span>
-                <span className="font-medium text-ink">{bill.dueDate}</span>
-              </div>
-              <div className="text-right">
-                <span className="text-[10px] text-muted block font-mono-brand">HALAGA</span>
-                <span className="font-bold text-forest-deep text-sm">₱{bill.totalAmount.toLocaleString()}</span>
-              </div>
-            </div>
-
-            {bill.status !== "Paid" && (
-              <button
-                onClick={() => onMarkAsPaid(bill.id)}
-                className="w-full rounded-xl bg-forest/10 border border-forest/20 py-2 font-mono-brand text-xs font-bold text-forest hover:bg-forest hover:text-white transition-all"
-              >
-                I-mark bilang Bayad na
-              </button>
-            )}
+      {rates.length === 0 ? (
+        <div className="flex flex-col items-center justify-center rounded-2xl border border-line bg-paper-card py-12 px-4 text-center shadow-sm">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-forest/5 text-forest border border-forest/10 mb-3">
+            <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
           </div>
-        ))}
-      </div>
-
-      {/* 2. Desktop Table (≥ md screens) */}
-      <div className="hidden overflow-hidden rounded-2xl border border-line bg-paper-card shadow-sm md:block">
-        <table className="w-full text-left text-xs">
-          <thead className="border-b border-line bg-paper font-mono-brand uppercase text-muted">
-            <tr>
-              <th className="px-5 py-4 font-bold">Room & Tenant</th>
-              <th className="px-5 py-4 font-bold">Uri ng Bill</th>
-              <th className="px-5 py-4 font-bold">Due Date</th>
-              <th className="px-5 py-4 font-bold">Halaga</th>
-              <th className="px-5 py-4 font-bold">Status</th>
-              <th className="px-5 py-4 text-right font-bold">Aksyon</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-line/60">
-            {bills.map((bill) => (
-              <tr key={bill.id} className="hover:bg-paper/60 transition-colors">
-                <td className="px-5 py-4">
-                  <p className="font-bold text-forest-deep">{bill.tenantName}</p>
-                  <p className="text-[11px] text-muted">{bill.unitName} - {bill.roomNumber}</p>
-                </td>
-                <td className="px-5 py-4 font-semibold text-ink">
-                  <div className="inline-flex items-center gap-2">
-                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-forest/5 border border-forest/10">
-                      {getIcon(bill.type)}
+          <h3 className="font-bold text-forest-deep text-sm mb-1">Walang Utility Rates</h3>
+          <p className="text-xs text-muted max-w-sm">
+            Wala pang nakatakdang rate para sa mga utilities sa kasalukuyan.
+          </p>
+        </div>
+      ) : (
+        <>
+          {/* 1. Mobile Cards (< md screens) */}
+          <div className="grid grid-cols-1 gap-3 md:hidden">
+            {rates.map((rate) => (
+              <div
+                key={rate.id}
+                className="flex flex-col gap-3 rounded-2xl border border-line bg-paper-card p-4 shadow-sm"
+              >
+                <div className="flex items-center justify-between border-b border-line/60 pb-2.5">
+                  <div className="flex items-center gap-2.5">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-forest/5 border border-forest/10">
+                      {getIcon(rate.type)}
                     </div>
-                    <span className="capitalize">{bill.type}</span>
+                    <div>
+                      <h3 className="font-bold text-forest-deep text-xs">{rate.name}</h3>
+                      <p className="text-[10px] text-muted">Base: {rate.unitLabel}</p>
+                    </div>
                   </div>
-                </td>
-                <td className="px-5 py-4 text-muted font-medium">{bill.dueDate}</td>
-                <td className="px-5 py-4 font-bold text-forest-deep">₱{bill.totalAmount.toLocaleString()}</td>
-                <td className="px-5 py-4">
-                  <span className={`rounded-md border px-2.5 py-1 font-mono-brand text-[10px] ${getBadge(bill.status)}`}>
-                    {bill.status}
+                  <span className="font-bold text-forest-deep text-sm">
+                    ₱{rate.ratePerUnit.toLocaleString()} <span className="text-[10px] text-muted font-normal">/ {rate.unitLabel}</span>
                   </span>
-                </td>
-                <td className="px-5 py-4 text-right">
-                  {bill.status !== "Paid" && (
-                    <button
-                      onClick={() => onMarkAsPaid(bill.id)}
-                      className="rounded-lg border border-forest/30 bg-forest/5 px-3 py-1.5 font-mono-brand text-[11px] font-bold text-forest hover:bg-forest hover:text-white transition-colors"
-                    >
-                      Mark as Paid
-                    </button>
-                  )}
-                </td>
-              </tr>
+                </div>
+
+                <button
+                  onClick={() => onEditRate(rate)}
+                  className="w-full rounded-xl bg-forest/10 border border-forest/20 py-2 font-mono-brand text-xs font-bold text-forest hover:bg-forest hover:text-white transition-all"
+                >
+                  I-update ang Rate
+                </button>
+              </div>
             ))}
-          </tbody>
-        </table>
-      </div>
+          </div>
+
+          {/* 2. Desktop Table (≥ md screens) */}
+          <div className="hidden overflow-hidden rounded-2xl border border-line bg-paper-card shadow-sm md:block">
+            <table className="w-full text-left text-xs">
+              <thead className="border-b border-line bg-paper font-mono-brand uppercase text-muted">
+                <tr>
+                  <th className="px-5 py-4 font-bold">Uri ng Utility</th>
+                  <th className="px-5 py-4 font-bold">Base Unit</th>
+                  <th className="px-5 py-4 font-bold">Rate / Halaga</th>
+                  <th className="px-5 py-4 text-right font-bold">Aksyon</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-line/60">
+                {rates.map((rate) => (
+                  <tr key={rate.id} className="hover:bg-paper/60 transition-colors">
+                    <td className="px-5 py-4 font-semibold text-ink">
+                      <div className="inline-flex items-center gap-2">
+                        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-forest/5 border border-forest/10">
+                          {getIcon(rate.type)}
+                        </div>
+                        <span className="font-bold text-forest-deep">{rate.name}</span>
+                      </div>
+                    </td>
+                    <td className="px-5 py-4 text-muted font-medium">{rate.unitLabel}</td>
+                    <td className="px-5 py-4 font-bold text-forest-deep">
+                      ₱{rate.ratePerUnit.toLocaleString()} <span className="text-[11px] text-muted font-normal">per {rate.unitLabel}</span>
+                    </td>
+                    <td className="px-5 py-4 text-right">
+                      <button
+                        onClick={() => onEditRate(rate)}
+                        className="rounded-lg border border-forest/30 bg-forest/5 px-3 py-1.5 font-mono-brand text-[11px] font-bold text-forest hover:bg-forest hover:text-white transition-colors"
+                      >
+                        I-edit ang Rate
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
     </div>
   );
 }

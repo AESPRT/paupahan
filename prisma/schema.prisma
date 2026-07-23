@@ -219,7 +219,6 @@ model Lease {
   endDate       DateTime?   @map("end_date") @db.Date
   monthlyRent   Decimal     @map("monthly_rent") @db.Decimal(12, 2)
   
-  // 👈 Mga bagong fields para sa Advance at Deposit months at total amounts
   advanceMonths Decimal     @default(1) @map("advance_months") @db.Decimal(4, 2)
   advanceAmount Decimal     @default(0) @map("advance_amount") @db.Decimal(12, 2)
   depositMonths Decimal     @default(1) @map("deposit_months") @db.Decimal(4, 2)
@@ -247,12 +246,14 @@ model Bill {
   dueDate           DateTime   @map("due_date") @db.Date
   rentAmount        Decimal    @default(0) @map("rent_amount") @db.Decimal(12, 2) 
   amenitiesFee      Decimal    @default(0) @map("amenities_fee") @db.Decimal(12, 2) 
+  utilityAmount     Decimal    @default(0) @map("utility_amount") @db.Decimal(12, 2) // 👈 Idinagdag para sa kabuuang utility sa bill
   totalAmount       Decimal    @default(0) @map("total_amount") @db.Decimal(12, 2) 
   status            BillStatus @default(draft)
   paymentReceiptUrl String?    @map("payment_receipt_url") 
   paidAt            DateTime?  @map("paid_at") 
   generatedAt       DateTime   @default(now()) @map("generated_at")
   updatedAt         DateTime   @updatedAt @map("updated_at")
+  metadata          Json       @default("{}") // 👈 Idinagdag para suportahan ang utilityType metadata
 
   lease    Lease       @relation(fields: [leaseId], references: [id], onDelete: Cascade)
   tenant   Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -281,6 +282,19 @@ model BillItem {
   @@map("bill_items")
 }
 
+// 👈 Bagong Model para sa Utility Rates
+model UtilityRate {
+  id            String      @id @default(uuid())
+  type          UtilityType @unique
+  name          String
+  ratePerUnit   Decimal     @map("rate_per_unit") @db.Decimal(12, 2)
+  unitLabel     String      @map("unit_label")
+  createdAt     DateTime    @default(now()) @map("created_at")
+  updatedAt     DateTime    @updatedAt @map("updated_at")
+
+  @@map("utility_rates")
+}
+
 model Payment {
   id            String   @id @default(uuid())
   billId        String   @map("bill_id")
@@ -302,7 +316,7 @@ model Payment {
 model MaintenanceRequest {
   id           String              @id @default(uuid())
   ticketNumber String?             @map("ticket_number") 
-  roomId       String              @map("room_id") // Pinalitan mula unitId patungong roomId
+  roomId       String              @map("room_id") 
   tenantId     String?             @map("tenant_id")
   title        String 
   category     MaintenanceCategory 

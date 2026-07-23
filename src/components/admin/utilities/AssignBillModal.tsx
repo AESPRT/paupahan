@@ -1,45 +1,58 @@
 "use client";
 
-import { useState } from "react";
-import { RoomUtilityBill, UtilityType } from "@/src/types/admin/utility";
+import { useState, useEffect } from "react";
+import { UtilityRate, UtilityType } from "@/src/types/admin/utility";
 
 interface AssignBillModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onAssign: (bill: Omit<RoomUtilityBill, "id">) => void;
+  onAssign: (data: { id: string; ratePerUnit: number }) => void; // O ang update handler para sa rate
+  currentRates?: UtilityRate[]; // Mga kasalukuyang rates para ma-edit
 }
 
 export function AssignBillModal({
   isOpen,
   onClose,
   onAssign,
+  currentRates = [],
 }: AssignBillModalProps) {
-  const [unitName, setUnitName] = useState("Building A");
-  const [roomNumber, setRoomNumber] = useState("Room 101");
-  const [tenantName, setTenantName] = useState("");
-  const [type, setType] = useState<UtilityType>("electricity");
-  const [amount, setAmount] = useState("");
-  const [dueDate, setDueDate] = useState("");
+  const [selectedRateId, setSelectedRateId] = useState("");
+  const [utilityName, setUtilityName] = useState("");
+  const [unitLabel, setUnitLabel] = useState("");
+  const [ratePerUnit, setRatePerUnit] = useState("");
+
+  // Kapag binuksan ang modal, piliin ang unang utility rate bilang default
+  useEffect(() => {
+    if (isOpen && currentRates.length > 0) {
+      setSelectedRateId(currentRates[0].id);
+      setUtilityName(currentRates[0].name);
+      setUnitLabel(currentRates[0].unitLabel);
+      setRatePerUnit(currentRates[0].ratePerUnit.toString());
+    }
+  }, [isOpen, currentRates]);
+
+  // Kapag nagbago ang piniling utility rate sa dropdown
+  const handleRateChange = (id: string) => {
+    setSelectedRateId(id);
+    const rateItem = currentRates.find((r) => r.id === id);
+    if (rateItem) {
+      setUtilityName(rateItem.name);
+      setUnitLabel(rateItem.unitLabel);
+      setRatePerUnit(rateItem.ratePerUnit.toString());
+    }
+  };
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.SubmitEvent) => {
     e.preventDefault();
-    if (!tenantName || !amount || !dueDate) return;
+    if (!selectedRateId || !ratePerUnit) return;
 
     onAssign({
-      unitName,
-      roomNumber,
-      tenantName,
-      type,
-      totalAmount: Number(amount),
-      dueDate,
-      status: "Pending",
+      id: selectedRateId,
+      ratePerUnit: Number(ratePerUnit),
     });
 
-    setTenantName("");
-    setAmount("");
-    setDueDate("");
     onClose();
   };
 
@@ -48,7 +61,7 @@ export function AssignBillModal({
       <div className="w-full max-w-md rounded-3xl border border-line bg-paper-card p-6 shadow-xl animate-in fade-in zoom-in duration-200">
         <div className="flex items-center justify-between border-b border-line pb-4">
           <h2 className="font-display text-lg font-bold text-forest-deep">
-            Mag-assign ng Bill sa Kwarto
+            I-update ang Rate ng Utility
           </h2>
           <button
             onClick={onClose}
@@ -62,93 +75,49 @@ export function AssignBillModal({
         </div>
 
         <form onSubmit={handleSubmit} className="mt-4 space-y-3.5">
-          {/* Unit & Room Selector */}
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="block text-xs font-bold text-forest-deep mb-1">
-                Unit / Building
-              </label>
-              <select
-                value={unitName}
-                onChange={(e) => setUnitName(e.target.value)}
-                className="w-full rounded-xl border border-line bg-paper px-3 py-2 text-xs font-medium text-ink outline-none"
-              >
-                <option value="Building A">Building A</option>
-                <option value="Building B">Building B</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-forest-deep mb-1">
-                Kwarto
-              </label>
-              <select
-                value={roomNumber}
-                onChange={(e) => setRoomNumber(e.target.value)}
-                className="w-full rounded-xl border border-line bg-paper px-3 py-2 text-xs font-medium text-ink outline-none"
-              >
-                <option value="Room 101">Room 101</option>
-                <option value="Room 102">Room 102</option>
-                <option value="Room 201">Room 201</option>
-              </select>
-            </div>
-          </div>
-
+          {/* Piliin kung aling Utility ang ia-update ang rate */}
           <div>
             <label className="block text-xs font-bold text-forest-deep mb-1">
-              Pangalan ng Tenant
+              Uri ng Utility
+            </label>
+            <select
+              value={selectedRateId}
+              onChange={(e) => handleRateChange(e.target.value)}
+              className="w-full rounded-xl border border-line bg-paper px-3 py-2 text-xs font-medium text-ink outline-none"
+            >
+              {currentRates.map((rate) => (
+                <option key={rate.id} value={rate.id}>
+                  {rate.name} ({rate.unitLabel})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Unit Label (Basal kung paano sinusukat e.g. kWh, m³, Flat) */}
+          <div>
+            <label className="block text-xs font-bold text-forest-deep mb-1">
+              Unit of Measurement (Basihan)
             </label>
             <input
               type="text"
-              required
-              placeholder="e.g. Juan Dela Cruz"
-              value={tenantName}
-              onChange={(e) => setTenantName(e.target.value)}
-              className="w-full rounded-xl border border-line bg-paper px-3.5 py-2 text-xs font-medium text-ink outline-none focus:border-forest"
+              disabled
+              value={unitLabel}
+              className="w-full rounded-xl border border-line bg-paper/50 px-3.5 py-2 text-xs font-medium text-muted outline-none cursor-not-allowed"
             />
           </div>
 
-          {/* Type & Amount */}
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="block text-xs font-bold text-forest-deep mb-1">
-                Uri ng Bill
-              </label>
-              <select
-                value={type}
-                onChange={(e) => setType(e.target.value as UtilityType)}
-                className="w-full rounded-xl border border-line bg-paper px-3 py-2 text-xs font-medium text-ink outline-none"
-              >
-                <option value="electricity">Kuryente</option>
-                <option value="water">Tubig</option>
-                <option value="internet">Internet</option>
-                <option value="amenities">Amenities</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-forest-deep mb-1">
-                Halaga (₱)
-              </label>
-              <input
-                type="number"
-                required
-                placeholder="0.00"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                className="w-full rounded-xl border border-line bg-paper px-3.5 py-2 text-xs font-medium text-ink outline-none focus:border-forest"
-              />
-            </div>
-          </div>
-
+          {/* Bagong Rate per Unit */}
           <div>
             <label className="block text-xs font-bold text-forest-deep mb-1">
-              Due Date
+              Bagong Rate Bawat Unit (₱)
             </label>
             <input
-              type="date"
+              type="number"
+              step="0.01"
               required
-              value={dueDate}
-              onChange={(e) => setDueDate(e.target.value)}
+              placeholder="0.00"
+              value={ratePerUnit}
+              onChange={(e) => setRatePerUnit(e.target.value)}
               className="w-full rounded-xl border border-line bg-paper px-3.5 py-2 text-xs font-medium text-ink outline-none focus:border-forest"
             />
           </div>
@@ -165,7 +134,7 @@ export function AssignBillModal({
               type="submit"
               className="rounded-xl bg-forest px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-forest-deep"
             >
-              I-assign ang Bill
+              I-save ang Rate
             </button>
           </div>
         </form>
