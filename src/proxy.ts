@@ -6,11 +6,9 @@ const JWT_SECRET = new TextEncoder().encode(
   process.env.JWT_SECRET || 'NONE'
 );
 
-// Pinalitan mula 'middleware' patungong 'proxy'
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Sinusuportahan ang ating session_user_id cookie pati na rin ang mga token
   const sessionUserId = request.cookies.get('session_user_id')?.value;
   const token = 
     request.cookies.get('token')?.value || 
@@ -19,8 +17,14 @@ export async function proxy(request: NextRequest) {
 
   const isAdminDashboard = pathname.startsWith('/admin/dashboard');
   const isTenantDashboard = pathname.startsWith('/tenant/dashboard');
+  const isTenantLogin = pathname === '/tenant/login';
 
-  // Kung walang session o token sa protected route
+  // 1. Kung naka-login na ang tenant at pumunta ulit sa login page, i-redirect sa dashboard
+  if (isTenantLogin && (sessionUserId || token)) {
+    return NextResponse.redirect(new URL('/tenant/dashboard/home', request.url));
+  }
+
+  // 2. Kung walang session o token sa protected route (/tenant/dashboard...)
   if ((isAdminDashboard || isTenantDashboard) && !sessionUserId && !token) {
     const loginPath = isAdminDashboard ? '/admin/login' : '/tenant/login';
     const loginUrl = new URL(loginPath, request.url);
@@ -29,12 +33,10 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  // Kung nag-login gamit ang ating database session cookie, ituloy ang request
   if (sessionUserId) {
     return NextResponse.next();
   }
 
-  // Kung may JWT token, i-verify ang signature
   if (token) {
     try {
       const { payload } = await jwtVerify(token, JWT_SECRET);
@@ -70,6 +72,7 @@ export async function proxy(request: NextRequest) {
 export const config = {
   matcher: [
     '/admin/dashboard/:path*',
-    '/tenant/dashboard/:path*',
+    '/tenant/dashboard/:path*', // 👈 Masasalo na nito ang lahat ng sub-pages sa ilalim ng tenant dashboard
+    '/tenant/login',            // 👈 Para ma-check din kung naka-login na
   ],
 };

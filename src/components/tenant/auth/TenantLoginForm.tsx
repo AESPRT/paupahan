@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
+import { loginTenantAction } from "@/src/actions/tenant/tenant-auth-actions"; // I-adjust ang path kung kinakailangan
 
 interface TenantLoginFormProps {
   onSuccessLogin: (loginCode: string) => void;
@@ -9,37 +10,28 @@ interface TenantLoginFormProps {
 export function TenantLoginForm({ onSuccessLogin }: TenantLoginFormProps) {
   const [code, setCode] = useState("");
   const [error, setError] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
+  const [isPending, startTransition] = useTransition();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.SubmitEvent) => {
     e.preventDefault();
     setError("");
 
-    const cleanCode = code.trim().toUpperCase();
+    const cleanCode = code.trim();
 
     if (!cleanCode) {
       setError("Paki-type ang iyong Tenant Login Code.");
       return;
     }
 
-    if (cleanCode.length < 6) {
-      setError("Siguraduhing tama at kumpleto ang iyong Login Code.");
-      return;
-    }
+    startTransition(async () => {
+      const result = await loginTenantAction(cleanCode);
 
-    setIsLoading(true);
-
-    // Simulate API Verification Check
-    setTimeout(() => {
-      // Demo validation: Gagana ang anumang valid format tulad ng "TNT-123456" o galing sa mock data
-      if (cleanCode.includes("INVALID")) {
-        setError("Hindi mahanap ang Tenant Code na ito. Mangyaring sumangguni sa iyong Landlord.");
-        setIsLoading(false);
-      } else {
-        setIsLoading(false);
+      if (result.success) {
         onSuccessLogin(cleanCode);
+      } else {
+        setError(result.error || "Hindi mahanap ang Tenant Code na ito. Mangyaring sumangguni sa iyong Landlord.");
       }
-    }, 1000);
+    });
   };
 
   return (
@@ -59,12 +51,13 @@ export function TenantLoginForm({ onSuccessLogin }: TenantLoginFormProps) {
         <div className="relative">
           <input
             type="text"
-            maxLength={12}
+            maxLength={20}
             placeholder="e.g. TNT-8K2P9X"
             value={code}
-            onChange={(e) => setCode(e.target.value.toUpperCase())}
-            className="w-full rounded-2xl border border-line bg-paper px-4 py-3.5 font-mono-brand text-center text-base font-bold tracking-widest text-forest-deep outline-none transition-all placeholder:font-sans placeholder:text-xs placeholder:font-normal placeholder:tracking-normal placeholder:text-muted focus:border-forest focus:ring-2 focus:ring-forest/10"
+            onChange={(e) => setCode(e.target.value)}
+            className="w-full rounded-2xl border border-line bg-paper px-4 py-3.5 font-mono-brand text-center text-base font-bold tracking-widest text-forest-deep outline-none transition-all placeholder:font-sans placeholder:text-xs placeholder:font-normal placeholder:tracking-normal placeholder:text-muted focus:border-forest focus:ring-2 focus:ring-forest/10 uppercase"
             required
+            disabled={isPending}
           />
         </div>
         <p className="mt-1.5 text-[11px] text-muted text-center">
@@ -75,10 +68,10 @@ export function TenantLoginForm({ onSuccessLogin }: TenantLoginFormProps) {
       {/* Submit Button */}
       <button
         type="submit"
-        disabled={isLoading}
+        disabled={isPending}
         className="w-full rounded-2xl bg-forest py-3.5 font-mono-brand text-xs font-bold text-white shadow-md transition-all hover:bg-forest-deep active:scale-95 disabled:opacity-50"
       >
-        {isLoading ? (
+        {isPending ? (
           <span className="flex items-center justify-center gap-2">
             <span className="h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent" />
             Biniberipika...

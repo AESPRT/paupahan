@@ -31,7 +31,7 @@ export function LoginHelpModal({ isOpen, onClose }: LoginHelpModalProps) {
             2. Maaari mo itong hingin sa iyong Property Owner o Landlord sa pamamagitan ng SMS o Chat.
           </p>
           <p>
-            3. Ang format nito ay karaniwang may 6 na character (halimbawa: <code className="rounded bg-paper px-1.5 py-0.5 font-mono-brand font-bold text-forest-deep">TNT-8K2P9X</code>).
+            3. Ang format nito ay karaniwang may 6 na character (halimbawa: <code className="rounded bg-paper px-1.5 py-0.5 font-mono-brand font-bold text-forest-deep">TENANT-8K2P9X</code>).
           </p>
         </div>
 

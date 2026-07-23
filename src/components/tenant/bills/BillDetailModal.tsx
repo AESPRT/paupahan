@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation"; // ✨ 1. I-import ang useRouter
 import { TenantBill } from "@/src/types/tenant/tenant-bill";
 import { ReadingUploadModal } from "./ReadingUploadModal";
 
@@ -22,6 +23,7 @@ export function BillDetailModal({
   onClose,
   onUpdateUtility,
 }: BillDetailModalProps) {
+  const router = useRouter(); // ✨ 2. Gamitin ang router hook
   const [uploadUtilityType, setUploadUtilityType] = useState<"electricity" | "water" | null>(null);
 
   if (!isOpen || !bill) return null;
@@ -251,22 +253,40 @@ export function BillDetailModal({
           </div>
 
           {/* Grand Total Footer */}
-          <div className="rounded-2xl bg-forest/10 p-4 border border-forest/20 flex items-center justify-between">
-            <div>
-              <p className="font-mono-brand text-[10px] uppercase font-bold text-forest-deep">
-                Kabuuang Bayarin (Total Bill)
-              </p>
-              <p className="text-[11px] text-muted">Due Date: {bill.dueDate}</p>
+          <div className="rounded-2xl bg-forest/10 p-4 border border-forest/20 space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-mono-brand text-[10px] uppercase font-bold text-forest-deep">
+                  Kabuuang Bayarin (Total Bill)
+                </p>
+                <p className="text-[11px] text-muted">Due Date: {bill.dueDate}</p>
+              </div>
+              <div className="font-display text-xl font-black text-forest-deep">
+                {bill.status === "Draft Pending Readings" || bill.status === "Pending Landlord Approval" ? (
+                  <span className="text-xs font-normal text-amber-800 font-mono-brand">
+                    Kailangan muna ng Approved Readings
+                  </span>
+                ) : (
+                  `₱${computedTotal.toLocaleString("en-PH", { minimumFractionDigits: 2 })}`
+                )}
+              </div>
             </div>
-            <div className="font-display text-xl font-black text-forest-deep">
-              {bill.status === "Draft Pending Readings" ? (
-                <span className="text-xs font-normal text-amber-800 font-mono-brand">
-                  Kailangan muna ng Approved Readings
-                </span>
-              ) : (
-                `₱${computedTotal.toLocaleString("en-PH", { minimumFractionDigits: 2 })}`
-              )}
-            </div>
+
+            {/* ✨ PAY BUTTON: Magre-redirect sa payment page gamit ang bill.id */}
+            {bill.status === "Pending Payment" && (
+              <button
+                onClick={() => {
+                  router.push(`/tenant/payment/${bill.id}`);
+                }}
+                className="w-full flex items-center justify-center gap-2 rounded-xl bg-forest py-3 font-mono-brand text-xs font-bold text-white shadow-md hover:bg-forest-deep transition-all active:scale-95"
+              >
+                {/* Credit Card / Payment Icon */}
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                </svg>
+                <span>Magbayad Na (Pay Now)</span>
+              </button>
+            )}
           </div>
 
           <button

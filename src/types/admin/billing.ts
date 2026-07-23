@@ -1,4 +1,4 @@
-export type BillingStatus = "Paid" | "Pending" | "Overdue";
+export type BillingStatus = "Paid" | "Pending" | "Overdue" | "Draft";
 
 export interface LineItem {
   description: string;

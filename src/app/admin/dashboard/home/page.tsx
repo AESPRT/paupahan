@@ -5,7 +5,7 @@ import { PendingApprovals } from "@/src/components/admin/dashboard/PendingApprov
 import { RecentActivities } from "@/src/components/admin/dashboard/RecentActivities";
 import { AdminAuditLogs } from "@/src/components/admin/dashboard/AdminAuditLogs";
 import { Footer } from "@/src/components/landing/Footer";
-import { getDashboardData } from "@/src/actions/dashboard-actions"; // ✨ Import ang dashboard action
+import { getDashboardData, handleApprovalAction } from "@/src/actions/dashboard-actions";
 
 export const metadata = {
   title: "Dashboard | Paupahan Admin",
@@ -13,31 +13,34 @@ export const metadata = {
 };
 
 export default async function DashboardPage() {
-  // ✨ Kunin ang totoong data mula sa database sa pamamagitan ng Server Action
   const { adminName, stats, auditLogs, chartData, pendingReadings, recentActivities } = await getDashboardData();
+
+  // ✨ Wrapper function para magtugma ang return type sa Promise<void> na inaasahan ng component
+  const handleActionWrapper = async (id: string, actionType: "approve" | "reject") => {
+    "use server";
+    const res = await handleApprovalAction(id, actionType);
+    if (!res.success) {
+      throw new Error(res.error || "Nabigong iproseso ang aksyon.");
+    }
+  };
 
   return (
     <div className="space-y-6 p-4 sm:p-6 lg:p-8">
-      {/* Top Header Component - Ipinapasa ang tunay na pangalan ng naka-login */}
       <DashboardHeader adminName={adminName} />
 
-      {/* 1. Stat Summary Section - Ipinapasa ang real database stats kung tatanggapin ng StatCards mo */}
       <section aria-label="Quick Statistics">
         <StatCards stats={stats} />
       </section>
 
-      {/* 2. Main Analytics & Activity Grid */}
       <section className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        {/* Analytics & Approvals Area */}
         <div className="space-y-6 lg:col-span-2">
           <RevenueChart data={chartData} />
-          <PendingApprovals readings={pendingReadings} />
+          {/* ✨ Gamitin ang wrapper function dito */}
+          <PendingApprovals readings={pendingReadings} onAction={handleActionWrapper} />
         </div>
 
-        {/* Notifications & Audit Logs Sidebar */}
         <div className="space-y-6">
           <RecentActivities activities={recentActivities} />
-          {/* ✨ Ipinapasa ang mga aktwal na audit logs mula sa DB */}
           <AdminAuditLogs logs={auditLogs} />
         </div>
       </section>

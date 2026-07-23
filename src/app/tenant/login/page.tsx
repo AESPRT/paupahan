@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { TenantLoginForm } from "@/src/components/tenant/auth/TenantLoginForm";
 import { LoginHelpModal } from "@/src/components/tenant/auth/LoginHelpModal";
 import { PaupahanLogo } from "@/src/components/ui/PaupahanLogo";
+import { Footer } from "@/src/components/landing/Footer";
 
 export default function TenantLoginPage() {
   const router = useRouter();
@@ -17,7 +18,7 @@ export default function TenantLoginPage() {
     }
 
     // Direct redirect patungo sa Tenant Portal Dashboard
-    router.push("/tenant/dashboard");
+    router.push("/tenant/dashboard/home");
   };
 
   return (
@@ -55,9 +56,7 @@ export default function TenantLoginPage() {
         </div>
 
         {/* Footer info */}
-        <p className="text-center font-mono-brand text-[11px] text-muted">
-          Paupahan SaaS System © 2026 • Ligtas at Mabilis na Portal
-        </p>
+        <Footer showNavLinks={false} />
       </div>
 
       {/* FAQ / Help Modal */}

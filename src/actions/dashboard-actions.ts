@@ -1,6 +1,7 @@
 'use server'
 
 import prisma from '@/src/lib/prisma'
+import { revalidatePath } from 'next/cache'
 import { cookies } from 'next/headers'
 
 export async function getDashboardData() {
@@ -87,9 +88,19 @@ export async function getDashboardData() {
 
     // 4. Kunin at i-map ang mga pending na bills/readings para sa Approvals
     const rawPendingBills = await prisma.bill.findMany({
-      where: { status: 'pending' },
+      where: { 
+        status: 'draft', // ✨ Binago sa 'draft' para makita lang ang mga di pa aprubado
+        items: {
+          some: {
+            OR: [
+              { proofPhotoUrl: { not: null } },
+              { currentReading: { not: null } }
+            ]
+          }
+        }
+      },
       orderBy: { generatedAt: 'desc' },
-      take: 5,
+      take: 10,
       include: {
         tenant: {
           select: {
@@ -108,15 +119,15 @@ export async function getDashboardData() {
             },
           },
         },
-        items: {
-          select: { type: true },
-        },
+        items: true,
       },
-    })
+    });
 
-    const pendingReadings = rawPendingBills.map((bill) => {
+    // I-flat map ang bawat item para kung may tubig at kuryente silang sabay na sinumite, hiwalay silang lilitaw sa listahan
+    const pendingReadings: any[] = [];
+
+    rawPendingBills.forEach((bill) => {
       const tenantName = bill.tenant?.fullName || 'Unknown Tenant';
-      
       const activeLease = bill.tenant?.leases?.[0];
       const roomNum = activeLease?.room?.roomNumber || '';
       const unitName = activeLease?.room?.unit?.name || '';
@@ -129,25 +140,41 @@ export async function getDashboardData() {
         minute: 'numeric',
       }).format(new Date(bill.generatedAt));
 
-      let type: "water" | "electricity" | "rent" | "amenities" = "rent";
-      const itemType = bill.items?.[0]?.type?.toLowerCase() || '';
-      if (itemType.includes('water')) type = "water";
-      else if (itemType.includes('electric')) type = "electricity";
-      else if (itemType.includes('amenit') || itemType.includes('parking')) type = "amenities";
+      // Suriin ang bawat item ng bill (Electricity, Water, atbp.)
+      bill.items.forEach((item) => {
+        // Ipakita lang sa pending approvals kung may current reading o litrato na pinasa ang tenant para sa item na ito
+        if (item.currentReading !== null || item.proofPhotoUrl) {
+          let type: "water" | "electricity" | "rent" | "amenities" = "electricity";
+          const itemType = item.type.toLowerCase();
+          
+          if (itemType.includes('water')) {
+            type = "water";
+          } else if (itemType.includes('electric')) {
+            type = "electricity";
+          } else if (itemType.includes('amenit') || itemType.includes('parking')) {
+            type = "amenities";
+          } else {
+            type = "rent";
+          }
 
-      const amountFormatted = new Intl.NumberFormat('fil-PH', {
-        style: 'currency',
-        currency: 'PHP',
-      }).format(Number(bill.totalAmount));
+          const itemAmountFormatted = new Intl.NumberFormat('fil-PH', {
+            style: 'currency',
+            currency: 'PHP',
+          }).format(Number(item.amount));
 
-      return {
-        id: bill.id,
-        tenantName,
-        unitName: unitLabel,
-        type,
-        readingOrAmount: amountFormatted,
-        dateSubmitted: timeAgo,
-      };
+          pendingReadings.push({
+            id: `${bill.id}-${item.type}`, // Ginawang unique ID gamit ang billId at item type para hindi mag-overlap
+            billId: bill.id, // I-save ang totoong bill id para sa approval action
+            utilityType: item.type, // Para malaman kung tubig o kuryente ang ia-apruba
+            tenantName,
+            unitName: unitLabel,
+            type,
+            readingOrAmount: `${item.currentReading || 0} ${item.unitLabel || 'units'} (${itemAmountFormatted})`,
+            dateSubmitted: timeAgo,
+            proofPhotoUrl: item.proofPhotoUrl || undefined,
+          });
+        }
+      });
     });
 
     // 5. Kunin ang huling mga notifications/activities para sa RecentActivities
@@ -252,5 +279,113 @@ export async function getDashboardData() {
       recentActivities: [],
       auditLogs: [],
     }
+  }
+}
+
+export async function handleApprovalAction(compositeId: string, actionType: "approve" | "reject") {
+  try {
+    const cookieStore = await cookies();
+    const adminId = cookieStore.get("session_user_id")?.value;
+
+    if (!adminId) {
+      return { success: false, error: "Walang active session." };
+    }
+
+    let billId = compositeId;
+    let targetUtilityType: string | null = null;
+
+    if (compositeId.endsWith("-electricity")) {
+      billId = compositeId.replace("-electricity", "");
+      targetUtilityType = "electricity";
+    } else if (compositeId.endsWith("-water")) {
+      billId = compositeId.replace("-water", "");
+      targetUtilityType = "water";
+    }
+
+    if (actionType === "approve") {
+      const bill = await prisma.bill.findUnique({
+        where: { id: billId },
+        include: { items: true },
+      });
+
+      if (!bill) {
+        return { success: false, error: "Hindi mahanap ang bill." };
+      }
+
+      // ✨ Kapag inaprubahan ng landlord, gagawin na itong 'pending' (o lumabas bilang opisyal na bill para bayaran)
+      // para mawala na siya sa draft/pending approvals list ng mga di pa aprubado.
+      await prisma.bill.update({
+        where: { id: billId },
+        data: {
+          status: "pending", 
+        },
+      });
+
+      await prisma.auditLog.create({
+        data: {
+          action: `Aprubahan ang Draft Bill / Utility Reading (${targetUtilityType || 'All'})`,
+          entityType: "Bill",
+          entityId: billId,
+          actorId: adminId,
+        },
+      });
+    } else {
+      // ✨ Kapag tinanggihan (Reject), i-reset ang readings/litrato at panatilihing draft o i-clear
+      const whereClause: any = targetUtilityType 
+        ? { billId, type: targetUtilityType as any }
+        : { billId };
+
+      const billItems = await prisma.billItem.findMany({ where: whereClause });
+      
+      for (const item of billItems) {
+        await prisma.billItem.update({
+          where: { id: item.id },
+          data: {
+            currentReading: null,
+            unitsUsed: 0,
+            amount: 0,
+            proofPhotoUrl: null,
+          },
+        });
+      }
+
+      const bill = await prisma.bill.findUnique({ 
+        where: { id: billId },
+        include: { items: true }
+      });
+
+      if (bill) {
+        let totalUtilityAmount = 0;
+        bill.items.forEach(item => {
+          totalUtilityAmount += Number(item.amount || 0);
+        });
+
+        const baseAmount = Number(bill.rentAmount) + Number(bill.amenitiesFee);
+        const newTotalAmount = baseAmount + totalUtilityAmount;
+
+        await prisma.bill.update({
+          where: { id: billId },
+          data: {
+            utilityAmount: totalUtilityAmount,
+            totalAmount: newTotalAmount,
+          },
+        });
+      }
+
+      await prisma.auditLog.create({
+        data: {
+          action: `Tinanggihan ang Draft Utility Reading (${targetUtilityType || 'All'})`,
+          entityType: "Bill",
+          entityId: billId,
+          actorId: adminId,
+        },
+      });
+    }
+
+    revalidatePath("/admin/dashboard/home");
+    return { success: true };
+  } catch (error) {
+    console.error("Error in handleApprovalAction:", error);
+    return { success: false, error: "Nagkaroon ng problema sa sistema." };
   }
 }

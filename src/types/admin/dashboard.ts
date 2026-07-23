@@ -13,6 +13,12 @@ export interface PendingReading {
   type: "water" | "electricity" | "rent" | "amenities";
   readingOrAmount: string;
   dateSubmitted: string;
+  proofPhotoUrl?: string; // ✨ Para sa litrato ng metro
+  utilityDetails?: {
+    previousReading: number;
+    currentReading: number;
+    unitsUsed: number;
+  };
 }
 
 export interface ActivityNotification {

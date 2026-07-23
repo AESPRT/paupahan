@@ -1,57 +1,50 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useTransition } from "react";
 import { BillingsHeader } from "@/src/components/admin/billings/BillingsHeader";
 import { CreateInvoiceModal } from "@/src/components/admin/billings/CreateInvoiceModal";
 import { InvoicesList } from "@/src/components/admin/billings/InvoicesList";
 import { Invoice } from "@/src/types/admin/billing";
 import { Footer } from "@/src/components/landing/Footer";
-
-const INITIAL_INVOICES: Invoice[] = [
-  {
-    id: "inv-101",
-    invoiceNumber: "INV-2026-001",
-    tenantName: "Juan Dela Cruz",
-    unitRoom: "Unit 102 - Room A",
-    issueDate: "2026-07-01",
-    dueDate: "2026-07-05",
-    lineItems: [
-      { description: "Buwanang Renta", amount: 6500 },
-      { description: "Sub-meter Kuryente", amount: 1420 },
-    ],
-    totalAmount: 7920,
-    status: "Paid",
-  },
-  {
-    id: "inv-102",
-    invoiceNumber: "INV-2026-002",
-    tenantName: "Maria Clara",
-    unitRoom: "Unit 201 - Room C",
-    issueDate: "2026-07-01",
-    dueDate: "2026-08-05",
-    lineItems: [
-      { description: "Buwanang Renta", amount: 7500 },
-      { description: "Tubig & Internet", amount: 680 },
-    ],
-    totalAmount: 8180,
-    status: "Pending",
-  },
-  {
-    id: "inv-103",
-    invoiceNumber: "INV-2026-003",
-    tenantName: "Pedro Penduko",
-    unitRoom: "Unit 101 - Room B",
-    issueDate: "2026-06-01",
-    dueDate: "2026-06-05",
-    lineItems: [{ description: "Buwanang Renta", amount: 6500 }],
-    totalAmount: 6500,
-    status: "Overdue",
-  },
-];
+import { 
+  getBillingsData, 
+  getOccupiedRoomsForBilling, 
+  createInvoiceAction, 
+  markInvoiceAsPaidAction 
+} from "@/src/actions/billings-actions";
 
 export default function BillingsPage() {
-  const [invoices, setInvoices] = useState<Invoice[]>(INITIAL_INVOICES);
+  interface ActiveTenantRoom {
+    roomId: string;
+    roomNumber: string;
+    unitName: string;
+    tenantName: string;
+    monthlyRent: number;
+  }
+
+  // Sa loob ng BillingsPage component:
+  const [occupiedRooms, setOccupiedRooms] = useState<ActiveTenantRoom[]>([]);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [isPending, startTransition] = useTransition();
+
+  // Load data mula sa database kapag binuksan ang pahina
+  useEffect(() => {
+    getBillingsData().then((data) => {
+      setInvoices(data.invoices as Invoice[]);
+      setLoading(false);
+    });
+  }, []);
+
+  // Function para buksan ang modal at i-fetch ang mga occupied rooms
+  const handleOpenModal = async () => {
+    const result = await getOccupiedRoomsForBilling();
+    if (result.success) {
+      setOccupiedRooms(result.roomsWithTenants);
+    }
+    setIsModalOpen(true);
+  };
 
   // Calculations for Summary Cards
   const totalCollected = invoices
@@ -66,37 +59,58 @@ export default function BillingsPage() {
     .filter((inv) => inv.status === "Overdue")
     .reduce((sum, inv) => sum + inv.totalAmount, 0);
 
-  // Handlers
-  const handleCreateInvoice = (
-    newInvoiceData: Omit<Invoice, "id" | "invoiceNumber">
-  ) => {
-    const newInvoice: Invoice = {
-      ...newInvoiceData,
-      id: `inv-${Date.now()}`,
-      invoiceNumber: `INV-2026-${String(invoices.length + 1).padStart(3, "0")}`,
-    };
-
-    setInvoices((prev) => [newInvoice, ...prev]);
+  // Handlers (Dynamic with Server Actions)
+  const handleCreateInvoice = async (newInvoiceData: Omit<Invoice, "id" | "invoiceNumber">) => {
+    startTransition(async () => {
+      const result = await createInvoiceAction(newInvoiceData);
+      if (result.success) {
+        // Refresh data para makuha ang bagong listahan galing database
+        const data = await getBillingsData();
+        setInvoices(data.invoices as Invoice[]);
+        setIsModalOpen(false);
+      } else {
+        alert(result.error);
+      }
+    });
   };
 
-  const handleMarkAsPaid = (id: string) => {
+  const handleMarkAsPaid = async (id: string) => {
+    // Optimistic UI update para mabilis magbago sa screen
     setInvoices((prev) =>
       prev.map((inv) => (inv.id === id ? { ...inv, status: "Paid" } : inv))
     );
+
+    startTransition(async () => {
+      const result = await markInvoiceAsPaidAction(id);
+      if (!result.success) {
+        alert(result.error);
+        // Refresh para ibalik sa tamang data kung nagka-error
+        const data = await getBillingsData();
+        setInvoices(data.invoices as Invoice[]);
+      }
+    });
   };
 
   const handleSendReminder = (invoice: Invoice) => {
     alert(`Nagpadala ng billing reminder kay ${invoice.tenantName} para sa ${invoice.invoiceNumber}`);
   };
 
+  if (loading) {
+    return (
+      <div className="flex h-[60vh] items-center justify-center">
+        <span className="text-sm font-medium text-muted">Nag-a-load ng billings at invoices...</span>
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-6 p-4 sm:p-6 lg:p-8">
+    <div className={`space-y-6 p-4 sm:p-6 lg:p-8 ${isPending ? 'opacity-75 transition-opacity' : ''}`}>
       {/* Header & Financial Metrics */}
       <BillingsHeader
         totalCollected={totalCollected}
         totalPending={totalPending}
         totalOverdue={totalOverdue}
-        onCreateInvoice={() => setIsModalOpen(true)}
+        onCreateInvoice={handleOpenModal} // 👈 Ginamit ang handleOpenModal para ma-fetch muna ang rooms bago buksan ang modal
       />
 
       {/* Invoices List */}
@@ -111,9 +125,10 @@ export default function BillingsPage() {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onCreate={handleCreateInvoice}
+        roomsWithTenants={occupiedRooms} // 👈 Ipinasa ang listahan ng occupied rooms papuntang modal
       />
 
-      <Footer showNavLinks = {false} />
+      <Footer showNavLinks={false} />
     </div>
   );
 }

@@ -11,11 +11,15 @@ export function BillCardItem({ bill, onOpenDetails }: BillCardItemProps) {
       case "Paid":
         return "bg-emerald-100 text-emerald-800 border-emerald-300";
       case "Pending Payment":
+        return "bg-blue-100 text-blue-800 border-blue-300";
+      case "Pending Landlord Approval":
         return "bg-amber-100 text-amber-800 border-amber-300";
       case "Draft Pending Readings":
         return "bg-purple-100 text-purple-800 border-purple-300";
       case "Overdue":
         return "bg-rose-100 text-rose-800 border-rose-300";
+      default:
+        return "bg-gray-100 text-gray-800 border-gray-300";
     }
   };
 

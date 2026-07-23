@@ -3,26 +3,52 @@
 import { useState } from "react";
 import { Invoice } from "@/src/types/admin/billing";
 
+interface ActiveTenantRoom {
+  roomId: string;
+  roomNumber: string;
+  unitName: string;
+  tenantName: string;
+  monthlyRent: number;
+}
+
 interface CreateInvoiceModalProps {
   isOpen: boolean;
   onClose: () => void;
   onCreate: (invoice: Omit<Invoice, "id" | "invoiceNumber">) => void;
+  roomsWithTenants?: ActiveTenantRoom[]; // Listahan ng mga may active tenant
 }
 
 export function CreateInvoiceModal({
   isOpen,
   onClose,
   onCreate,
+  roomsWithTenants = [],
 }: CreateInvoiceModalProps) {
+  const [selectedRoomId, setSelectedRoomId] = useState("");
   const [tenantName, setTenantName] = useState("");
   const [unitRoom, setUnitRoom] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [rentAmount, setRentAmount] = useState("");
   const [utilityAmount, setUtilityAmount] = useState("");
 
+  // Kapag nagbago ang piniling room, auto-fill ang tenant name at default rent amount
+  const handleRoomChange = (roomId: string) => {
+    setSelectedRoomId(roomId);
+    const found = roomsWithTenants.find((r) => r.roomId === roomId);
+    if (found) {
+      setTenantName(found.tenantName);
+      setUnitRoom(`${found.unitName} - Room ${found.roomNumber}`);
+      setRentAmount(found.monthlyRent ? found.monthlyRent.toString() : "");
+    } else {
+      setTenantName("");
+      setUnitRoom("");
+      setRentAmount("");
+    }
+  };
+
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.SubmitEvent) => {
     e.preventDefault();
     if (!tenantName || !unitRoom || !dueDate) return;
 
@@ -51,6 +77,8 @@ export function CreateInvoiceModal({
       status: "Pending",
     });
 
+    // Reset form
+    setSelectedRoomId("");
     setTenantName("");
     setUnitRoom("");
     setDueDate("");
@@ -75,32 +103,39 @@ export function CreateInvoiceModal({
         </div>
 
         <form onSubmit={handleSubmit} className="mt-4 space-y-3.5">
+          {/* Dropdown para sa mga Occupied Rooms */}
           <div>
             <label className="block text-xs font-bold text-forest-deep mb-1">
-              Pangalan ng Tenant
+              Pumili ng Kuwarto / Tenant (Occupied)
             </label>
-            <input
-              type="text"
+            <select
               required
-              placeholder="e.g. Juan Dela Cruz"
-              value={tenantName}
-              onChange={(e) => setTenantName(e.target.value)}
+              value={selectedRoomId}
+              onChange={(e) => handleRoomChange(e.target.value)}
               className="w-full rounded-xl border border-line bg-paper px-3.5 py-2 text-xs font-medium text-ink outline-none focus:border-forest"
-            />
+            >
+              <option value="">-- Piliin ang Kuwarto at Tenant --</option>
+              {roomsWithTenants.map((item) => (
+                <option key={item.roomId} value={item.roomId}>
+                  {item.unitName} - Room {item.roomNumber} ({item.tenantName})
+                </option>
+              ))}
+            </select>
           </div>
 
+          {/* Auto-filled Tenant Name & Due Date */}
           <div className="grid grid-cols-2 gap-2">
             <div>
               <label className="block text-xs font-bold text-forest-deep mb-1">
-                Unit at Kwarto
+                Pangalan ng Tenant
               </label>
               <input
                 type="text"
                 required
-                placeholder="e.g. Unit 101 - Room A"
-                value={unitRoom}
-                onChange={(e) => setUnitRoom(e.target.value)}
-                className="w-full rounded-xl border border-line bg-paper px-3.5 py-2 text-xs font-medium text-ink outline-none focus:border-forest"
+                readOnly
+                placeholder="Awtomatikong lalabas..."
+                value={tenantName}
+                className="w-full rounded-xl border border-line bg-paper/60 px-3.5 py-2 text-xs font-medium text-muted outline-none cursor-not-allowed"
               />
             </div>
 

@@ -64,12 +64,12 @@ interface TenantNavItem extends Omit<NavItem, "icon"> {
 }
 
 const NAV_ITEMS: TenantNavItem[] = [
-  { id: "dashboard", label: "Dashboard", path: "/tenant/dashboard", icon: Icons.Dashboard },
-  { id: "bills", label: "Bills", path: "/tenant/bills", icon: Icons.Bills },
-  { id: "utilities", label: "Utilities", path: "/tenant/utilities", icon: Icons.Utilities },
-  { id: "maintenance", label: "Maintenance", path: "/tenant/maintenance", icon: Icons.Maintenance },
-  { id: "history", label: "History", path: "/tenant/history", icon: Icons.History },
-  { id: "settings", label: "Settings", path: "/tenant/settings", icon: Icons.Settings },
+  { id: "dashboard", label: "Dashboard", path: "/tenant/dashboard/home", icon: Icons.Dashboard },
+  { id: "bills", label: "Bills", path: "/tenant/dashboard/bills", icon: Icons.Bills },
+  { id: "utilities", label: "Utilities", path: "/tenant/dashboard/utilities", icon: Icons.Utilities },
+  { id: "maintenance", label: "Maintenance", path: "/tenant/dashboard/maintenance", icon: Icons.Maintenance },
+  { id: "history", label: "History", path: "/tenant/dashboard/history", icon: Icons.History },
+  { id: "settings", label: "Settings", path: "/tenant/dashboard/settings", icon: Icons.Settings },
 ];
 
 export function TenantNavigationRail() {
