@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 'use server'
 
 import prisma from '@/src/lib/prisma'
@@ -8,14 +7,34 @@ import { createAuditLog } from '@/src/actions/audit-actions'
 
 export async function getUnitsData() {
   try {
+    const cookieStore = await cookies();
+    const adminId = cookieStore.get('session_user_id')?.value;
+
+    if (!adminId) {
+      return [];
+    }
+
+    // 1. Kunin muna ang mga property ID na pagmamay-ari ng naka-login na landlord
+    const landlordProperties = await prisma.property.findMany({
+      where: { landlordId: adminId },
+      select: { id: true },
+    });
+    const propertyIds = landlordProperties.map((p) => p.id);
+
+    if (propertyIds.length === 0) {
+      return [];
+    }
+
+    // 2. Kunin lamang ang mga unit sa ilalim ng mga property ng landlord na ito
     const unitsList = await prisma.unit.findMany({
+      where: { propertyId: { in: propertyIds } },
       include: {
         property: { select: { name: true, city: true, addressLine: true } },
         rooms: {
           include: {
             leases: {
               where: { 
-                status: { in: ['active', 'pending'] } // 👈 Isama ang pending
+                status: { in: ['active', 'pending'] } 
               },
               include: {
                 tenant: { select: { fullName: true } },
@@ -26,7 +45,7 @@ export async function getUnitsData() {
         },
       },
       orderBy: { createdAt: 'desc' },
-    })
+    });
 
     const formattedUnits = unitsList.map((unit) => {
       const formattedRooms = unit.rooms.map((room) => {
@@ -37,7 +56,6 @@ export async function getUnitsData() {
         if (room.status === 'maintenance') {
           status = "Maintenance";
         } else if (activeOrPendingLease) {
-          // Kung ang lease ay pending, gawing "Reserved", kung active naman ay "Occupied"
           status = activeOrPendingLease.status === 'pending' ? "Reserved" : "Occupied";
         } else if (room.status === 'occupied') {
           status = "Occupied";
@@ -76,56 +94,45 @@ export async function addUnitAction(name: string) {
     if (!adminId) {
       return { success: false, error: "Walang active session." };
     }
-    
-    await createAuditLog({
-      actorId: adminId,
-        action: `Gumawa ng bagong Unit/Building: ${name}`,
-        entityType: 'Unit',
-        entityId: adminId,
-        metadata: { actionType: 'ADD' },
-    })
 
-    // 1. Hanapin muna ang unang available na Property sa database
-    let property = await prisma.property.findFirst();
+    // 1. Hanapin muna kung mayroon nang property ang landlord na ito
+    let property = await prisma.property.findFirst({
+      where: { landlordId: adminId },
+    });
 
-    // 2. Kung walang property, kailangan nating kumuha ng Landlord para maikonekta ito
+    // 2. Kung wala pang property ang landlord na ito, gawan siya ng sariling property
     if (!property) {
-      const landlordUser = await prisma.user.findFirst({
-        where: { 
-          OR: [
-            { role: 'staff' },
-            { role: 'landlord' }
-          ]
-        }
-      });
-
-      if (!landlordUser) {
-        return { success: false, error: 'Walang nahanap na Landlord o Admin account sa database para magmay-ari ng Property.' };
-      }
-
       property = await prisma.property.create({
         data: {
           name: "Pangunahing Gusali",
           addressLine: "Main Address",
           city: "Manila",
-          landlordId: landlordUser.id,
-        } as any,
+          landlordId: adminId,
+        },
       });
     }
 
-    // 3. I-create na ang Unit sa ilalim ng nahanap o ginawang Property
+    await createAuditLog({
+      actorId: adminId,
+      action: `Gumawa ng bagong Unit/Building: ${name}`,
+      entityType: 'Unit',
+      entityId: adminId,
+      metadata: { actionType: 'ADD' },
+    });
+
+    // 3. I-create ang Unit sa ilalim ng property ng landlord
     await prisma.unit.create({
       data: {
         propertyId: property.id,
         name,
       },
-    })
+    });
     
-    revalidatePath('/admin/dashboard/units')
-    return { success: true }
+    revalidatePath('/admin/dashboard/units');
+    return { success: true };
   } catch (error) {
     console.error('Error adding unit:', error);
-    return { success: false, error: 'May naganap na error sa pagdagdag ng unit/building.' }
+    return { success: false, error: 'May naganap na error sa pagdagdag ng unit/building.' };
   }
 }
 
@@ -137,38 +144,36 @@ export async function addRoomAction(propertyOrUnitId: string, roomNumber: string
     if (!adminId) {
       return { success: false, error: "Walang active session." };
     }
-    
-    await createAuditLog({
-      actorId: adminId,
-        action: `Gumawa ng bagong Room: ${roomNumber} sa Unit/Property ID: ${propertyOrUnitId}`,
-        entityType: 'Room',
-        entityId: adminId,
-        metadata: { actionType: 'ADD' },
-    })
 
     let targetUnitId = propertyOrUnitId;
 
-    // 1. Suriin muna kung ang ID na ipinasa ay direktang isang Unit ID
-    const unitExists = await prisma.unit.findUnique({
-      where: { id: propertyOrUnitId },
+    // 1. Suriin muna kung ang ID ay direktang isang Unit na pag-aari ng landlord
+    const unitExists = await prisma.unit.findFirst({
+      where: { 
+        id: propertyOrUnitId,
+        property: { landlordId: adminId }
+      },
     });
 
-    // 2. Kung HINDI unit ang ID na ito, baka ito ay isang Property ID
+    // 2. Kung hindi unit, baka ito ay isang Property ID ng landlord
     if (!unitExists) {
-      const propertyExists = await prisma.property.findUnique({
-        where: { id: propertyOrUnitId },
+      const propertyExists = await prisma.property.findFirst({
+        where: { 
+          id: propertyOrUnitId,
+          landlordId: adminId
+        },
       });
 
       if (!propertyExists) {
-        return { success: false, error: 'Hindi natagpuan ang Unit o Property na ito.' };
+        return { success: false, error: 'Hindi natagpuan ang Unit o Property o wala kang pahintulot dito.' };
       }
 
-      // Hanapin kung mayroon nang Unit sa ilalim ng Property na ito
+      // Hanapin kung mayroon nang Unit sa ilalim ng property na ito
       let unit = await prisma.unit.findFirst({
         where: { propertyId: propertyOrUnitId },
       });
 
-      // Kung wala pang Unit sa ilalim ng property na ito, gumawa muna tayo ng default unit
+      // Kung wala pa, gumawa muna ng default unit
       if (!unit) {
         unit = await prisma.unit.create({
           data: {
@@ -181,7 +186,15 @@ export async function addRoomAction(propertyOrUnitId: string, roomNumber: string
       targetUnitId = unit.id;
     }
 
-    // 3. I-create na ang Room gamit ang tamang targetUnitId
+    await createAuditLog({
+      actorId: adminId,
+      action: `Gumawa ng bagong Room: ${roomNumber} sa Unit/Property ID: ${propertyOrUnitId}`,
+      entityType: 'Room',
+      entityId: adminId,
+      metadata: { actionType: 'ADD' },
+    });
+
+    // 3. I-create ang Room
     await prisma.room.create({
       data: {
         unitId: targetUnitId,
@@ -189,12 +202,12 @@ export async function addRoomAction(propertyOrUnitId: string, roomNumber: string
         monthlyRent,
         status: 'vacant',
       },
-    })
+    });
     
-    revalidatePath('/admin/dashboard/units')
-    return { success: true }
+    revalidatePath('/admin/dashboard/units');
+    return { success: true };
   } catch (error) {
     console.error('Error adding room:', error);
-    return { success: false, error: 'May naganap na error sa pagdagdag ng kwarto. Baka pareho ang numero ng kwarto sa unit na ito.' }
+    return { success: false, error: 'May naganap na error sa pagdagdag ng kwarto. Baka pareho ang numero ng kwarto sa unit na ito.' };
   }
 }

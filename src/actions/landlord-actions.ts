@@ -1,10 +1,13 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 'use server'
 
 import prisma from '@/src/lib/prisma'
+import { PlanTier } from '@prisma/client'
 import { revalidatePath } from 'next/cache'
 import bcrypt from 'bcryptjs'
 import { cookies } from 'next/headers'
 import { createAuditLog } from '@/src/actions/audit-actions'
+import axios from 'axios' // 👈 Gamit na ang axios
 
 export type ActionResponse = {
   success: boolean
@@ -18,6 +21,8 @@ export async function registerLandlord(formData: FormData): Promise<ActionRespon
     const email = formData.get('email') as string
     const phone = formData.get('phone') as string
     const password = formData.get('password') as string
+    const referenceNumber = formData.get('referenceNumber') as string
+    const selectedPlanParam = formData.get('plan') as string
 
     if (!fullName || !email || !password) {
       return { success: false, message: 'Punan ang lahat ng kinakailangang impormasyon.' }
@@ -34,7 +39,53 @@ export async function registerLandlord(formData: FormData): Promise<ActionRespon
     // I-hash ang password
     const passwordHash = await bcrypt.hash(password, 10)
 
-    // 1. I-create ang user account
+    // 1. Alamin ang plan tier at billing cycle gamit ang axios kung may referenceNumber
+    let planTierStr = selectedPlanParam || 'panimula'
+    let billingCycle = 'MONTHLY'
+
+    if (referenceNumber) {
+      try {
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+        
+        // Pagtawag gamit ang axios
+        const response = await axios.get(`${apiUrl}/v1/paupahan-payments/user-subscription`, {
+          params: { referenceNumber },
+          timeout: 5000, // 5 seconds timeout
+        });
+
+        if (response.data && response.data.hasActiveSub && response.data.subscription) {
+          const sub = response.data.subscription;
+          planTierStr = sub.package_id || sub.planTier || 'panimula';
+          billingCycle = sub.billing_cycle || 'MONTHLY';
+        }
+      } catch (apiError: any) {
+        console.error('Error fetching subscription from API server via Axios:', apiError.message || apiError);
+      }
+    }
+
+    // Siguraduhing valid ang PlanTier batay sa enum
+    const validPlanTiers = ['panimula', 'bahay_upa', 'maalam', 'negosyante', 'custom'];
+    const planTier: PlanTier = (validPlanTiers.includes(planTierStr) ? planTierStr : 'panimula') as PlanTier;
+
+    // 2. I-map ang mga limitasyon batay sa iyong PLANS config
+    let maxUnitsLimit = 1;
+    let maxRoomLimit = 3;
+
+    if (planTier === 'bahay_upa') {
+      maxUnitsLimit = 3;
+      maxRoomLimit = 10;
+    } else if (planTier === 'maalam') {
+      maxUnitsLimit = 10;
+      maxRoomLimit = 30;
+    } else if (planTier === 'negosyante') {
+      maxUnitsLimit = 30;
+      maxRoomLimit = 100;
+    } else if (planTier === 'custom') {
+      maxUnitsLimit = 999999;
+      maxRoomLimit = 999999;
+    }
+
+    // 3. I-create ang user account sa Prisma database
     const newUser = await prisma.user.create({
       data: {
         fullName,
@@ -45,18 +96,23 @@ export async function registerLandlord(formData: FormData): Promise<ActionRespon
       },
     })
 
-    // 2. Awtomatikong bigyan ng libreng default subscription
+    // 4. I-create ang subscription gamit ang tamang PlanTier at limitasyon
+    const durationMonths = billingCycle === 'ANNUAL' ? 12 : (planTier === 'panimula' ? 12 : 1);
+    const expiresAt = new Date();
+    expiresAt.setMonth(expiresAt.getMonth() + durationMonths);
+
     await prisma.subscription.create({
       data: {
         landlordId: newUser.id,
-        planTier: 'panimula',
+        planTier: planTier,
         status: 'active',
-        maxUnitsLimit: 1,
-        maxRoomLimit: 3,
+        maxUnitsLimit: maxUnitsLimit,
+        maxRoomLimit: maxRoomLimit,
+        renewsOn: expiresAt,
       },
     })
 
-    // 3. I-create ang Property kung mayroon
+    // 5. I-create ang Property kung mayroon
     if (propertyName) {
       await prisma.property.create({
         data: {
@@ -68,38 +124,36 @@ export async function registerLandlord(formData: FormData): Promise<ActionRespon
       })
     }
 
-    // 4. I-record sa Audit Log ang pagrerehistro ng bagong landlord account
+    // 6. I-record sa Audit Log
     await createAuditLog({
       actorId: newUser.id,
-      action: `Nilikha ang bagong Landlord account at property (${propertyName || 'Walang Pangalan'})`,
+      action: `Nilikha ang bagong Landlord account (Plano: ${planTier}) at property (${propertyName || 'Walang Pangalan'})`,
       entityType: 'AUTH',
       entityId: newUser.id,
-      metadata: { email: newUser.email, propertyName, actionType: 'REGISTER_LANDLORD' },
+      metadata: { email: newUser.email, propertyName, planTier, referenceNumber, actionType: 'REGISTER_LANDLORD' },
     })
 
-    // 5. Gumawa ng sesyon / i-set ang cookies para awtomatikong maging logged-in
+    // 7. I-set ang session cookies
     const cookieStore = await cookies()
     
-    // I-set ang session_user_id
     cookieStore.set('session_user_id', newUser.id, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
       path: '/',
-      maxAge: 60 * 60 * 24 * 7, // 1 linggo
+      maxAge: 60 * 60 * 24 * 7,
     })
 
-    // 👈 I-set din ang user_role cookie para mabasa ng proxy middleware
     cookieStore.set('user_role', newUser.role, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
       path: '/',
-      maxAge: 60 * 60 * 24 * 7, // 1 linggo
+      maxAge: 60 * 60 * 24 * 7,
     })
 
     revalidatePath('/admin/dashboard')
-    return { success: true, message: 'Matagumpay na nairehistro ang account!' }
+    return { success: true, message: 'Matagumpay na nairehistro ang account at na-activate ang plano!' }
   } catch (error) {
     console.error('Error registering admin/landlord:', error)
     return { success: false, message: 'May naganap na error sa server. Subukan muli mamaya.' }

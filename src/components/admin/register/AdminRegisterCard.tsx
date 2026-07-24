@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import { AdminRegisterForm } from "./AdminRegisterForm";
 
 export function AdminRegisterCard() {
@@ -16,7 +17,9 @@ export function AdminRegisterCard() {
         </p>
       </div>
 
-      <AdminRegisterForm />
+      <Suspense fallback={<div className="text-center py-6 text-sm text-muted">Naglo-load...</div>}>
+        <AdminRegisterForm />
+      </Suspense>
 
       <p className="mt-6 text-center text-xs text-muted">
         May account ka na?{" "}

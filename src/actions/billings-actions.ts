@@ -9,7 +9,29 @@ import { createAuditLog } from '@/src/actions/audit-actions'
 
 export async function getBillingsData() {
   try {
+    const cookieStore = await cookies();
+    const adminId = cookieStore.get('session_user_id')?.value;
+
+    if (!adminId) {
+      return { success: true, invoices: [] };
+    }
+
+    // 1. Kunin muna ang mga tenant ID sa ilalim ng landlord na ito
+    const landlordTenants = await prisma.tenant.findMany({
+      where: { userId: adminId },
+      select: { id: true },
+    });
+    const tenantIds = landlordTenants.map((t) => t.id);
+
+    if (tenantIds.length === 0) {
+      return { success: true, invoices: [] };
+    }
+
+    // 2. Kunin lamang ang mga bill na pag-aari ng mga tenant ng landlord na ito
     const dbBills = await prisma.bill.findMany({
+      where: {
+        tenantId: { in: tenantIds },
+      },
       include: {
         tenant: {
           select: {
@@ -45,18 +67,16 @@ export async function getBillingsData() {
       
       const lineItems: { description: string; amount: number }[] = [];
       
-      // Simulan ang pag-compute ng total mula sa renta
       let computedTotalAmount = Number(bill.rentAmount) || 0;
       if (computedTotalAmount > 0) {
         lineItems.push({ description: "Buwanang Renta", amount: computedTotalAmount });
       }
 
-      // 2. Amenities mula sa Active Lease o bill amenitiesFee
       if (activeLease?.amenities && activeLease.amenities.length > 0) {
         activeLease.amenities.forEach((leaseAmenity) => {
           const amenityAmount = Number(leaseAmenity.amount);
           if (amenityAmount > 0) {
-            computedTotalAmount += amenityAmount; // Dagdag sa total
+            computedTotalAmount += amenityAmount;
             lineItems.push({
               description: `Amenity: ${leaseAmenity.amenity.name}${leaseAmenity.amenity.frequency ? ` (${leaseAmenity.amenity.frequency})` : ""}`,
               amount: amenityAmount,
@@ -65,11 +85,10 @@ export async function getBillingsData() {
         });
       } else if (Number(bill.amenitiesFee) > 0) {
         const fallbackAmenities = Number(bill.amenitiesFee);
-        computedTotalAmount += fallbackAmenities; // Dagdag sa total
+        computedTotalAmount += fallbackAmenities;
         lineItems.push({ description: "Amenities Fee", amount: fallbackAmenities });
       }
 
-      // 3. Utilities / Bill Items (Isasama lamang sa line items at totalAmount KUNG "approved" na)
       if (bill.items && bill.items.length > 0) {
         bill.items.forEach((item) => {
           const itemAmount = Number(item.amount);
@@ -78,25 +97,21 @@ export async function getBillingsData() {
 
           if (itemAmount > 0 && item.type && item.type.toUpperCase() !== "AMENITIES") {
             if (!isUtility) {
-              // Kung hindi utility at may halaga, isama agad
               computedTotalAmount += itemAmount;
               lineItems.push({
                 description: `${item.type.toUpperCase()} (${item.currentReading ? `Reading: ${item.currentReading}` : 'Item'})`,
                 amount: itemAmount,
               });
             } else if (isUtility && isApproved) {
-              // Kung utility, ISASAMA LAMANG sa total at line items kung ito ay APPROVED na
               computedTotalAmount += itemAmount;
               lineItems.push({
                 description: `${item.type.toUpperCase()} (Reading: ${item.currentReading ?? 'N/A'})`,
                 amount: itemAmount,
               });
             }
-            // Kung ang utility ay pending o hindi pa approved, hindi ito idaragdag sa computedTotalAmount at hindi rin ipapakita sa lineItems.
           }
         });
       } else if (Number(bill.utilityAmount) > 0) {
-        // Fallback kung naka-rely sa bill.utilityAmount (I-check kung approved ba ang bill status o hayaan kung ganoon ang business logic)
         const utilityAmt = Number(bill.utilityAmount);
         computedTotalAmount += utilityAmt;
         lineItems.push({ description: "Kuryente / Tubig Utilities", amount: utilityAmt });
@@ -119,7 +134,7 @@ export async function getBillingsData() {
         issueDate: bill.generatedAt.toISOString().split("T")[0],
         dueDate: bill.dueDate.toISOString().split("T")[0],
         lineItems,
-        totalAmount: computedTotalAmount, // 👈 Ginamit natin ang dynamically computed total na walang unapproved utilities
+        totalAmount: computedTotalAmount,
         status,
         paymentDetails: latestPayment ? {
           method: latestPayment.paymentMethod,
@@ -138,9 +153,17 @@ export async function getBillingsData() {
 
 export async function createInvoiceAction(newInvoiceData: Omit<Invoice, "id" | "invoiceNumber">) {
   try {
-    // 1. Hanapin muna ang tenant at ang active lease nito base sa pangalan na pinasa mula sa UI
+    const cookieStore = await cookies();
+    const adminId = cookieStore.get("session_user_id")?.value;
+    
+    if (!adminId) {
+      return { success: false, error: "Walang active session." };
+    }
+
+    // 1. Hanapin ang tenant na kabilang LAMANG sa landlord na ito at may active lease
     const tenant = await prisma.tenant.findFirst({
       where: {
+        landlordId: adminId,
         fullName: {
           contains: newInvoiceData.tenantName,
           mode: 'insensitive',
@@ -157,14 +180,13 @@ export async function createInvoiceAction(newInvoiceData: Omit<Invoice, "id" | "
     if (!tenant || tenant.leases.length === 0) {
       return { 
         success: false, 
-        error: `Hindi mahanap ang aktibong lease para sa tenant na si "${newInvoiceData.tenantName}". Siguraduhing nakarehistro na siya.` 
+        error: `Hindi mahanap ang aktibong lease para sa tenant na si "${newInvoiceData.tenantName}" sa iyong mga property.` 
       };
     }
 
     const activeLease = tenant.leases[0];
     const billingMonthYear = newInvoiceData.issueDate.slice(0, 7);
 
-    // 2. Kalkulahin o kunin ang rent amount at iba pang fees mula sa line items
     let rentAmount = 0;
     let amenitiesFee = 0;
     let utilityAmount = 0;
@@ -183,13 +205,6 @@ export async function createInvoiceAction(newInvoiceData: Omit<Invoice, "id" | "
     if (rentAmount === 0 && newInvoiceData.totalAmount > 0) {
       rentAmount = newInvoiceData.totalAmount;
     }
-
-    const cookieStore = await cookies();
-    const adminId = cookieStore.get("session_user_id")?.value;
-    
-    if (!adminId) {
-      return { success: false, error: "Walang active session." };
-    }
     
     await createAuditLog({
       actorId: adminId,
@@ -199,7 +214,6 @@ export async function createInvoiceAction(newInvoiceData: Omit<Invoice, "id" | "
       metadata: { actionType: 'ADD' },
     });
 
-    // 3. I-save ang Bill at ang mga kaugnay na BillItems sa database
     await prisma.bill.create({
       data: {
         leaseId: activeLease.id,
@@ -230,7 +244,6 @@ export async function createInvoiceAction(newInvoiceData: Omit<Invoice, "id" | "
               unitLabel: item.description,
               amount: desc.includes('rent') || desc.includes('renta') ? 0 : item.amount,
               ratePerUnit: item.amount,
-              // ✨ Tinanggal muli ang 'status' dito para maiwasan ang PrismaClientValidationError
             };
           }),
         },
@@ -247,7 +260,32 @@ export async function createInvoiceAction(newInvoiceData: Omit<Invoice, "id" | "
 
 export async function markInvoiceAsPaidAction(id: string) {
   try {
-    // I-update ang status ng Bill sa Prisma database
+    const cookieStore = await cookies();
+    const adminId = cookieStore.get("session_user_id")?.value;
+    
+    if (!adminId) {
+      return { success: false, error: "Walang active session." };
+    }
+
+    // 1. Seguridad: Siguraduhing ang bill ay pagmamay-ari ng tenant na nasa ilalim ng landlord na ito
+    const landlordTenants = await prisma.tenant.findMany({
+      where: { userId: adminId },
+      select: { id: true },
+    });
+    const tenantIds = landlordTenants.map((t) => t.id);
+
+    const billCheck = await prisma.bill.findFirst({
+      where: {
+        id,
+        tenantId: { in: tenantIds },
+      },
+      select: { id: true },
+    });
+
+    if (!billCheck) {
+      return { success: false, error: "Hindi natagpuan ang invoice o wala kang pahintulot dito." };
+    }
+
     await prisma.bill.update({
       where: { id },
       data: {
@@ -255,21 +293,14 @@ export async function markInvoiceAsPaidAction(id: string) {
         paidAt: new Date(),
       },
     });
-
-    const cookieStore = await cookies();
-    const adminId = cookieStore.get("session_user_id")?.value;
-    
-    if (!adminId) {
-      return { success: false, error: "Walang active session." };
-    }
     
     await createAuditLog({
       actorId: adminId,
-        action: `Minarkahan bilang bayad ang invoice ID: ${id}`,
-        entityType: 'Billing',
-        entityId: adminId,
-        metadata: { actionType: 'ADD' },
-    })
+      action: `Minarkahan bilang bayad ang invoice ID: ${id}`,
+      entityType: 'Billing',
+      entityId: adminId,
+      metadata: { actionType: 'ADD' },
+    });
 
     revalidatePath("/admin/billings");
     return { success: true };
@@ -281,10 +312,29 @@ export async function markInvoiceAsPaidAction(id: string) {
 
 export async function getOccupiedRoomsForBilling() {
   try {
-    // Kunin ang mga active leases kasama ang room, unit, tenant, at ang kanilang leaseAmenities
+    const cookieStore = await cookies();
+    const adminId = cookieStore.get("session_user_id")?.value;
+
+    if (!adminId) {
+      return { success: false, roomsWithTenants: [], error: "Walang active session." };
+    }
+
+    // 1. Kunin ang mga tenant ID ng landlord na ito
+    const landlordTenants = await prisma.tenant.findMany({
+      where: { userId: adminId },
+      select: { id: true },
+    });
+    const tenantIds = landlordTenants.map((t) => t.id);
+
+    if (tenantIds.length === 0) {
+      return { success: true, roomsWithTenants: [] };
+    }
+
+    // 2. Kunin lamang ang mga active lease na naka-attach sa mga tenant ng landlord na ito
     const activeLeases = await prisma.lease.findMany({
       where: {
         status: "active",
+        tenantId: { in: tenantIds },
       },
       include: {
         tenant: {
@@ -301,7 +351,6 @@ export async function getOccupiedRoomsForBilling() {
             },
           },
         },
-        // 👈 Dito natin kukunin ang nakatalagang amenities gamit ang iyong LeaseAmenity model
         amenities: {
           include: {
             amenity: {
@@ -315,9 +364,7 @@ export async function getOccupiedRoomsForBilling() {
       },
     });
 
-    // I-format ang data para sa frontend modal dropdown
     const roomsWithTenants = activeLeases.map((lease) => {
-      // I-map ang LeaseAmenity para makuha ang pangalan at amount
       const formattedAmenities = lease.amenities.map((item) => ({
         id: item.amenityId,
         name: item.amenity.name,
@@ -326,13 +373,13 @@ export async function getOccupiedRoomsForBilling() {
       }));
 
       return {
-        leaseId: lease.id, // Opsyonal: maganda ring isama ang leaseId para madaling i-reference
+        leaseId: lease.id,
         roomId: lease.room.id,
         roomNumber: lease.room.roomNumber,
         unitName: lease.room.unit?.name ?? "Main Unit",
         tenantName: lease.tenant?.fullName ?? "Unknown Tenant",
         monthlyRent: Number(lease.monthlyRent ?? lease.room.monthlyRent ?? 0),
-        amenities: formattedAmenities, // 👈 Awtomatikong isasama rito ang nakatakdang amenities ng tenant!
+        amenities: formattedAmenities,
       };
     });
 

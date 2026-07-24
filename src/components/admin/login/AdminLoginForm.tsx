@@ -6,9 +6,6 @@ import Link from "next/link";
 import { Input } from "@/src/components/ui/Input";
 import { loginUser } from "@/src/actions/auth-actions";
 
-const DEMO_EMAIL = "admin@paupahan.ph";
-const DEMO_PASSWORD = "password123";
-
 export function AdminLoginForm() {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -16,13 +13,6 @@ export function AdminLoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
-
-  // Handler para mabilisang mai-fill ang demo credentials
-  const fillDemoCredentials = () => {
-    setEmail(DEMO_EMAIL);
-    setPassword(DEMO_PASSWORD);
-    setErrorMessage("");
-  };
 
   const handleSubmit = (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -48,30 +38,6 @@ export function AdminLoginForm() {
 
   return (
     <form onSubmit={handleSubmit} className="mt-6 space-y-4">
-      {/* Demo Credentials Box */}
-      <div className="rounded-xl border border-forest/20 bg-forest/[0.04] p-3.5 text-xs text-forest-deep">
-        <div className="flex items-center justify-between">
-          <span className="font-bold uppercase tracking-wider text-forest">
-            🔑 Demo Access
-          </span>
-          <button
-            type="button"
-            onClick={fillDemoCredentials}
-            className="rounded-lg bg-forest/10 px-2.5 py-1 text-[11px] font-bold text-forest hover:bg-forest/20 cursor-pointer"
-          >
-            Gamitin
-          </button>
-        </div>
-        <div className="mt-2 space-y-0.5 font-mono text-[11.5px] text-muted">
-          <p>
-            Email: <span className="font-semibold text-forest-deep">{DEMO_EMAIL}</span>
-          </p>
-          <p>
-            Password: <span className="font-semibold text-forest-deep">{DEMO_PASSWORD}</span>
-          </p>
-        </div>
-      </div>
-
       {errorMessage && (
         <div className="rounded-xl border border-coral/30 bg-coral/10 p-3 text-xs font-semibold text-coral-deep">
           {errorMessage}

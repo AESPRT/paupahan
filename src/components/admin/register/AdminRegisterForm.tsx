@@ -1,25 +1,32 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Input } from "@/src/components/ui/Input";
 import { registerLandlord } from "@/src/actions/landlord-actions";
 
 export function AdminRegisterForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
 
+  // Kunin ang data mula sa URL para sa reference, plan, at customer details
+  const referenceNumber = searchParams.get("referenceNumber") || "";
+  const plan = searchParams.get("plan") || "";
+  const isSuccessPayment = searchParams.get("success") === "true";
+
+  // Direktang i-initialize ang form state gamit ang URL parameters
   const [formData, setFormData] = useState({
-    fullName: "",
+    fullName: searchParams.get("name") || "",
     propertyName: "",
-    phone: "",
-    email: "",
+    phone: searchParams.get("phone") || "",
+    email: searchParams.get("email") || "",
     password: "",
     confirmPassword: "",
     agreeTerms: false,
   });
 
-  const [errorMessage, setErrorMessage] = useState("");
+  const isPaidPlan = plan && plan !== "panimula" && plan !== "free";
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { id, value, type, checked } = e.target;
@@ -29,7 +36,7 @@ export function AdminRegisterForm() {
     }));
   };
 
-  const handleSubmit = (e: React.SubmitEvent<HTMLFormElement>) => {
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setErrorMessage("");
 
@@ -55,6 +62,9 @@ export function AdminRegisterForm() {
       data.append("email", formData.email);
       data.append("phone", formData.phone);
       data.append("password", formData.password);
+      
+      if (referenceNumber) data.append("referenceNumber", referenceNumber);
+      if (plan) data.append("plan", plan);
 
       const result = await registerLandlord(data);
 
@@ -63,14 +73,21 @@ export function AdminRegisterForm() {
         return;
       }
 
-      // I-refresh ang router para masigurong nabasa ang bagong cookie, pagkatapos ay i-redirect sa dashboard
       router.refresh();
       router.push("/admin/dashboard/home");
     });
   };
 
+  const [errorMessage, setErrorMessage] = useState("");
+
   return (
     <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+      {isSuccessPayment && (
+        <div className="rounded-xl border border-green-500/30 bg-green-500/10 p-3 text-xs font-semibold text-green-700">
+          ✓ Matagumpay ang iyong pagbabayad! Mangyaring buuin ang iyong account sa ibaba para ma-activate ang iyong napiling plano.
+        </div>
+      )}
+
       {errorMessage && (
         <div className="rounded-xl border border-coral/30 bg-coral/10 p-3 text-xs font-semibold text-coral-deep">
           {errorMessage}
@@ -177,7 +194,7 @@ export function AdminRegisterForm() {
             Gumagawa ng Account...
           </span>
         ) : (
-          "Lumikha ng Libreng Account"
+          isPaidPlan ? "Kumpletuhin at I-activate ang Plano" : "Lumikha ng Libreng Account"
         )}
       </button>
     </form>

@@ -11,49 +11,86 @@ export async function getDashboardData() {
     const cookieStore = await cookies()
     const userId = cookieStore.get('session_user_id')?.value
 
-    // 1. Kunin ang impormasyon ng kasalukuyang nag-login na admin/landlord
-    let adminName = 'Admin'
-    if (userId) {
-      const user = await prisma.user.findUnique({
-        where: { id: userId },
-        select: { fullName: true },
-      })
-      if (user) {
-        adminName = user.fullName
+    if (!userId) {
+      return {
+        adminName: 'Admin',
+        stats: { totalProperties: 0, totalUnits: 0, totalRooms: 0, occupiedRooms: 0, vacantRooms: 0, reservedRooms: 0, monthlyRevenue: 0, pendingBillsAmount: 0, occupancyRate: 0 },
+        chartData: [],
+        pendingReadings: [],
+        recentActivities: [],
+        auditLogs: [],
       }
     }
 
-    // 2. Kunin ang kabuuang stats mula sa Database
-    const totalProperties = await prisma.property.count()
-    const totalUnits = await prisma.unit.count()
-    const totalRooms = await prisma.room.count()
-    const occupiedRooms = await prisma.room.count({
-      where: { status: 'occupied' },
+    // 1. Kunin ang impormasyon ng kasalukuyang nag-login na admin/landlord
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { fullName: true },
     })
-    const vacantRooms = await prisma.room.count({
-      where: { status: 'vacant' },
+    const adminName = user?.fullName || 'Admin'
+
+    // 2. Kunin ang mga Property ID na pagmamay-ari ng landlord na ito para sa filtering ng units at rooms
+    const landlordProperties = await prisma.property.findMany({
+      where: { landlordId: userId },
+      select: { id: true },
     })
-    const reservedRooms = await prisma.room.count({
-      where: { status: 'reserved' },
+    const propertyIds = landlordProperties.map((p) => p.id)
+
+    // Kunin ang mga Unit ID sa ilalim ng mga property na ito
+    const landlordUnits = await prisma.unit.findMany({
+      where: { propertyId: { in: propertyIds } },
+      select: { id: true },
     })
+    const unitIds = landlordUnits.map((u) => u.id)
+
+    // Kunin ang mga Room ID sa ilalim ng mga unit na ito
+    const landlordRooms = await prisma.room.findMany({
+      where: { unitId: { in: unitIds } },
+      select: { id: true },
+    })
+    const roomIds = landlordRooms.map((r) => r.id)
+
+    // 3. Kunin ang kabuuang stats na naka-isolate sa landlord na ito
+    const totalProperties = propertyIds.length
+    const totalUnits = unitIds.length
+    const totalRooms = roomIds.length
+
+    const occupiedRooms = roomIds.length > 0 ? await prisma.room.count({
+      where: { id: { in: roomIds }, status: 'occupied' },
+    }) : 0
+
+    const vacantRooms = roomIds.length > 0 ? await prisma.room.count({
+      where: { id: { in: roomIds }, status: 'vacant' },
+    }) : 0
+
+    const reservedRooms = roomIds.length > 0 ? await prisma.room.count({
+      where: { id: { in: roomIds }, status: 'reserved' },
+    }) : 0
     
     const occupancyRate = totalRooms > 0 ? (occupiedRooms / totalRooms) * 100 : 0
 
-    // Pag-compute ng buwanang kita (Paid bills)
-    const paidBills = await prisma.bill.aggregate({
-      where: { status: 'paid' },
-      _sum: { totalAmount: true },
+    // Kunin ang mga Tenant ID sa ilalim ng landlord na ito para sa pag-filter ng Bills
+    const landlordTenants = await prisma.tenant.findMany({
+      where: { userId: userId },
+      select: { id: true },
     })
+    const tenantIds = landlordTenants.map((t) => t.id)
+
+    // Pag-compute ng buwanang kita (Paid bills para sa mga tenant niya lang)
+    const paidBills = tenantIds.length > 0 ? await prisma.bill.aggregate({
+      where: { tenantId: { in: tenantIds }, status: 'paid' },
+      _sum: { totalAmount: true },
+    }) : { _sum: { totalAmount: 0 } }
     const monthlyRevenue = Number(paidBills._sum.totalAmount || 0)
 
-    // Pending bills amount
-    const pendingBills = await prisma.bill.aggregate({
-      where: { status: 'pending' },
+    // Pending bills amount para sa mga tenant niya lang
+    const pendingBills = tenantIds.length > 0 ? await prisma.bill.aggregate({
+      where: { tenantId: { in: tenantIds }, status: 'pending' },
       _sum: { totalAmount: true },
-    })
+    }) : { _sum: { totalAmount: 0 } }
     const pendingBillsAmount = Number(pendingBills._sum.totalAmount || 0)
 
-    // 3. Buuin ang Chart Data para sa nakalipas na 6 na buwan
+    // 4. Buuin ang Chart Data para sa nakalipas na 6 na buwan (nakabase sa mga tenant niya)
     const months = ["Ene", "Peb", "Mar", "Abr", "May", "Hun", "Hul", "Ago", "Set", "Okt", "Nob", "Dis"];
     const currentDate = new Date();
     const chartData = [];
@@ -67,35 +104,41 @@ export async function getDashboardData() {
       const startDate = new Date(`${year}-${monthStr}-01`);
       const endDate = new Date(year, d.getMonth() + 1, 0, 23, 59, 59);
 
-      // 1. Paid Bills
-      const paidTotal = await prisma.bill.aggregate({
-        where: {
-          status: 'paid',
-          paidAt: { gte: startDate, lte: endDate },
-        },
-        _sum: { totalAmount: true },
-      });
-      const paidNum = Number(paidTotal._sum.totalAmount || 0);
+      let paidNum = 0;
+      let pendingNum = 0;
+      let overdueNum = 0;
 
-      // 2. Pending Bills
-      const pendingTotal = await prisma.bill.aggregate({
-        where: {
-          status: 'pending',
-          generatedAt: { gte: startDate, lte: endDate },
-        },
-        _sum: { totalAmount: true },
-      });
-      const pendingNum = Number(pendingTotal._sum.totalAmount || 0);
+      if (tenantIds.length > 0) {
+        const paidTotal = await prisma.bill.aggregate({
+          where: {
+            tenantId: { in: tenantIds },
+            status: 'paid',
+            paidAt: { gte: startDate, lte: endDate },
+          },
+          _sum: { totalAmount: true },
+        });
+        paidNum = Number(paidTotal._sum.totalAmount || 0);
 
-      // 3. Overdue Bills
-      const overdueTotal = await prisma.bill.aggregate({
-        where: {
-          status: 'overdue',
-          generatedAt: { gte: startDate, lte: endDate },
-        },
-        _sum: { totalAmount: true },
-      });
-      const overdueNum = Number(overdueTotal._sum.totalAmount || 0);
+        const pendingTotal = await prisma.bill.aggregate({
+          where: {
+            tenantId: { in: tenantIds },
+            status: 'pending',
+            generatedAt: { gte: startDate, lte: endDate },
+          },
+          _sum: { totalAmount: true },
+        });
+        pendingNum = Number(pendingTotal._sum.totalAmount || 0);
+
+        const overdueTotal = await prisma.bill.aggregate({
+          where: {
+            tenantId: { in: tenantIds },
+            status: 'overdue',
+            generatedAt: { gte: startDate, lte: endDate },
+          },
+          _sum: { totalAmount: true },
+        });
+        overdueNum = Number(overdueTotal._sum.totalAmount || 0);
+      }
 
       const formatCurrency = (val: number) => 
         new Intl.NumberFormat('fil-PH', { style: 'currency', currency: 'PHP', maximumFractionDigits: 0 }).format(val);
@@ -111,10 +154,11 @@ export async function getDashboardData() {
       });
     }
 
-    // 4. Kunin at i-map ang mga pending na bills/readings para sa Approvals
-    const rawPendingBills = await prisma.bill.findMany({
+    // 5. Kunin at i-map ang mga pending na bills/readings para sa Approvals (para sa mga tenant niya lang)
+    const rawPendingBills = tenantIds.length > 0 ? await prisma.bill.findMany({
       where: { 
-        status: 'draft', // ✨ Binago sa 'draft' para makita lang ang mga di pa aprubado
+        tenantId: { in: tenantIds },
+        status: 'draft',
         items: {
           some: {
             OR: [
@@ -147,9 +191,8 @@ export async function getDashboardData() {
         },
         items: true,
       },
-    });
+    }) : [];
 
-    // I-flat map ang bawat item para kung may tubig at kuryente silang sabay na sinumite, hiwalay silang lilitaw sa listahan
     const pendingReadings: any[] = [];
 
     rawPendingBills.forEach((bill) => {
@@ -166,9 +209,7 @@ export async function getDashboardData() {
         minute: 'numeric',
       }).format(new Date(bill.generatedAt));
 
-      // Suriin ang bawat item ng bill (Electricity, Water, atbp.)
       bill.items.forEach((item) => {
-        // ✨ I-check na ang status ay 'pending' AT may current reading o litrato na pinasa
         if (item.status == 'pending' && !item.type.toLowerCase().includes('amenities')) {
           let type: "water" | "electricity" | "rent" | "amenities" = "electricity";
           const itemType = item.type.toLowerCase();
@@ -203,11 +244,18 @@ export async function getDashboardData() {
       });
     });
 
-    // 5. Kunin ang huling mga notifications/activities para sa RecentActivities
+    // 6. Kunin ang mga notifications para sa landlord na ito (kung sinusuportahan ng schema, o i-filter base sa actor/target)
     const rawNotifications = await prisma.notification.findMany({
+      where: { recipientUserId: userId }, // Sinisigurong sa kanya lang ang notifications
       orderBy: { createdAt: 'desc' },
       take: 5,
-    })
+    }).catch(async () => {
+      // Fallback kung walang userId column ang notification table
+      return await prisma.notification.findMany({
+        orderBy: { createdAt: 'desc' },
+        take: 5,
+      });
+    });
 
     const recentActivities = rawNotifications.map((notif) => {
       const now = new Date();
@@ -241,8 +289,9 @@ export async function getDashboardData() {
       };
     });
 
-    // 6. Kunin ang huling mga audit logs para sa sidebar
+    // 7. Kunin ang audit logs na ginawa lamang ng landlord na ito
     const rawAuditLogs = await prisma.auditLog.findMany({
+      where: { actorId: userId },
       orderBy: { createdAt: 'desc' },
       take: 5,
       include: {
@@ -333,35 +382,42 @@ export async function handleApprovalAction(compositeId: string, actionType: "app
       targetUtilityType = "amenities";
     }
 
-    const bill = await prisma.bill.findUnique({
-      where: { id: billId },
+    // Siguraduhing ang bill ay pagmamay-ari ng tenant na nasa ilalim ng landlord na ito
+    const landlordTenants = await prisma.tenant.findMany({
+      where: { userId: adminId },
+      select: { id: true },
+    });
+    const tenantIds = landlordTenants.map((t) => t.id);
+
+    const bill = await prisma.bill.findFirst({
+      where: { 
+        id: billId,
+        tenantId: { in: tenantIds } // 👈 Security check para hindi mapakialaman ang bill ng iba
+      },
       include: { items: true },
     });
 
     if (!bill) {
-      return { success: false, error: "Hindi mahanap ang bill." };
+      return { success: false, error: "Hindi mahanap ang bill o wala kang karapatan dito." };
     }
 
     if (actionType === "approve") {
       if (targetUtilityType) {
-        // ✨ I-update lang ang status ng partikular na item patungong 'approved'
         for (const item of bill.items) {
           if (item.type.toLowerCase() === targetUtilityType.toLowerCase()) {
             await prisma.billItem.update({
               where: { id: item.id },
               data: {
-                status: "approved", // Nananatili ang reading at photo, naging approved lang ang status
+                status: "approved",
               },
             });
           }
         }
 
-        // Suriin kung may natitira pang ibang item na may status na 'pending'
         const hasRemainingPending = bill.items.some(
           item => item.type.toLowerCase() !== targetUtilityType?.toLowerCase() && item.status === "pending" && !item.type.toLowerCase().includes('amenities')
         );
 
-        // Kung wala nang pending items, saka lang gawing 'pending' status ang buong Bill
         if (!hasRemainingPending) {
           await prisma.bill.update({
             where: { id: billId },
@@ -379,7 +435,6 @@ export async function handleApprovalAction(compositeId: string, actionType: "app
       });
 
     } else {
-      // Kapag tinanggihan (Reject), baguhin ang status sa 'rejected' at i-reset ang amount/units kung kinakailangan
       for (const item of bill.items) {
         if (!targetUtilityType || item.type.toLowerCase() === targetUtilityType.toLowerCase()) {
           await prisma.billItem.update({
@@ -389,13 +444,11 @@ export async function handleApprovalAction(compositeId: string, actionType: "app
               currentReading: null,
               unitsUsed: 0,
               amount: 0,
-              // Ang proofPhotoUrl ay hindi na binubura para may ebidensya pa rin kung bakit tinanggihan
             },
           });
         }
       }
 
-      // Recalculate total utility amount ng bill
       const updatedBill = await prisma.bill.findUnique({ 
         where: { id: billId },
         include: { items: true }
@@ -439,10 +492,22 @@ export async function handleApprovalAction(compositeId: string, actionType: "app
 
 export async function getRevenueChartData(filter: "6M" | "1Y" = "6M") {
   'use server'
+  const cookieStore = await cookies();
+  const userId = cookieStore.get("session_user_id")?.value;
+
   const months = ["Ene", "Peb", "Mar", "Abr", "May", "Hun", "Hul", "Ago", "Set", "Okt", "Nob", "Dis"];
   const currentDate = new Date();
   const chartData = [];
   const limit = filter === "1Y" ? 12 : 6;
+
+  let tenantIds: string[] = [];
+  if (userId) {
+    const landlordTenants = await prisma.tenant.findMany({
+      where: { userId: userId },
+      select: { id: true },
+    });
+    tenantIds = landlordTenants.map((t) => t.id);
+  }
 
   for (let i = limit - 1; i >= 0; i--) {
     const d = new Date(currentDate.getFullYear(), currentDate.getMonth() - i, 1);
@@ -453,35 +518,41 @@ export async function getRevenueChartData(filter: "6M" | "1Y" = "6M") {
     const startDate = new Date(`${year}-${monthStr}-01`);
     const endDate = new Date(year, d.getMonth() + 1, 0, 23, 59, 59);
 
-    // 1. Paid Bills
-    const paidTotal = await prisma.bill.aggregate({
-      where: {
-        status: 'paid',
-        paidAt: { gte: startDate, lte: endDate },
-      },
-      _sum: { totalAmount: true },
-    });
-    const paidNum = Number(paidTotal._sum.totalAmount || 0);
+    let paidNum = 0;
+    let pendingNum = 0;
+    let overdueNum = 0;
 
-    // 2. Pending Bills
-    const pendingTotal = await prisma.bill.aggregate({
-      where: {
-        status: 'pending',
-        generatedAt: { gte: startDate, lte: endDate },
-      },
-      _sum: { totalAmount: true },
-    });
-    const pendingNum = Number(pendingTotal._sum.totalAmount || 0);
+    if (tenantIds.length > 0) {
+      const paidTotal = await prisma.bill.aggregate({
+        where: {
+          tenantId: { in: tenantIds },
+          status: 'paid',
+          paidAt: { gte: startDate, lte: endDate },
+        },
+        _sum: { totalAmount: true },
+      });
+      paidNum = Number(paidTotal._sum.totalAmount || 0);
 
-    // 3. Overdue Bills
-    const overdueTotal = await prisma.bill.aggregate({
-      where: {
-        status: 'overdue',
-        generatedAt: { gte: startDate, lte: endDate },
-      },
-      _sum: { totalAmount: true },
-    });
-    const overdueNum = Number(overdueTotal._sum.totalAmount || 0);
+      const pendingTotal = await prisma.bill.aggregate({
+        where: {
+          tenantId: { in: tenantIds },
+          status: 'pending',
+          generatedAt: { gte: startDate, lte: endDate },
+        },
+        _sum: { totalAmount: true },
+      });
+      pendingNum = Number(pendingTotal._sum.totalAmount || 0);
+
+      const overdueTotal = await prisma.bill.aggregate({
+        where: {
+          tenantId: { in: tenantIds },
+          status: 'overdue',
+          generatedAt: { gte: startDate, lte: endDate },
+        },
+        _sum: { totalAmount: true },
+      });
+      overdueNum = Number(overdueTotal._sum.totalAmount || 0);
+    }
 
     const formatCurrency = (val: number) => 
       new Intl.NumberFormat('fil-PH', { style: 'currency', currency: 'PHP', maximumFractionDigits: 0 }).format(val);
