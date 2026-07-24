@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition, useCallback } from "react";
+import { useEffect, useState, useTransition, useCallback, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { TenantLoginForm } from "@/src/components/tenant/auth/TenantLoginForm";
 import { LoginHelpModal } from "@/src/components/tenant/auth/LoginHelpModal";
@@ -8,7 +8,7 @@ import { PaupahanLogo } from "@/src/components/ui/PaupahanLogo";
 import { Footer } from "@/src/components/landing/Footer";
 import { loginTenantAction } from "@/src/actions/tenant/tenant-auth-actions";
 
-export default function TenantLoginPage() {
+function TenantLoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const codeParam = searchParams.get("code");
@@ -17,7 +17,6 @@ export default function TenantLoginPage() {
   const [qrError, setQrError] = useState("");
   const [isAutoLoggingIn, startAutoLoginTransition] = useTransition();
 
-  // 1. Ideklara muna ang handleQrLogin gamit ang useCallback bago ang useEffect
   const handleQrLogin = useCallback((code: string) => {
     startAutoLoginTransition(async () => {
       setQrError("");
@@ -35,7 +34,6 @@ export default function TenantLoginPage() {
     });
   }, [router]);
 
-  // 2. Gamitin na ito sa useEffect ngayon na deklarado na sa itaas
   useEffect(() => {
     if (codeParam) {
       handleQrLogin(codeParam);
@@ -110,5 +108,19 @@ export default function TenantLoginPage() {
         onClose={() => setIsHelpOpen(false)}
       />
     </div>
+  );
+}
+
+export default function TenantLoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen flex-col items-center justify-center bg-paper p-4">
+          <div className="inline-block h-10 w-10 animate-spin rounded-full border-4 border-solid border-forest border-r-transparent"></div>
+        </div>
+      }
+    >
+      <TenantLoginContent />
+    </Suspense>
   );
 }

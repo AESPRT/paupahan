@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import { TenantNavigationRail } from "@/src/components/tenant/navigation/TenantNavigationRail";
 
 export default function TenantLayout({
@@ -11,7 +13,6 @@ export default function TenantLayout({
       <TenantNavigationRail />
 
       {/* Main Page Content Wrapper */}
-      {/* May lg:pl-64 para magbigay ng kwalta sa Desktop Sidebar at pb-20 sa Mobile para hindi matakpan ng Bottom Nav */}
       <main className="pb-20 lg:pb-8 lg:pl-64">
         {children}
       </main>
