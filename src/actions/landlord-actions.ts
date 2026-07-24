@@ -4,7 +4,7 @@ import prisma from '@/src/lib/prisma'
 import { revalidatePath } from 'next/cache'
 import bcrypt from 'bcryptjs'
 import { cookies } from 'next/headers'
-import { createAuditLog } from '@/src/actions/audit-actions' // 👈 I-import ang createAuditLog
+import { createAuditLog } from '@/src/actions/audit-actions'
 
 export type ActionResponse = {
   success: boolean
@@ -68,7 +68,7 @@ export async function registerLandlord(formData: FormData): Promise<ActionRespon
       })
     }
 
-    // ✨ 4. I-record sa Audit Log ang pagrerehistro ng bagong landlord account
+    // 4. I-record sa Audit Log ang pagrerehistro ng bagong landlord account
     await createAuditLog({
       actorId: newUser.id,
       action: `Nilikha ang bagong Landlord account at property (${propertyName || 'Walang Pangalan'})`,
@@ -77,9 +77,20 @@ export async function registerLandlord(formData: FormData): Promise<ActionRespon
       metadata: { email: newUser.email, propertyName, actionType: 'REGISTER_LANDLORD' },
     })
 
-    // 5. Gumawa ng sesyon / i-set ang cookie para awtomatikong maging logged-in
+    // 5. Gumawa ng sesyon / i-set ang cookies para awtomatikong maging logged-in
     const cookieStore = await cookies()
+    
+    // I-set ang session_user_id
     cookieStore.set('session_user_id', newUser.id, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 60 * 60 * 24 * 7, // 1 linggo
+    })
+
+    // 👈 I-set din ang user_role cookie para mabasa ng proxy middleware
+    cookieStore.set('user_role', newUser.role, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',

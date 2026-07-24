@@ -11,7 +11,6 @@ export async function loginTenantAction(loginCode: string) {
       return { success: false, error: "Mangyaring ilagay ang iyong Login Code." };
     }
 
-    // Hanapin ang tenant gamit ang login code at ang active lease nito
     const tenantRecord = await prisma.tenant.findFirst({
       where: {
         loginCode: trimmedCode,
@@ -51,8 +50,9 @@ export async function loginTenantAction(loginCode: string) {
 
     const activeLease = tenantRecord.leases[0];
 
-    // I-set ang session cookie para sa proxy/middleware
     const cookieStore = await cookies();
+    
+    // I-set ang session_user_id
     cookieStore.set({
       name: "session_user_id",
       value: tenantRecord.id,
@@ -60,6 +60,16 @@ export async function loginTenantAction(loginCode: string) {
       secure: process.env.NODE_ENV === "production",
       path: "/",
       maxAge: 60 * 60 * 24 * 7, // 1 Linggo
+    });
+
+    // 👈 I-set din ang role cookie para madaling mabasa ng proxy
+    cookieStore.set({
+      name: "user_role",
+      value: "tenant",
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      path: "/",
+      maxAge: 60 * 60 * 24 * 7,
     });
 
     return {
@@ -80,14 +90,25 @@ export async function loginTenantAction(loginCode: string) {
 export async function logoutTenantAction() {
   try {
     const cookieStore = await cookies();
-    // Burahin o i-expire ang session cookie
+    
+    // Burahin ang session cookie
     cookieStore.set({
       name: "session_user_id",
       value: "",
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       path: "/",
-      maxAge: 0, // Agarang pagka-expire
+      maxAge: 0,
+    });
+
+    // 👈 Burahin din ang role cookie
+    cookieStore.set({
+      name: "user_role",
+      value: "",
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      path: "/",
+      maxAge: 0,
     });
 
     return { success: true };

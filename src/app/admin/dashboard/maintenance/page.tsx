@@ -27,14 +27,24 @@ export default function MaintenancePage() {
   }, []);
 
   // Update Status Handler (Admin/Landlord Action) gamit ang Server Action
-  const handleUpdateStatus = (id: string, newStatus: MaintenanceStatus) => {
-    // I-optimistic update ang UI agad para mabilis ang reaksyon
+  const handleUpdateStatus = (
+    id: string, 
+    newStatus: MaintenanceStatus, 
+    expenses?: number, 
+    adminRemark?: string
+  ) => {
+    // I-optimistic update ang UI agad kasama ang expenses at adminRemark para mabilis mag-reflect
     setRequests((prev) =>
-      prev.map((req) => (req.id === id ? { ...req, status: newStatus } : req))
+      prev.map((req) => 
+        req.id === id 
+          ? { ...req, status: newStatus, expenses: expenses ?? req.expenses, adminRemark: adminRemark ?? req.adminRemark } 
+          : req
+      )
     );
 
     startTransition(async () => {
-      const res = await updateMaintenanceStatusAction(id, newStatus);
+      // Ipasa ang expenses at adminRemark papunta sa server action
+      const res = await updateMaintenanceStatusAction(id, newStatus, adminRemark, expenses);
       if (!res.success) {
         alert(res.error);
         // I-revert o i-refetch kung nagka-error

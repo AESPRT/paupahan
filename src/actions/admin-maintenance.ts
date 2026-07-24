@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use server";
 
 import prisma from "@/src/lib/prisma";
@@ -5,7 +6,6 @@ import { MaintenanceStatus } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 
-// Uri para sa category na tumutugma sa MaintenanceRequest type
 type MaintenanceCategoryType = "Plumbing" | "Electrical" | "Appliance" | "Structural" | "Others";
 
 export async function getAdminMaintenanceRequests() {
@@ -55,7 +55,6 @@ export async function getAdminMaintenanceRequests() {
       else if (req.priority === "high") priority = "High";
       else if (req.priority === "emergency") priority = "Emergency";
 
-      // Ligtas na pag-map ng Prisma category patungo sa MaintenanceCategoryType
       let category: MaintenanceCategoryType = "Others";
       const catLower = req.category.toLowerCase();
       if (catLower === "plumbing") category = "Plumbing";
@@ -69,14 +68,15 @@ export async function getAdminMaintenanceRequests() {
         unitName: req.room.unit.name,
         roomNumber: req.room.roomNumber,
         tenantName: req.tenant?.fullName || "Hindi nakatala",
-        category, // 👈 Siguradong pasok na sa tamang union type
+        category,
         issueTitle: req.title,
         description: req.description,
         priority,
         status,
         dateReported: new Date(req.createdAt).toISOString().split("T")[0],
-        photoUrl: req.photoUrl || undefined,
+        imageUrl: req.photoUrl || undefined,
         adminRemark: req.adminRemark || undefined,
+        expenses: req.expenses ?? 0, // 👈 Siguraduhing naipapasa ang expenses mula Prisma
       };
     });
 
@@ -87,7 +87,12 @@ export async function getAdminMaintenanceRequests() {
   }
 }
 
-export async function updateMaintenanceStatusAction(requestId: string, newStatus: "Pending" | "In Progress" | "Resolved" | "Rejected", adminRemark?: string) {
+export async function updateMaintenanceStatusAction(
+    requestId: string, 
+    newStatus: "Pending" | "In Progress" | "Resolved" | "Rejected", 
+    adminRemark?: string,
+    expenses?: number
+  ) {
   try {
     const cookieStore = await cookies();
     const userId = cookieStore.get("session_user_id")?.value;
@@ -97,12 +102,19 @@ export async function updateMaintenanceStatusAction(requestId: string, newStatus
     else if (newStatus === "Resolved") prismaStatus = MaintenanceStatus.resolved;
     else if (newStatus === "Rejected") prismaStatus = MaintenanceStatus.rejected;
 
+    const updateData: any = {
+      status: prismaStatus,
+      adminRemark: adminRemark || undefined,
+    };
+
+    // 👈 Isama lang ang expenses kung Resolved ang status
+    if (newStatus === "Resolved") {
+      updateData.expenses = expenses !== undefined ? expenses : 0;
+    }
+
     const updatedRequest = await prisma.maintenanceRequest.update({
       where: { id: requestId },
-      data: {
-        status: prismaStatus,
-        adminRemark: adminRemark || undefined,
-      },
+      data: updateData,
       include: {
         tenant: true,
       },
@@ -130,7 +142,7 @@ export async function updateMaintenanceStatusAction(requestId: string, newStatus
           action: "UPDATE_MAINTENANCE_STATUS",
           entityType: "MaintenanceRequest",
           entityId: requestId,
-          metadata: { status: newStatus, adminRemark },
+          metadata: { status: newStatus, adminRemark, expenses: updateData.expenses },
         },
       });
     }

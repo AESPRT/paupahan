@@ -22,8 +22,9 @@ export async function logoutUser() {
     })
   }
   
-  // Burahin ang mga cookies na ginagamit sa sesyon
+  // Burahin ang mga cookies na ginagamit sa sesyon pati ang user_role
   cookieStore.delete('session_user_id')
+  cookieStore.delete('user_role') // 👈 Burahin din ang user role cookie
   cookieStore.delete('token')
   cookieStore.delete('accessToken')
 
@@ -75,9 +76,20 @@ export async function loginUser(formData: FormData): Promise<LoginResponse> {
       return { success: false, message: 'Maling email o password. Pakisubukan ulit.' }
     }
 
-    // Itakda ang session cookie sa server
+    // Itakda ang session cookies sa server
     const cookieStore = await cookies()
+    
+    // 1. Session User ID cookie
     cookieStore.set('session_user_id', user.id, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 60 * 60 * 24 * 7, // 1 linggo
+    })
+
+    // 2. User Role cookie para sa Proxy/Middleware validation
+    cookieStore.set('user_role', user.role, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',

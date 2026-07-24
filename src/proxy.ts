@@ -1,31 +1,23 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { jwtVerify } from 'jose';
-
-const JWT_SECRET = new TextEncoder().encode(
-  process.env.JWT_SECRET || 'NONE'
-);
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   const sessionUserId = request.cookies.get('session_user_id')?.value;
-  const token = 
-    request.cookies.get('token')?.value || 
-    request.cookies.get('accessToken')?.value ||
-    request.headers.get('Authorization')?.replace('Bearer ', '');
+  const userRoleCookie = request.cookies.get('user_role')?.value;
 
   const isAdminDashboard = pathname.startsWith('/admin/dashboard');
   const isTenantDashboard = pathname.startsWith('/tenant/dashboard');
   const isTenantLogin = pathname === '/tenant/login';
 
-  // 1. Kung naka-login na ang tenant at pumunta ulit sa login page, i-redirect sa dashboard
-  if (isTenantLogin && (sessionUserId || token)) {
+  // 1. Kung naka-login na ang tenant at pumunta ulit sa login page
+  if (isTenantLogin && sessionUserId && userRoleCookie === 'tenant') {
     return NextResponse.redirect(new URL('/tenant/dashboard/home', request.url));
   }
 
-  // 2. Kung walang session o token sa protected route (/tenant/dashboard...)
-  if ((isAdminDashboard || isTenantDashboard) && !sessionUserId && !token) {
+  // 2. Kung walang session sa protected route -> I-redirect sa tamang Login Page
+  if ((isAdminDashboard || isTenantDashboard) && !sessionUserId) {
     const loginPath = isAdminDashboard ? '/admin/login' : '/tenant/login';
     const loginUrl = new URL(loginPath, request.url);
     loginUrl.searchParams.set('callbackUrl', pathname);
@@ -33,37 +25,31 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
+  // 3. Pag-verify ng Session at Roles para sa mga Protected Routes
   if (sessionUserId) {
-    return NextResponse.next();
-  }
-
-  if (token) {
-    try {
-      const { payload } = await jwtVerify(token, JWT_SECRET);
-      const userRole = payload.role as string;
-
-      if (isAdminDashboard && userRole !== 'admin' && userRole !== 'landlord') {
-        return NextResponse.redirect(new URL('/unauthorized', request.url));
+    // 🔴 KUNG TENANT ANG NAKA-LOGIN
+    if (userRoleCookie === 'tenant') {
+      if (isAdminDashboard) {
+        return NextResponse.redirect(new URL('/tenant/dashboard/home', request.url));
       }
-
-      if (isTenantDashboard && userRole !== 'tenant' && userRole !== 'admin') {
-        return NextResponse.redirect(new URL('/unauthorized', request.url));
+    } 
+    // 🔴 KUNG LANDLORD O ADMIN ANG NAKA-LOGIN
+    else if (userRoleCookie === 'admin' || userRoleCookie === 'landlord') {
+      if (isTenantDashboard) {
+        return NextResponse.redirect(new URL('/admin/dashboard/home', request.url));
       }
-
-      return NextResponse.next();
-    } catch (err) {
-      console.error('Proxy JWT Error:', err);
-      
-      const loginPath = isAdminDashboard ? '/admin/login' : '/tenant/login';
-      const loginUrl = new URL(loginPath, request.url);
-      
-      const response = NextResponse.redirect(loginUrl);
-      response.cookies.delete('token');
-      response.cookies.delete('accessToken');
-      response.cookies.delete('session_user_id');
-      
-      return response;
+    } 
+    // 🔴 KUNG MAY COOKIE PERO WALANG TAMANG ROLE (O orphaned session)
+    else {
+      if (isTenantDashboard) {
+        return NextResponse.redirect(new URL('/tenant/login', request.url));
+      }
+      if (isAdminDashboard) {
+        return NextResponse.redirect(new URL('/admin/login', request.url));
+      }
     }
+
+    return NextResponse.next();
   }
 
   return NextResponse.next();
@@ -72,7 +58,7 @@ export async function proxy(request: NextRequest) {
 export const config = {
   matcher: [
     '/admin/dashboard/:path*',
-    '/tenant/dashboard/:path*', // 👈 Masasalo na nito ang lahat ng sub-pages sa ilalim ng tenant dashboard
-    '/tenant/login',            // 👈 Para ma-check din kung naka-login na
+    '/tenant/dashboard/:path*',
+    '/tenant/login',
   ],
 };
