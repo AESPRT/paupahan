@@ -442,7 +442,6 @@ export async function handleApprovalAction(compositeId: string, actionType: "app
             data: {
               status: "rejected",
               currentReading: null,
-              unitsUsed: 0,
               amount: 0,
             },
           });
