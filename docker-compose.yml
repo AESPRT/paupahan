@@ -11,6 +11,9 @@ services:
       - DATABASE_URL=postgresql://aedev_admin:admin123@fold_go_postgres:5432/paupahan_db?schema=public
       - NEXT_PUBLIC_API_URL=https://api.aesprt.com
     networks:
+      - foldgo-api_default
       - default
 
-# Kung gumagamit ka ng external network para sa postgres, idagdag dito o i-adjust base sa setup mo
+networks:
+  foldgo-api_default:
+    external: true
