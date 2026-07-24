@@ -11,16 +11,10 @@ import { addRoomAction, addUnitAction } from "@/src/actions/units-actions";
 
 interface UnitsClientWrapperProps {
   initialUnits: Unit[];
-  totalUnits: number;
-  totalRooms: number;
-  vacantRooms: number;
 }
 
 export default function UnitsClientWrapper({
-  initialUnits,
-  totalUnits: initialTotalUnits,
-  totalRooms: initialTotalRooms,
-  vacantRooms: initialVacantRooms,
+  initialUnits
 }: UnitsClientWrapperProps) {
   // 1. Gawing state ang units para madali nating ma-update nang realtime
   const [units, setUnits] = useState<Unit[]>(initialUnits);

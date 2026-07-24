@@ -1,32 +1,59 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
+import {
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  CartesianGrid,
+  Legend,
+} from "recharts";
 
 interface RevenueItem {
   month: string;
-  val: number;
-  amount: string;
+  paid: number;
+  pending: number;
+  overdue: number;
+  paidFormatted: string;
+  pendingFormatted: string;
+  overdueFormatted: string;
 }
 
 interface RevenueChartProps {
   data?: RevenueItem[];
+  onFilterChange?: (filter: "6M" | "1Y") => Promise<RevenueItem[]>;
 }
 
-export function RevenueChart({ data = [] }: RevenueChartProps) {
+export function RevenueChart({ data = [], onFilterChange }: RevenueChartProps) {
   const [filter, setFilter] = useState<"6M" | "1Y">("6M");
+  const [chartData, setChartData] = useState<RevenueItem[]>(
+    data.length > 0
+      ? data
+      : [
+          { month: "Ene", paid: 0, pending: 0, overdue: 0, paidFormatted: "₱0", pendingFormatted: "₱0", overdueFormatted: "₱0" },
+          { month: "Peb", paid: 0, pending: 0, overdue: 0, paidFormatted: "₱0", pendingFormatted: "₱0", overdueFormatted: "₱0" },
+          { month: "Mar", paid: 0, pending: 0, overdue: 0, paidFormatted: "₱0", pendingFormatted: "₱0", overdueFormatted: "₱0" },
+          { month: "Abr", paid: 0, pending: 0, overdue: 0, paidFormatted: "₱0", pendingFormatted: "₱0", overdueFormatted: "₱0" },
+          { month: "May", paid: 0, pending: 0, overdue: 0, paidFormatted: "₱0", pendingFormatted: "₱0", overdueFormatted: "₱0" },
+          { month: "Hun", paid: 0, pending: 0, overdue: 0, paidFormatted: "₱0", pendingFormatted: "₱0", overdueFormatted: "₱0" },
+        ]
+  );
+  const [isPending, startTransition] = useTransition();
 
-  // Fallback kung sakaling walang data
-  const chartData = data.length > 0 ? data : [
-    { month: "Ene", val: 0, amount: "₱0" },
-    { month: "Peb", val: 0, amount: "₱0" },
-    { month: "Mar", val: 0, amount: "₱0" },
-    { month: "Abr", val: 0, amount: "₱0" },
-    { month: "May", val: 0, amount: "₱0" },
-    { month: "Hun", val: 0, amount: "₱0" },
-  ];
-
-  // Kunin ang pinakamataas na value para magsilbing 100% height scale ng mga bars
-  const maxVal = Math.max(...chartData.map((d) => d.val), 100);
+  const handleFilterClick = (newFilter: "6M" | "1Y") => {
+    setFilter(newFilter);
+    if (onFilterChange) {
+      startTransition(async () => {
+        const newData = await onFilterChange(newFilter);
+        if (newData && newData.length > 0) {
+          setChartData(newData);
+        }
+      });
+    }
+  };
 
   return (
     <div className="rounded-2xl border border-line bg-paper-card p-4 sm:p-5 shadow-sm">
@@ -34,31 +61,29 @@ export function RevenueChart({ data = [] }: RevenueChartProps) {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h3 className="font-display text-base sm:text-lg font-bold text-forest-deep">
-            Kita at Koleksyon (Revenue Trends)
+            Kita at Koleksyon Trends
           </h3>
           <p className="text-[11px] sm:text-xs text-muted">
-            Koleksyon ng renta at utilities mula sa database
+            Paghambing ng Paid, Pending, at Overdue bills bawat buwan
           </p>
         </div>
 
         {/* Filter Toggle Buttons */}
         <div className="flex self-start sm:self-auto rounded-xl border border-line bg-paper p-1 text-xs font-bold">
           <button
-            onClick={() => setFilter("6M")}
-            className={`rounded-lg px-2.5 py-1 text-[11px] sm:text-xs transition-colors ${
-              filter === "6M"
-                ? "bg-forest text-white"
-                : "text-muted hover:text-forest-deep"
+            onClick={() => handleFilterClick("6M")}
+            disabled={isPending}
+            className={`rounded-lg px-3 py-1 text-[11px] sm:text-xs transition-colors ${
+              filter === "6M" ? "bg-forest text-white shadow-sm" : "text-muted hover:text-forest-deep"
             }`}
           >
             6 Buwan
           </button>
           <button
-            onClick={() => setFilter("1Y")}
-            className={`rounded-lg px-2.5 py-1 text-[11px] sm:text-xs transition-colors ${
-              filter === "1Y"
-                ? "bg-forest text-white"
-                : "text-muted hover:text-forest-deep"
+            onClick={() => handleFilterClick("1Y")}
+            disabled={isPending}
+            className={`rounded-lg px-3 py-1 text-[11px] sm:text-xs transition-colors ${
+              filter === "1Y" ? "bg-forest text-white shadow-sm" : "text-muted hover:text-forest-deep"
             }`}
           >
             1 Taon
@@ -66,37 +91,77 @@ export function RevenueChart({ data = [] }: RevenueChartProps) {
         </div>
       </div>
 
-      {/* Dynamic Chart Area */}
-      <div className="mt-6 sm:mt-8 overflow-x-auto pb-2 scrollbar-thin">
-        <div className="flex h-44 sm:h-48 min-w-[320px] items-end justify-between gap-2 sm:gap-4 border-b border-line pb-2">
-          {chartData.map((item) => {
-            // Kalkulahin ang porsyento ng taas batay sa pinakamataas na kita
-            const heightPercent = maxVal > 0 ? Math.max((item.val / maxVal) * 100, 8) : 8;
-
-            return (
-              <div
-                key={item.month}
-                className="group relative flex flex-1 flex-col items-center justify-end h-full gap-1.5"
-              >
-                {/* Tooltip para sa eksaktong halaga */}
-                <span className="pointer-events-none rounded-md bg-forest-deep/90 sm:bg-forest-deep px-1.5 py-0.5 text-[9px] sm:text-[10px] font-bold text-white transition-opacity sm:opacity-0 sm:group-hover:opacity-100 sm:absolute sm:-top-8 whitespace-nowrap">
-                  {item.amount}
-                </span>
-
-                {/* Bar Visual na may dynamic height */}
-                <div
-                  style={{ height: `${heightPercent}%` }}
-                  className="w-full max-w-[28px] sm:max-w-[36px] rounded-t-xl bg-coral/80 transition-all group-hover:bg-coral group-active:scale-95"
-                />
-
-                {/* Label Month */}
-                <span className="font-mono-brand text-[10px] sm:text-[11px] font-semibold text-muted">
-                  {item.month}
-                </span>
-              </div>
-            );
-          })}
-        </div>
+      {/* Multi-Line Chart Area */}
+      <div className={`mt-6 h-72 sm:h-80 w-full transition-opacity ${isPending ? "opacity-50" : "opacity-100"}`}>
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={chartData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border-line, #e5e7eb)" />
+            <XAxis 
+              dataKey="month" 
+              tickLine={false} 
+              axisLine={false} 
+              tick={{ fontSize: 11, fill: 'var(--muted, #6b7280)' }} 
+            />
+            <YAxis 
+              tickLine={false} 
+              axisLine={false} 
+              tick={{ fontSize: 11, fill: 'var(--muted, #6b7280)' }}
+              tickFormatter={(value) => `₱${value >= 1000 ? `${value / 1000}k` : value}`}
+            />
+            <Tooltip 
+              content={({ active, payload, label }) => {
+                if (active && payload && payload.length) {
+                  const data = payload[0].payload as RevenueItem;
+                  return (
+                    <div className="rounded-xl bg-forest-deep px-3 py-2.5 text-white shadow-xl text-xs space-y-1">
+                      <p className="font-bold border-b border-white/20 pb-1 mb-1">{label}</p>
+                      <p className="text-emerald-400">Paid: <span className="font-bold">{data.paidFormatted}</span></p>
+                      <p className="text-amber-400">Pending: <span className="font-bold">{data.pendingFormatted}</span></p>
+                      <p className="text-rose-400">Overdue: <span className="font-bold">{data.overdueFormatted}</span></p>
+                    </div>
+                  );
+                }
+                return null;
+              }}
+            />
+            <Legend 
+              verticalAlign="top" 
+              height={36} 
+              iconType="circle"
+              formatter={(value) => <span className="text-xs font-semibold text-forest-deep capitalize">{value}</span>}
+            />
+            {/* Paid Line (Green/Forest) */}
+            <Line 
+              type="monotone" 
+              dataKey="paid" 
+              name="Paid"
+              stroke="#10b981" 
+              strokeWidth={2.5} 
+              dot={{ r: 3, fill: "#10b981" }}
+              activeDot={{ r: 5 }} 
+            />
+            {/* Pending Line (Amber/Yellow) */}
+            <Line 
+              type="monotone" 
+              dataKey="pending" 
+              name="Pending"
+              stroke="#f59e0b" 
+              strokeWidth={2.5} 
+              dot={{ r: 3, fill: "#f59e0b" }}
+              activeDot={{ r: 5 }} 
+            />
+            {/* Overdue Line (Coral/Red) */}
+            <Line 
+              type="monotone" 
+              dataKey="overdue" 
+              name="Overdue"
+              stroke="#f43f5e" 
+              strokeWidth={2.5} 
+              dot={{ r: 3, fill: "#f43f5e" }}
+              activeDot={{ r: 5 }} 
+            />
+          </LineChart>
+        </ResponsiveContainer>
       </div>
     </div>
   );

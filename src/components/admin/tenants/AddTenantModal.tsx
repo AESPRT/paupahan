@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useState, useEffect } from "react";
@@ -18,22 +20,33 @@ export function AddTenantModal({ isOpen, onClose, onTenantAdded }: AddTenantModa
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   
-  // 👈 Mga bagong state para sa Advance at Deposit months
   const [advanceMonths, setAdvanceMonths] = useState<number>(1);
   const [depositMonths, setDepositMonths] = useState<number>(1);
   
   const [unitsData, setUnitsData] = useState<any[]>([]);
+  const [availableAmenities, setAvailableAmenities] = useState<any[]>([]);
+  const [selectedAmenities, setSelectedAmenities] = useState<{ [key: string]: { selected: boolean; amount: number } }>({});
+
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
-      getUnitsAndRoomsForTenant().then((data) => setUnitsData(data));
+      getUnitsAndRoomsForTenant().then((data: any) => {
+        setUnitsData(data.unitsData || []);
+        if (data.amenities) {
+          setAvailableAmenities(data.amenities);
+          const initialMap: any = {};
+          data.amenities.forEach((item: any) => {
+            initialMap[item.id] = { selected: false, amount: Number(item.amount) };
+          });
+          setSelectedAmenities(initialMap);
+        }
+      });
     }
   }, [isOpen]);
 
   if (!isOpen) return null;
 
-  // Hanapin ang napiling room para makuha ang monthly rent nito sa pag-compute
   let selectedRoomMonthlyRent = 0;
   if (selectedRoomId) {
     for (const unit of unitsData) {
@@ -48,12 +61,40 @@ export function AddTenantModal({ isOpen, onClose, onTenantAdded }: AddTenantModa
   const computedAdvanceAmount = selectedRoomMonthlyRent * advanceMonths;
   const computedDepositAmount = selectedRoomMonthlyRent * depositMonths;
 
+  const handleAmenityToggle = (amenityId: string) => {
+    setSelectedAmenities(prev => ({
+      ...prev,
+      [amenityId]: {
+        ...prev[amenityId],
+        selected: !prev[amenityId].selected,
+      }
+    }));
+  };
+
+  const handleAmenityAmountChange = (amenityId: string, val: string) => {
+    setSelectedAmenities(prev => ({
+      ...prev,
+      [amenityId]: {
+        ...prev[amenityId],
+        amount: Number(val) || 0,
+      }
+    }));
+  };
+
   const handleSubmit = async (e: React.SubmitEvent) => {
     e.preventDefault();
     if (!fullName || !selectedRoomId || !startDate) {
       alert("Pakiusap na punan ang mga pangunahing impormasyon (Pangalan, Kwarto, at Simula ng Upa).");
       return;
     }
+
+    const amenitiesPayload = Object.entries(selectedAmenities)
+      .filter(([_, data]) => data.selected)
+      .map(([amenityId, data]) => ({
+        amenityId,
+        amount: data.amount,
+        quantity: 1,
+      }));
 
     setLoading(true);
     const result = await addTenantAction({
@@ -63,8 +104,9 @@ export function AddTenantModal({ isOpen, onClose, onTenantAdded }: AddTenantModa
       roomId: selectedRoomId,
       startDate,
       endDate: endDate || undefined,
-      advanceMonths, // 👈 Ipinapasa sa server action
-      depositMonths, // 👈 Ipinapasa sa server action
+      advanceMonths,
+      depositMonths,
+      amenities: amenitiesPayload, // 👈 Ipinapasa na rito ang mga napiling amenities
     });
     setLoading(false);
 
@@ -85,6 +127,7 @@ export function AddTenantModal({ isOpen, onClose, onTenantAdded }: AddTenantModa
     setEndDate("");
     setAdvanceMonths(1);
     setDepositMonths(1);
+    setSelectedAmenities({});
     onClose();
   };
 
@@ -142,7 +185,7 @@ export function AddTenantModal({ isOpen, onClose, onTenantAdded }: AddTenantModa
                 <optgroup key={unit.id} label={unit.name}>
                   {unit.rooms.map((room: any) => (
                     <option key={room.id} value={room.id}>
-                      Room {room.roomNumber} (₱{Number(room.monthlyRent).toLocaleString()}) {room.status === 'vacant' ? '- Vacant' : '- Occupied'}
+                      Room {room.roomNumber} (₱{Number(room.monthlyRent).toLocaleString()})
                     </option>
                   ))}
                 </optgroup>
@@ -150,7 +193,7 @@ export function AddTenantModal({ isOpen, onClose, onTenantAdded }: AddTenantModa
             </select>
           </div>
 
-          {/* 👈 Advance at Deposit Months Inputs */}
+          {/* Advance at Deposit Months Inputs */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 rounded-xl border border-line p-3 bg-background/50">
             <div>
               <label className="block text-xs font-medium text-muted mb-1">Advance (Bilang ng Buwan)</label>
@@ -184,6 +227,50 @@ export function AddTenantModal({ isOpen, onClose, onTenantAdded }: AddTenantModa
               </span>
             </div>
           </div>
+
+          {/* ✨ AMENITIES SELECTION LIST */}
+          {availableAmenities.length > 0 && (
+            <div className="rounded-xl border border-line p-3 bg-background/50 space-y-2">
+              <label className="block text-xs font-bold text-foreground mb-1">
+                Maglakip ng mga Amenities / Karagdagang Bayarin (Opsyonal)
+              </label>
+              <div className="space-y-2 max-h-36 overflow-y-auto pr-1">
+                {availableAmenities.map((amenity) => {
+                  const isChecked = selectedAmenities[amenity.id]?.selected || false;
+                  const currentAmount = selectedAmenities[amenity.id]?.amount ?? Number(amenity.amount);
+
+                  return (
+                    <div key={amenity.id} className="flex items-center justify-between gap-2 rounded-lg border border-line bg-background p-2">
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          id={`amenity-${amenity.id}`}
+                          checked={isChecked}
+                          onChange={() => handleAmenityToggle(amenity.id)}
+                          className="h-4 w-4 rounded border-line text-primary focus:ring-primary cursor-pointer"
+                        />
+                        <label htmlFor={`amenity-${amenity.id}`} className="text-xs font-medium text-foreground cursor-pointer">
+                          {amenity.name} <span className="text-[10px] text-muted">({amenity.frequency})</span>
+                        </label>
+                      </div>
+
+                      {isChecked && (
+                        <div className="w-24">
+                          <input
+                            type="number"
+                            value={currentAmount}
+                            onChange={(e) => handleAmenityAmountChange(amenity.id, e.target.value)}
+                            placeholder="Amount"
+                            className="w-full rounded border border-line bg-background px-2 py-1 text-xs text-right text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>

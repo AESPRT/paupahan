@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use server";
 
 import prisma from "@/src/lib/prisma";
@@ -67,10 +68,7 @@ export async function getTenantDashboardData() {
       select: { paymentSettings: true },
     });
 
-    const paymentSettings = (landlordUser?.paymentSettings as any) || {
-      gcash: { number: "N/A", name: "Landlord" },
-      bank: { bankName: "N/A", accountNumber: "N/A", accountName: "Landlord" },
-    };
+    const paymentSettings = (landlordUser?.paymentSettings as any) || {};
 
     // I-parse ang utility items mula sa bill items kung mayroon man
     const electricityItem = latestBill?.items.find((i) => i.type === "electricity");

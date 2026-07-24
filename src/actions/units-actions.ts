@@ -1,7 +1,10 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 'use server'
 
 import prisma from '@/src/lib/prisma'
 import { revalidatePath } from 'next/cache'
+import { cookies } from 'next/headers'
+import { createAuditLog } from '@/src/actions/audit-actions'
 
 export async function getUnitsData() {
   try {
@@ -11,7 +14,9 @@ export async function getUnitsData() {
         rooms: {
           include: {
             leases: {
-              where: { status: 'active' },
+              where: { 
+                status: { in: ['active', 'pending'] } // 👈 Isama ang pending
+              },
               include: {
                 tenant: { select: { fullName: true } },
               },
@@ -25,17 +30,25 @@ export async function getUnitsData() {
 
     const formattedUnits = unitsList.map((unit) => {
       const formattedRooms = unit.rooms.map((room) => {
-        const activeLease = room.leases[0];
-        let status: "Occupied" | "Vacant" | "Maintenance" = "Vacant";
-        if (room.status === 'occupied') status = "Occupied";
-        else if (room.status === 'maintenance') status = "Maintenance";
+        const activeOrPendingLease = room.leases[0];
+        
+        let status: "Occupied" | "Vacant" | "Maintenance" | "Reserved" = "Vacant";
+        
+        if (room.status === 'maintenance') {
+          status = "Maintenance";
+        } else if (activeOrPendingLease) {
+          // Kung ang lease ay pending, gawing "Reserved", kung active naman ay "Occupied"
+          status = activeOrPendingLease.status === 'pending' ? "Reserved" : "Occupied";
+        } else if (room.status === 'occupied') {
+          status = "Occupied";
+        }
 
         return {
           id: room.id,
           roomNumber: room.roomNumber,
           status,
           monthlyRent: Number(room.monthlyRent),
-          tenantName: activeLease?.tenant?.fullName,
+          tenantName: activeOrPendingLease?.tenant?.fullName,
         };
       });
 
@@ -57,6 +70,21 @@ export async function getUnitsData() {
 
 export async function addUnitAction(name: string) {
   try {
+    const cookieStore = await cookies();
+    const adminId = cookieStore.get("session_user_id")?.value;
+    
+    if (!adminId) {
+      return { success: false, error: "Walang active session." };
+    }
+    
+    await createAuditLog({
+      actorId: adminId,
+        action: `Gumawa ng bagong Unit/Building: ${name}`,
+        entityType: 'Unit',
+        entityId: adminId,
+        metadata: { actionType: 'ADD' },
+    })
+
     // 1. Hanapin muna ang unang available na Property sa database
     let property = await prisma.property.findFirst();
 
@@ -103,6 +131,21 @@ export async function addUnitAction(name: string) {
 
 export async function addRoomAction(propertyOrUnitId: string, roomNumber: string, monthlyRent: number) {
   try {
+    const cookieStore = await cookies();
+    const adminId = cookieStore.get("session_user_id")?.value;
+    
+    if (!adminId) {
+      return { success: false, error: "Walang active session." };
+    }
+    
+    await createAuditLog({
+      actorId: adminId,
+        action: `Gumawa ng bagong Room: ${roomNumber} sa Unit/Property ID: ${propertyOrUnitId}`,
+        entityType: 'Room',
+        entityId: adminId,
+        metadata: { actionType: 'ADD' },
+    })
+
     let targetUnitId = propertyOrUnitId;
 
     // 1. Suriin muna kung ang ID na ipinasa ay direktang isang Unit ID

@@ -51,7 +51,8 @@ export async function registerLandlord(formData: FormData): Promise<ActionRespon
         landlordId: newUser.id,
         planTier: 'panimula',
         status: 'active',
-        maxUnitsLimit: 5,
+        maxUnitsLimit: 1,
+        maxRoomLimit: 3,
       },
     })
 

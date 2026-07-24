@@ -10,21 +10,29 @@ export interface UtilityItem {
   status: "Pending Tenant Input" | "Pending Landlord Approval" | "Approved";
 }
 
+// ✨ Idagdag ang AmenityItem interface para sa listahan
+export interface AmenityItem {
+  name: string;
+  amount: number;
+  frequency?: string | null;
+}
+
 export interface TenantBill {
   id: string;
   monthYear: string; // e.g. "Hulyo 2026"
   dueDate: string;
   status: BillStatus;
   
-  // Fixed Charges (Naka-set na mula sa Landlord)
+  // Fixed Charges
   rentAmount: number;
-  amenitiesFee: number; // e.g. Garbage fee, Condo dues, Wi-Fi
+  amenitiesFee: number; 
+  amenitiesList?: AmenityItem[]; // 👈 Idagdag ito rito para makilala ng TypeScript
   
   // Dynamic Utilities
   electricity: UtilityItem;
   water: UtilityItem;
   
-  // Total (Kalkulado kapag approved na ang utilities)
+  // Total
   totalAmount: number;
   
   paymentReceiptUrl?: string;

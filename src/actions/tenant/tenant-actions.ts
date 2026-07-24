@@ -1,15 +1,32 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-unused-vars */
+ 
 "use server";
 
 import prisma from "@/src/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { NotificationChannel, NotificationStatus } from "@prisma/client";
+import { cookies } from "next/headers";
 
 export async function getBillDetailsForPayment(billId: string) {
   try {
-    // Kunin ang bill kasama ang mga items nito (para sa submeter/utilities)
     const bill = await prisma.bill.findUnique({
       where: { id: billId },
       include: {
-        items: true, // Kasama ang kuryente, tubig, amenities, atbp.
+        items: true,
+        lease: {
+          include: {
+            room: {
+              include: {
+                unit: {
+                  include: {
+                    property: true, // Kunin muna ang property para makuha ang landlordId
+                  },
+                },
+              },
+            },
+          },
+        },
       },
     });
 
@@ -17,10 +34,33 @@ export async function getBillDetailsForPayment(billId: string) {
       return null;
     }
 
-    // I-format ang month/year kung paano mo ito gustong ipakita
-    const monthYearFormatted = bill.billingMonthYear; 
+    // Kunin ang landlordId mula sa property ng lease/room/unit
+    const landlordId = bill.lease?.room?.unit?.property?.landlordId;
 
-    // I-format ang due date para maging mabasa
+    let landlordSettings = null;
+
+    if (landlordId) {
+      // Direktang hanapin ang landlord sa User table gamit ang landlordId para sigurado
+      const landlordUser = await prisma.user.findUnique({
+        where: { id: landlordId },
+        select: { paymentSettings: true },
+      });
+
+      if (landlordUser?.paymentSettings) {
+        landlordSettings = landlordUser.paymentSettings;
+        
+        // I-parse kung sakaling string ang pagkakaseed/pagkaka-store sa database
+        if (typeof landlordSettings === "string") {
+          try {
+            landlordSettings = JSON.parse(landlordSettings);
+          } catch (e) {
+            landlordSettings = null;
+          }
+        }
+      }
+    }
+
+    const monthYearFormatted = bill.billingMonthYear; 
     const dueDateFormatted = new Date(bill.dueDate).toLocaleDateString("en-US", {
       month: "long",
       day: "numeric",
@@ -29,11 +69,12 @@ export async function getBillDetailsForPayment(billId: string) {
 
     return {
       id: bill.id,
-      tenantId: bill.tenantId, // 👈 Idinagdag ito rito para mawala ang TypeScript error
+      tenantId: bill.tenantId,
       monthYear: monthYearFormatted,
       totalAmount: Number(bill.totalAmount),
       dueDate: dueDateFormatted,
       status: bill.status,
+      landlordPaymentSettings: landlordSettings,
     };
   } catch (error) {
     console.error("Error fetching bill details for payment:", error);
@@ -48,7 +89,7 @@ export async function submitPaymentAction(formData: FormData) {
     const paymentMethod = formData.get("paymentMethod") as string;
     const referenceNo = formData.get("referenceNo") as string;
     const amount = Number(formData.get("amount"));
-    const receiptUrl = formData.get("receiptUrl") as string; // O kaya ay URL mula sa iyong file upload handler
+    const receiptUrl = formData.get("receiptUrl") as string;
 
     if (!billId || !tenantId || !amount) {
       return { success: false, error: "Kulang ang mga kinakailangang impormasyon." };
@@ -65,14 +106,56 @@ export async function submitPaymentAction(formData: FormData) {
       },
     });
 
-    // 2. I-update ang status ng bill sa `bills` table (halimbawa: gawing pending approval o bayad na, depende sa workflow mo)
+    // 2. I-update ang status ng bill at i-save ang receipt URL
     await prisma.bill.update({
       where: { id: billId },
       data: {
-        status: "pending", // o "paid" kung automatic kapag naisumite
+        status: "pending", 
         paymentReceiptUrl: receiptUrl || null,
       },
     });
+
+    // 3. Hanapin ang Landlord User ID para mapadalhan ng notification
+    // Binaybay natin ang relasyon: Bill -> Lease -> Room -> Unit -> Property -> landlordId (User)
+    const billDetails = await prisma.bill.findUnique({
+      where: { id: billId },
+      include: {
+        tenant: true,
+        lease: {
+          include: {
+            room: {
+              include: {
+                unit: {
+                  include: {
+                    property: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    const landlordId = billDetails?.lease?.room?.unit?.property?.landlordId;
+    const tenantName = billDetails?.tenant?.fullName || "Isang tenant";
+    const billingMonth = billDetails?.billingMonthYear || "buwan na ito";
+
+    if (landlordId) {
+      // 4. Gumawa ng In-App Notification para sa Landlord
+      await prisma.notification.create({
+        data: {
+          recipientUserId: landlordId,
+          type: "PAYMENT_SUBMITTED",
+          channel: NotificationChannel.in_app,
+          title: "Bagong Bayad na Isinumite",
+          message: `Nagsumite ng bayad si ${tenantName} para sa billing ng ${billingMonth} gamit ang ${paymentMethod}.`,
+          relatedEntityType: "Bill",
+          relatedEntityId: billId,
+          status: NotificationStatus.pending,
+        },
+      });
+    }
 
     // I-revalidate ang path para mag-update ang UI
     revalidatePath(`/tenant/payment/${billId}`);
@@ -82,5 +165,113 @@ export async function submitPaymentAction(formData: FormData) {
   } catch (error) {
     console.error("Error submitting payment:", error);
     return { success: false, error: "Nagkaroon ng problema sa pagproseso ng iyong bayad." };
+  }
+}
+
+export async function getTenantSettingsData() {
+  try {
+    const cookieStore = await cookies();
+    const tenantId = cookieStore.get("session_user_id")?.value;
+
+    if (!tenantId) {
+      return { success: false, error: "Walang active session." };
+    }
+
+    // Gamitin ang tenantId at i-query kasama ang leases
+    const tenant = (await prisma.tenant.findUnique({
+      where: { id: tenantId },
+      include: {
+        leases: {
+          where: { status: "active" },
+          include: {
+            room: {
+              include: {
+                unit: {
+                  include: {
+                    property: true,
+                  },
+                },
+              },
+            },
+          },
+          take: 1,
+        },
+      },
+    })) as any; // I-cast bilang any upang maiwasan ang strict TypeScript property errors
+
+    if (!tenant) {
+      return { success: false, error: "Hindi nahanap ang tenant." };
+    }
+
+    const activeLease = tenant.leases[0];
+    const room = activeLease?.room;
+    const unit = room?.unit;
+    const property = unit?.property;
+
+    // Sinasalo ang notification settings mapa-snake_case man o camelCase ang database column
+    const notifs = tenant.notificationSettings || tenant.notification_settings || {};
+
+    const settingsData = {
+      fullName: tenant.fullName || "",
+      email: tenant.email || "",
+      phoneNumber: tenant.phone || "",
+      emergencyContactName: tenant.emergencyContactName || "",
+      emergencyContactPhone: tenant.emergencyContactPhone || "",
+      roomName: room ? `Room ${room.roomNumber} - ${unit?.name || ""}` : "Walang active room",
+      propertyName: property?.name || "Walang assigned property",
+      notifications: {
+        smsAlerts: notifs.smsAlerts ?? notifs.sms_alerts ?? true,
+        emailAlerts: notifs.emailAlerts ?? notifs.email_alerts ?? true,
+        billingReminders: notifs.billingReminders ?? notifs.billing_reminders ?? true,
+      },
+    };
+
+    return { success: true, data: settingsData };
+  } catch (error) {
+    console.error("Error fetching tenant settings:", error);
+    return { success: false, error: "Nabigong makuha ang settings." };
+  }
+}
+
+// Action para i-update ang tenant profile at notifications
+export async function updateTenantSettingsAction(formData: FormData) {
+  try {
+    const cookieStore = await cookies();
+    const tenantId = cookieStore.get("session_user_id")?.value;
+
+    if (!tenantId) {
+      return { success: false, error: "Walang active session." };
+    }
+
+    const fullName = formData.get("fullName") as string;
+    const phoneNumber = formData.get("phoneNumber") as string;
+    const emergencyContactName = formData.get("emergencyContactName") as string;
+    const emergencyContactPhone = formData.get("emergencyContactPhone") as string;
+    
+    const smsAlerts = formData.get("smsAlerts") === "true";
+    const emailAlerts = formData.get("emailAlerts") === "true";
+    const billingReminders = formData.get("billingReminders") === "true";
+
+    // Gumamit ng type assertion para sa update data kung sakaling hindi pa nai-update ang Prisma Client types
+    await prisma.tenant.update({
+      where: { id: tenantId },
+      data: {
+        fullName,
+        phone: phoneNumber,
+        emergencyContactName,
+        emergencyContactPhone,
+        notificationSettings: {
+          smsAlerts,
+          emailAlerts,
+          billingReminders,
+        },
+      } as any,
+    });
+
+    revalidatePath("/tenant/settings");
+    return { success: true, message: "Matagumpay na na-update ang iyong profile!" };
+  } catch (error) {
+    console.error("Error updating tenant settings:", error);
+    return { success: false, error: "Nabigong i-update ang profile." };
   }
 }

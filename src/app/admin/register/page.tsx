@@ -1,4 +1,3 @@
-import { AuthHeader } from "@/src/components/auth/AuthHeader";
 import { AuthFooter } from "@/src/components/auth/AuthFooter";
 import { AdminRegisterCard } from "@/src/components/admin/register/AdminRegisterCard";
 

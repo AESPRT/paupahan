@@ -1,14 +1,43 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
-import { MOCK_UTILITIES_DATA } from "@/src/data/tenant-utilities";
+import { useState, useEffect } from "react";
 import { UtilityHeader } from "@/src/components/tenant/utilities/UtilityHeader";
 import { UtilityRateCard } from "@/src/components/tenant/utilities/UtilityRateCard";
 import { UtilityCalculator } from "@/src/components/tenant/utilities/UtilityCalculator";
 import { AmenityCard } from "@/src/components/tenant/utilities/AmenityCard";
 import { Footer } from "@/src/components/landing/Footer";
+import { getTenantUtilitiesAndAmenities } from "@/src/actions/tenant/utility-actions"; // 👈 I-import ang tamang action
 
 export default function TenantUtilitiesPage() {
-  const { rates, amenities } = MOCK_UTILITIES_DATA;
+  const [rates, setRates] = useState<any[]>([]);
+  const [amenities, setAmenities] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const result = await getTenantUtilitiesAndAmenities();
+        if (result.success) {
+          setRates(result.rates);
+          setAmenities(result.amenities);
+        }
+      } catch (error) {
+        console.error("Nabigong i-load ang utility data:", error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadData();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex h-[60vh] items-center justify-center">
+        <span className="text-sm font-medium text-muted">Nag-a-load ng utility rates...</span>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 p-4 sm:p-6 lg:p-8">
@@ -20,11 +49,15 @@ export default function TenantUtilitiesPage() {
         <h2 className="font-display text-xs font-bold uppercase tracking-wider text-muted">
           Kasalukuyang Utility Rates (Per Unit)
         </h2>
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          {rates.map((rate) => (
-            <UtilityRateCard key={rate.id} rate={rate} />
-          ))}
-        </div>
+        {rates.length > 0 ? (
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            {rates.map((rate) => (
+              <UtilityRateCard key={rate.id} rate={rate} />
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-muted">Wala pang nakatakdang utility rates sa sistema.</p>
+        )}
       </section>
 
       {/* 3. Calculator Section */}
@@ -35,14 +68,18 @@ export default function TenantUtilitiesPage() {
         <h2 className="font-display text-xs font-bold uppercase tracking-wider text-muted">
           Karagdagang Amenities at Bayarin (Amenities & Dues)
         </h2>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          {amenities.map((amenity) => (
-            <AmenityCard key={amenity.id} amenity={amenity} />
-          ))}
-        </div>
+        {amenities.length > 0 ? (
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            {amenities.map((amenity) => (
+              <AmenityCard key={amenity.id} amenity={amenity} />
+            ))}
+          </div>
+        ) : (
+          <p className="text-xs text-muted">Wala kang kasalukuyang nakatalagang amenities sa iyong lease.</p>
+        )}
       </section>
 
-      <Footer showNavLinks = {false} />
+      <Footer showNavLinks={false} />
     </div>
   );
 }

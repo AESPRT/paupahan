@@ -1,11 +1,14 @@
 import { UtilityRate } from "@/src/types/tenant/tenant-utilities";
 
 interface UtilityRateCardProps {
-  rate: UtilityRate;
+  rate: UtilityRate & { unitLabel?: string; unit?: string };
 }
 
 export function UtilityRateCard({ rate }: UtilityRateCardProps) {
   const isElectricity = rate.type === "electricity";
+  
+  // Kunin ang unit label mula sa unitLabel o unit property
+  const displayUnit = rate.unitLabel || rate.unit || "unit";
 
   return (
     <div className="relative overflow-hidden rounded-3xl border border-line bg-paper-card p-5 shadow-sm space-y-3">
@@ -37,7 +40,7 @@ export function UtilityRateCard({ rate }: UtilityRateCardProps) {
               {rate.name}
             </h3>
             <p className="font-mono-brand text-[10px] text-muted">
-              Huling na-update: {rate.lastUpdated}
+              Huling na-update: {rate.lastUpdated || "Kamakailan"}
             </p>
           </div>
         </div>
@@ -48,12 +51,12 @@ export function UtilityRateCard({ rate }: UtilityRateCardProps) {
           ₱{rate.ratePerUnit.toFixed(2)}
         </span>
         <span className="font-mono-brand text-xs font-bold text-muted">
-          / {rate.unit}
+          / {displayUnit}
         </span>
       </div>
 
       <p className="text-xs text-muted leading-relaxed">
-        {rate.description}
+        {rate.description || "Nakatakdang rate para sa utility na ito."}
       </p>
     </div>
   );

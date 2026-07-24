@@ -1,20 +1,49 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useState } from "react";
-import { submitPaymentAction } from "@/src/actions/tenant/tenant-actions"; // I-import ang action
+import { submitPaymentAction } from "@/src/actions/tenant/tenant-actions";
 
 interface PaymentViewProps {
   billId: string;
-  tenantId: string; // ✨ Idinagdag para sa database relation
+  tenantId: string;
   monthYear: string;
   totalAmount: number;
   dueDate: string;
+  landlordPaymentSettings?: any;
 }
 
-export function PaymentView({ billId, tenantId, monthYear, totalAmount, dueDate }: PaymentViewProps) {
-  const [selectedMethod, setSelectedMethod] = useState<"gcash" | "cash">("gcash");
+export function PaymentView({ 
+  billId, 
+  tenantId, 
+  monthYear, 
+  totalAmount, 
+  dueDate,
+  landlordPaymentSettings 
+}: PaymentViewProps) {
+  const [selectedMethod, setSelectedMethod] = useState<string>("cash");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [referenceNumber, setReferenceNumber] = useState("");
+
+  const settings = landlordPaymentSettings || {};
+
+  // Sinasalo ang parehong camelCase at snake_case mula sa database/json
+  const isGcashActive = Boolean(settings.isGcashActive || settings.is_gcash_active);
+  const isMayaActive = Boolean(settings.isMayaActive || settings.is_maya_active);
+  const isBankActive = Boolean(settings.isBankActive || settings.is_bank_active);
+
+  const gcashName = settings.gcashName || settings.gcash_name || "";
+  const gcashNumber = settings.gcashNumber || settings.gcash_number || "";
+  const mayaName = settings.mayaName || settings.maya_name || "";
+  const mayaNumber = settings.mayaNumber || settings.maya_number || "";
+
+  // Dynamic list ng mga available payment methods
+  const availableMethods = [
+    { id: "cash", label: "Cash", sub: "Direkta sa Landlord", icon: "💵", color: "bg-emerald-600" },
+    ...(isGcashActive ? [{ id: "gcash", label: "GCash", sub: "Online Transfer", icon: "G", color: "bg-blue-500" }] : []),
+    ...(isMayaActive ? [{ id: "maya", label: "Maya", sub: "Online Transfer", icon: "M", color: "bg-green-600" }] : []),
+    ...(isBankActive ? [{ id: "bank", label: "Bank Transfer", sub: "Online Transfer", icon: "🏦", color: "bg-indigo-600" }] : []),
+  ];
 
   const handlePaymentSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -27,15 +56,12 @@ export function PaymentView({ billId, tenantId, monthYear, totalAmount, dueDate 
       formData.append("paymentMethod", selectedMethod);
       formData.append("amount", totalAmount.toString());
       formData.append("referenceNo", referenceNumber);
-      // Kung may file upload ka para sa resibo, i-append din dito ang URL/Path nito
-      // formData.append("receiptUrl", uploadedFileUrl);
 
       const result = await submitPaymentAction(formData);
 
       if (result.success) {
         alert(result.message);
-        // Maaari kang mag-redirect dito patungong dashboard
-        window.location.href = "/tenant/dashboard";
+        window.location.href = "/tenant/dashboard/home";
       } else {
         alert(result.error);
       }
@@ -78,62 +104,66 @@ export function PaymentView({ billId, tenantId, monthYear, totalAmount, dueDate 
 
       {/* Payment Form */}
       <form onSubmit={handlePaymentSubmit} className="space-y-6">
-        {/* Selection: GCash or Cash */}
+        {/* Dynamic Selection Options */}
         <div className="space-y-3">
           <label className="font-display text-xs font-bold uppercase tracking-wider text-muted">
             Piliin ang Paraan ng Pagbabayad
           </label>
-          <div className="grid grid-cols-2 gap-3 sm:gap-4">
-            {/* GCash Option */}
-            <button
-              type="button"
-              onClick={() => setSelectedMethod("gcash")}
-              className={`flex flex-col items-center justify-center gap-2 rounded-2xl border p-4 text-center transition-all ${
-                selectedMethod === "gcash"
-                  ? "border-forest bg-forest/5 text-forest-deep shadow-xs ring-2 ring-forest/20"
-                  : "border-line bg-paper-card text-muted hover:bg-paper"
-              }`}
-            >
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-500 text-white font-bold text-sm">
-                G
-              </div>
-              <div>
-                <p className="text-xs sm:text-sm font-bold text-forest-deep">GCash</p>
-                <p className="text-[10px] text-muted">Online Transfer</p>
-              </div>
-            </button>
-
-            {/* Cash Option */}
-            <button
-              type="button"
-              onClick={() => setSelectedMethod("cash")}
-              className={`flex flex-col items-center justify-center gap-2 rounded-2xl border p-4 text-center transition-all ${
-                selectedMethod === "cash"
-                  ? "border-forest bg-forest/5 text-forest-deep shadow-xs ring-2 ring-forest/20"
-                  : "border-line bg-paper-card text-muted hover:bg-paper"
-              }`}
-            >
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-600 text-white font-bold">
-                💵
-              </div>
-              <div>
-                <p className="text-xs sm:text-sm font-bold text-forest-deep">Cash</p>
-                <p className="text-[10px] text-muted">Direkta sa Landlord</p>
-              </div>
-            </button>
+          <div className={`grid gap-3 sm:gap-4 ${
+            availableMethods.length === 1 ? "grid-cols-1" : 
+            availableMethods.length === 2 ? "grid-cols-2" : "grid-cols-2 sm:grid-cols-3"
+          }`}>
+            {availableMethods.map((method) => (
+              <button
+                key={method.id}
+                type="button"
+                onClick={() => setSelectedMethod(method.id)}
+                className={`flex flex-col items-center justify-center gap-2 rounded-2xl border p-4 text-center transition-all ${
+                  selectedMethod === method.id
+                    ? "border-forest bg-forest/5 text-forest-deep shadow-xs ring-2 ring-forest/20"
+                    : "border-line bg-paper-card text-muted hover:bg-paper"
+                }`}
+              >
+                <div className={`flex h-10 w-10 items-center justify-center rounded-xl text-white font-bold text-sm ${method.color}`}>
+                  {method.icon}
+                </div>
+                <div>
+                  <p className="text-xs sm:text-sm font-bold text-forest-deep">{method.label}</p>
+                  <p className="text-[10px] text-muted">{method.sub}</p>
+                </div>
+              </button>
+            ))}
           </div>
         </div>
 
         {/* Conditional Details based on Selected Method */}
-        {selectedMethod === "gcash" ? (
+        {selectedMethod === "cash" && (
+          <div className="rounded-3xl border border-line bg-paper-card p-5 sm:p-6 space-y-4 animate-in fade-in duration-200">
+            <h3 className="font-display text-xs font-bold uppercase tracking-wider text-muted">
+              Mga Tagubilin sa Cash Payment
+            </h3>
+            <div className="rounded-2xl bg-amber-50 border border-amber-300 p-4 text-xs text-amber-900 space-y-1">
+              <p className="font-bold">Paalala:</p>
+              <p className="leading-snug">
+                Mangyaring dalhin ang eksaktong halaga ng cash diretso sa opisina o sa iyong landlord. Kapag tinanggap na ito, ia-update ang status ng iyong bill sa system.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {selectedMethod === "gcash" && (
           <div className="rounded-3xl border border-line bg-paper-card p-5 sm:p-6 space-y-4 animate-in fade-in duration-200">
             <h3 className="font-display text-xs font-bold uppercase tracking-wider text-muted">
               Mga Hakbang sa GCash
             </h3>
             <div className="rounded-2xl bg-paper p-4 text-xs text-muted space-y-2 border border-line/60">
               <p>1. Mag-transfer ng eksaktong halaga sa pamamagitan ng GCash:</p>
-              <p className="font-mono-brand font-bold text-forest-deep">Pangalan: Juan Dela Cruz</p>
-              <p className="font-mono-brand font-bold text-forest-deep">Number: 0912-345-6789</p>
+              <p className="font-mono-brand font-bold text-forest-deep">
+                Pangalan: {gcashName || "Hindi pa na-setup"}
+              </p>
+              <p className="font-mono-brand font-bold text-forest-deep">
+                Number: {gcashNumber || "Wala pang numero"}
+              </p>
             </div>
 
             <div className="space-y-1.5">
@@ -158,16 +188,43 @@ export function PaymentView({ billId, tenantId, monthYear, totalAmount, dueDate 
               />
             </div>
           </div>
-        ) : (
+        )}
+
+        {selectedMethod === "maya" && (
           <div className="rounded-3xl border border-line bg-paper-card p-5 sm:p-6 space-y-4 animate-in fade-in duration-200">
             <h3 className="font-display text-xs font-bold uppercase tracking-wider text-muted">
-              Mga Tagubilin sa Cash Payment
+              Mga Hakbang sa Maya
             </h3>
-            <div className="rounded-2xl bg-amber-50 border border-amber-300 p-4 text-xs text-amber-900 space-y-1">
-              <p className="font-bold">Paalala:</p>
-              <p className="leading-snug">
-                Mangyaring dalhin ang eksaktong halaga ng cash diretso sa opisina o sa iyong landlord. Kapag tinanggap na ito, ia-update ang status ng iyong bill sa system.
+            <div className="rounded-2xl bg-paper p-4 text-xs text-muted space-y-2 border border-line/60">
+              <p>1. Mag-transfer ng eksaktong halaga sa pamamagitan ng Maya:</p>
+              <p className="font-mono-brand font-bold text-forest-deep">
+                Pangalan: {mayaName || "Hindi pa na-setup"}
               </p>
+              <p className="font-mono-brand font-bold text-forest-deep">
+                Number: {mayaNumber || "Wala pang numero"}
+              </p>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-forest-deep">Maya Reference Number (Ref No.)</label>
+              <input
+                type="text"
+                required
+                placeholder="Hal. 1029384756"
+                value={referenceNumber}
+                onChange={(e) => setReferenceNumber(e.target.value)}
+                className="w-full rounded-2xl border border-line bg-paper px-4 py-3 font-mono-brand text-xs sm:text-sm text-forest-deep outline-none focus:border-forest"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-forest-deep">Mag-upload ng Screenshot ng Resibo</label>
+              <input
+                type="file"
+                accept="image/*"
+                required
+                className="w-full text-xs text-muted file:mr-4 file:rounded-xl file:border-0 file:bg-forest/10 file:px-4 file:py-2.5 file:font-mono-brand file:text-xs file:font-bold file:text-forest hover:file:bg-forest/20"
+              />
             </div>
           </div>
         )}

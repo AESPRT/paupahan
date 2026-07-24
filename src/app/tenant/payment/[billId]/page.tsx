@@ -9,7 +9,7 @@ interface PaymentPageProps {
 export default async function TenantPaymentPage({ params }: PaymentPageProps) {
   const { billId } = await params;
 
-  // Kunin ang totoong detalye ng bill at tenantId mula sa database gamit ang Server Action
+  // Kunin ang detalye ng bill kasama ang landlord payment settings mula sa database
   const bill = await getBillDetailsForPayment(billId);
 
   if (!bill) {
@@ -24,6 +24,7 @@ export default async function TenantPaymentPage({ params }: PaymentPageProps) {
         monthYear={bill.monthYear}
         totalAmount={bill.totalAmount}
         dueDate={bill.dueDate}
+        landlordPaymentSettings={bill.landlordPaymentSettings}
       />
     </main>
   );

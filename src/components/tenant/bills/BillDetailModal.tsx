@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useState } from "react";
@@ -117,7 +118,11 @@ export function BillDetailModal({
                 </div>
                 <div>
                   <p className="text-xs font-bold text-forest-deep">Fixed Amenities & Dues</p>
-                  <p className="text-[10px] text-muted">Basura, Wi-Fi & Maintenance fee</p>
+                  <p className="text-[10px] text-muted">
+                    {bill.amenitiesList && bill.amenitiesList.length > 0
+                      ? bill.amenitiesList.map((a: any) => a.name).join(", ")
+                      : "Walang nakatalagang amenities"}
+                  </p>
                 </div>
               </div>
               <span className="font-mono-brand text-xs font-bold text-forest-deep">

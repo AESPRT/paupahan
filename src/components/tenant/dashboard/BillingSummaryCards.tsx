@@ -18,15 +18,16 @@ export function BillingSummaryCards({ data }: BillingSummaryProps) {
     }
   };
 
+  const isPaid = data.paymentStatus === "Paid";
+
   return (
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+    <div className={`grid grid-cols-1 gap-3 ${isPaid ? "sm:grid-cols-2" : "sm:grid-cols-3"}`}>
       {/* Total Bill Card */}
       <div className="rounded-3xl border border-line bg-paper-card p-5 shadow-sm">
         <div className="flex items-center justify-between">
           <span className="font-mono-brand text-[11px] font-bold uppercase tracking-wider text-muted">
             Babayaran Ngayong Buwan
           </span>
-          {/* Receipt / Invoice SVG Icon */}
           <div className="flex h-7 w-7 items-center justify-center rounded-xl bg-forest/10 text-forest shrink-0">
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -57,30 +58,31 @@ export function BillingSummaryCards({ data }: BillingSummaryProps) {
           ₱{data.pendingBalance.toLocaleString("en-PH", { minimumFractionDigits: 2 })}
         </div>
         <p className="mt-1 text-[11px] text-muted">
-          {data.pendingBalance > 0 ? "Kailangang bayaran bago mag-due" : "Walang natitirang utang"}
+          {data.pendingBalance > 0 ? "Kailangang bayaran bago mag-due" : "Fully paid na ang iyong account"}
         </p>
       </div>
 
-      {/* Due Date Card */}
-      <div className="rounded-3xl border border-line bg-paper-card p-5 shadow-sm">
-        <div className="flex items-center justify-between">
-          <span className="font-mono-brand text-[11px] font-bold uppercase tracking-wider text-muted">
-            Huling Araw ng Bayad (Due Date)
-          </span>
-          {/* Clock / Due Date SVG Icon */}
-          <div className="flex h-7 w-7 items-center justify-center rounded-xl bg-amber-100 text-amber-700 shrink-0">
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
+      {/* Due Date Card - Nakatago (Conditional) kung Paid na */}
+      {!isPaid && (
+        <div className="rounded-3xl border border-line bg-paper-card p-5 shadow-sm">
+          <div className="flex items-center justify-between">
+            <span className="font-mono-brand text-[11px] font-bold uppercase tracking-wider text-muted">
+              Huling Araw ng Bayad (Due Date)
+            </span>
+            <div className="flex h-7 w-7 items-center justify-center rounded-xl bg-amber-100 text-amber-700 shrink-0">
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
           </div>
+          <div className="mt-2 font-mono-brand text-2xl sm:text-3xl font-bold text-forest-deep">
+            {data.dueDate}
+          </div>
+          <p className="mt-[2px] text-[11px] text-coral-deep font-semibold">
+            i-settle ang bayad bago ang nakatakdang petsa
+          </p>
         </div>
-        <div className="mt-2 font-mono-brand text-2xl sm:text-3xl font-bold text-forest-deep">
-          {data.dueDate}
-        </div>
-        <p className="mt-[2px] text-[11px] text-coral-deep font-semibold">
-          i-settle ang bayad bago ang nakatakdang petsa
-        </p>
-      </div>
+      )}
     </div>
   );
 }

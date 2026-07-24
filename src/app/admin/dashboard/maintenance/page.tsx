@@ -1,62 +1,49 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useTransition } from "react";
 import { MaintenanceHeader } from "@/src/components/admin/maintenance/MaintenanceHeader";
 import { MaintenanceCards } from "@/src/components/admin/maintenance/MaintenanceCards";
 import { MaintenanceRequest, MaintenanceStatus } from "@/src/types/admin/maintenance";
 import { Footer } from "@/src/components/landing/Footer";
-
-const INITIAL_REQUESTS: MaintenanceRequest[] = [
-  {
-    id: "m1",
-    ticketNumber: "TICK-101",
-    unitName: "Building A",
-    roomNumber: "Room 101",
-    tenantName: "Juan Dela Cruz",
-    category: "Plumbing",
-    issueTitle: "Tumatagas na Banyo at Gripo",
-    description: "Malakas po ang patak ng tubig sa ilalim ng lavatory sink sa banyo, kailangan po ng palit gasket.",
-    priority: "High",
-    status: "Pending",
-    dateReported: "2026-07-21",
-  },
-  {
-    id: "m2",
-    ticketNumber: "TICK-102",
-    unitName: "Building B",
-    roomNumber: "Room 202",
-    tenantName: "Maria Clara",
-    category: "Electrical",
-    issueTitle: "Pumutok na Outlet sa Kusina",
-    description: "Hindi na gumagana ang dalawang saksakan pagkatapos gumamit ng microwave kahapon.",
-    priority: "Emergency",
-    status: "In Progress",
-    dateReported: "2026-07-20",
-  },
-  {
-    id: "m3",
-    ticketNumber: "TICK-103",
-    unitName: "Building A",
-    roomNumber: "Room 103",
-    tenantName: "Pedro Penduko",
-    category: "Structural",
-    issueTitle: "Loose Door Lock Handle",
-    description: "Medyo maalon po ang doorknob sa main door ng kwarto.",
-    priority: "Low",
-    status: "Resolved",
-    dateReported: "2026-07-15",
-  },
-];
+import { getAdminMaintenanceRequests, updateMaintenanceStatusAction } from "@/src/actions/admin-maintenance";
 
 export default function MaintenancePage() {
-  const [requests, setRequests] = useState<MaintenanceRequest[]>(INITIAL_REQUESTS);
+  const [requests, setRequests] = useState<MaintenanceRequest[]>([]);
   const [filterStatus, setFilterStatus] = useState<string>("All");
+  const [isLoading, setIsLoading] = useState(true);
+  const [, startTransition] = useTransition();
 
-  // Update Status Handler (Admin/Landlord Action)
+  // Kunin ang mga request mula sa database pag-load ng page
+  useEffect(() => {
+    async function fetchRequests() {
+      setIsLoading(true);
+      const res = await getAdminMaintenanceRequests();
+      if (res.success && res.requests) {
+        setRequests(res.requests as MaintenanceRequest[]);
+      }
+      setIsLoading(false);
+    }
+    fetchRequests();
+  }, []);
+
+  // Update Status Handler (Admin/Landlord Action) gamit ang Server Action
   const handleUpdateStatus = (id: string, newStatus: MaintenanceStatus) => {
+    // I-optimistic update ang UI agad para mabilis ang reaksyon
     setRequests((prev) =>
       prev.map((req) => (req.id === id ? { ...req, status: newStatus } : req))
     );
+
+    startTransition(async () => {
+      const res = await updateMaintenanceStatusAction(id, newStatus);
+      if (!res.success) {
+        alert(res.error);
+        // I-revert o i-refetch kung nagka-error
+        const refreshed = await getAdminMaintenanceRequests();
+        if (refreshed.success && refreshed.requests) {
+          setRequests(refreshed.requests as MaintenanceRequest[]);
+        }
+      }
+    });
   };
 
   // Calculations for Admin Stats
@@ -95,13 +82,19 @@ export default function MaintenancePage() {
         ))}
       </div>
 
-      {/* Requests Cards & Status Updater */}
-      <MaintenanceCards
-        requests={filteredRequests}
-        onUpdateStatus={handleUpdateStatus}
-      />
+      {/* Loading o Requests Cards */}
+      {isLoading ? (
+        <div className="py-20 text-center font-mono-brand text-sm text-muted">
+          Kinukuha ang mga maintenance requests...
+        </div>
+      ) : (
+        <MaintenanceCards
+          requests={filteredRequests}
+          onUpdateStatus={handleUpdateStatus}
+        />
+      )}
 
-      <Footer showNavLinks = {false} />
+      <Footer showNavLinks={false} />
     </div>
   );
 }

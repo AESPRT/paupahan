@@ -1,8 +1,10 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 'use server'
 
 import prisma from '@/src/lib/prisma'
 import { revalidatePath } from 'next/cache'
 import { cookies } from 'next/headers'
+import { createAuditLog } from '@/src/actions/audit-actions'
 
 export async function getDashboardData() {
   try {
@@ -30,6 +32,9 @@ export async function getDashboardData() {
     })
     const vacantRooms = await prisma.room.count({
       where: { status: 'vacant' },
+    })
+    const reservedRooms = await prisma.room.count({
+      where: { status: 'reserved' },
     })
     
     const occupancyRate = totalRooms > 0 ? (occupiedRooms / totalRooms) * 100 : 0
@@ -62,27 +67,47 @@ export async function getDashboardData() {
       const startDate = new Date(`${year}-${monthStr}-01`);
       const endDate = new Date(year, d.getMonth() + 1, 0, 23, 59, 59);
 
-      const monthlyTotal = await prisma.bill.aggregate({
+      // 1. Paid Bills
+      const paidTotal = await prisma.bill.aggregate({
         where: {
           status: 'paid',
-          paidAt: {
-            gte: startDate,
-            lte: endDate,
-          },
+          paidAt: { gte: startDate, lte: endDate },
         },
         _sum: { totalAmount: true },
       });
+      const paidNum = Number(paidTotal._sum.totalAmount || 0);
 
-      const amountNum = Number(monthlyTotal._sum.totalAmount || 0);
-      
-      const formattedAmount = amountNum >= 1000 
-        ? `₱${(amountNum / 1000).toFixed(1)}k` 
-        : `₱${amountNum}`;
+      // 2. Pending Bills
+      const pendingTotal = await prisma.bill.aggregate({
+        where: {
+          status: 'pending',
+          generatedAt: { gte: startDate, lte: endDate },
+        },
+        _sum: { totalAmount: true },
+      });
+      const pendingNum = Number(pendingTotal._sum.totalAmount || 0);
+
+      // 3. Overdue Bills
+      const overdueTotal = await prisma.bill.aggregate({
+        where: {
+          status: 'overdue',
+          generatedAt: { gte: startDate, lte: endDate },
+        },
+        _sum: { totalAmount: true },
+      });
+      const overdueNum = Number(overdueTotal._sum.totalAmount || 0);
+
+      const formatCurrency = (val: number) => 
+        new Intl.NumberFormat('fil-PH', { style: 'currency', currency: 'PHP', maximumFractionDigits: 0 }).format(val);
 
       chartData.push({
         month: monthName,
-        val: amountNum,
-        amount: formattedAmount,
+        paid: paidNum,
+        pending: pendingNum,
+        overdue: overdueNum,
+        paidFormatted: formatCurrency(paidNum),
+        pendingFormatted: formatCurrency(pendingNum),
+        overdueFormatted: formatCurrency(overdueNum),
       });
     }
 
@@ -93,6 +118,7 @@ export async function getDashboardData() {
         items: {
           some: {
             OR: [
+              { status: { equals: 'pending' } },
               { proofPhotoUrl: { not: null } },
               { currentReading: { not: null } }
             ]
@@ -142,8 +168,8 @@ export async function getDashboardData() {
 
       // Suriin ang bawat item ng bill (Electricity, Water, atbp.)
       bill.items.forEach((item) => {
-        // Ipakita lang sa pending approvals kung may current reading o litrato na pinasa ang tenant para sa item na ito
-        if (item.currentReading !== null || item.proofPhotoUrl) {
+        // ✨ I-check na ang status ay 'pending' AT may current reading o litrato na pinasa
+        if (item.status == 'pending' && !item.type.toLowerCase().includes('amenities')) {
           let type: "water" | "electricity" | "rent" | "amenities" = "electricity";
           const itemType = item.type.toLowerCase();
           
@@ -163,9 +189,9 @@ export async function getDashboardData() {
           }).format(Number(item.amount));
 
           pendingReadings.push({
-            id: `${bill.id}-${item.type}`, // Ginawang unique ID gamit ang billId at item type para hindi mag-overlap
-            billId: bill.id, // I-save ang totoong bill id para sa approval action
-            utilityType: item.type, // Para malaman kung tubig o kuryente ang ia-apruba
+            id: `${bill.id}-${item.type}`, 
+            billId: bill.id, 
+            utilityType: item.type, 
             tenantName,
             unitName: unitLabel,
             type,
@@ -251,6 +277,7 @@ export async function getDashboardData() {
         totalRooms,
         occupiedRooms,
         vacantRooms,
+        reservedRooms,
         monthlyRevenue,
         pendingBillsAmount,
         occupancyRate,
@@ -270,6 +297,7 @@ export async function getDashboardData() {
         totalRooms: 0, 
         occupiedRooms: 0, 
         vacantRooms: 0, 
+        reservedRooms: 0,
         monthlyRevenue: 0, 
         pendingBillsAmount: 0, 
         occupancyRate: 0 
@@ -300,67 +328,86 @@ export async function handleApprovalAction(compositeId: string, actionType: "app
     } else if (compositeId.endsWith("-water")) {
       billId = compositeId.replace("-water", "");
       targetUtilityType = "water";
+    } else if (compositeId.endsWith("-amenities")) {
+      billId = compositeId.replace("-amenities", "");
+      targetUtilityType = "amenities";
+    }
+
+    const bill = await prisma.bill.findUnique({
+      where: { id: billId },
+      include: { items: true },
+    });
+
+    if (!bill) {
+      return { success: false, error: "Hindi mahanap ang bill." };
     }
 
     if (actionType === "approve") {
-      const bill = await prisma.bill.findUnique({
-        where: { id: billId },
-        include: { items: true },
-      });
+      if (targetUtilityType) {
+        // ✨ I-update lang ang status ng partikular na item patungong 'approved'
+        for (const item of bill.items) {
+          if (item.type.toLowerCase() === targetUtilityType.toLowerCase()) {
+            await prisma.billItem.update({
+              where: { id: item.id },
+              data: {
+                status: "approved", // Nananatili ang reading at photo, naging approved lang ang status
+              },
+            });
+          }
+        }
 
-      if (!bill) {
-        return { success: false, error: "Hindi mahanap ang bill." };
+        // Suriin kung may natitira pang ibang item na may status na 'pending'
+        const hasRemainingPending = bill.items.some(
+          item => item.type.toLowerCase() !== targetUtilityType?.toLowerCase() && item.status === "pending" && !item.type.toLowerCase().includes('amenities')
+        );
+
+        // Kung wala nang pending items, saka lang gawing 'pending' status ang buong Bill
+        if (!hasRemainingPending) {
+          await prisma.bill.update({
+            where: { id: billId },
+            data: { status: "pending" },
+          });
+        }
       }
 
-      // ✨ Kapag inaprubahan ng landlord, gagawin na itong 'pending' (o lumabas bilang opisyal na bill para bayaran)
-      // para mawala na siya sa draft/pending approvals list ng mga di pa aprubado.
-      await prisma.bill.update({
-        where: { id: billId },
-        data: {
-          status: "pending", 
-        },
+      await createAuditLog({
+        actorId: adminId,
+        action: `Inaprubahan ang ${targetUtilityType || 'utility'} reading para sa Bill: ${billId}`,
+        entityType: 'Bill',
+        entityId: adminId,
+        metadata: { actionType: 'APPROVAL' },
       });
 
-      await prisma.auditLog.create({
-        data: {
-          action: `Aprubahan ang Draft Bill / Utility Reading (${targetUtilityType || 'All'})`,
-          entityType: "Bill",
-          entityId: billId,
-          actorId: adminId,
-        },
-      });
     } else {
-      // ✨ Kapag tinanggihan (Reject), i-reset ang readings/litrato at panatilihing draft o i-clear
-      const whereClause: any = targetUtilityType 
-        ? { billId, type: targetUtilityType as any }
-        : { billId };
-
-      const billItems = await prisma.billItem.findMany({ where: whereClause });
-      
-      for (const item of billItems) {
-        await prisma.billItem.update({
-          where: { id: item.id },
-          data: {
-            currentReading: null,
-            unitsUsed: 0,
-            amount: 0,
-            proofPhotoUrl: null,
-          },
-        });
+      // Kapag tinanggihan (Reject), baguhin ang status sa 'rejected' at i-reset ang amount/units kung kinakailangan
+      for (const item of bill.items) {
+        if (!targetUtilityType || item.type.toLowerCase() === targetUtilityType.toLowerCase()) {
+          await prisma.billItem.update({
+            where: { id: item.id },
+            data: {
+              status: "rejected",
+              currentReading: null,
+              unitsUsed: 0,
+              amount: 0,
+              // Ang proofPhotoUrl ay hindi na binubura para may ebidensya pa rin kung bakit tinanggihan
+            },
+          });
+        }
       }
 
-      const bill = await prisma.bill.findUnique({ 
+      // Recalculate total utility amount ng bill
+      const updatedBill = await prisma.bill.findUnique({ 
         where: { id: billId },
         include: { items: true }
       });
 
-      if (bill) {
+      if (updatedBill) {
         let totalUtilityAmount = 0;
-        bill.items.forEach(item => {
+        updatedBill.items.forEach(item => {
           totalUtilityAmount += Number(item.amount || 0);
         });
 
-        const baseAmount = Number(bill.rentAmount) + Number(bill.amenitiesFee);
+        const baseAmount = Number(updatedBill.rentAmount) + Number(updatedBill.amenitiesFee);
         const newTotalAmount = baseAmount + totalUtilityAmount;
 
         await prisma.bill.update({
@@ -372,20 +419,83 @@ export async function handleApprovalAction(compositeId: string, actionType: "app
         });
       }
 
-      await prisma.auditLog.create({
-        data: {
-          action: `Tinanggihan ang Draft Utility Reading (${targetUtilityType || 'All'})`,
-          entityType: "Bill",
-          entityId: billId,
-          actorId: adminId,
-        },
+      await createAuditLog({
+        actorId: adminId,
+        action: `Tinanggihan ang ${targetUtilityType || 'utility'} reading para sa Bill: ${billId}`,
+        entityType: 'Bill',
+        entityId: adminId,
+        metadata: { actionType: 'APPROVAL' },
       });
     }
 
     revalidatePath("/admin/dashboard/home");
+    revalidatePath("/admin/billings");
     return { success: true };
   } catch (error) {
     console.error("Error in handleApprovalAction:", error);
     return { success: false, error: "Nagkaroon ng problema sa sistema." };
   }
+}
+
+export async function getRevenueChartData(filter: "6M" | "1Y" = "6M") {
+  'use server'
+  const months = ["Ene", "Peb", "Mar", "Abr", "May", "Hun", "Hul", "Ago", "Set", "Okt", "Nob", "Dis"];
+  const currentDate = new Date();
+  const chartData = [];
+  const limit = filter === "1Y" ? 12 : 6;
+
+  for (let i = limit - 1; i >= 0; i--) {
+    const d = new Date(currentDate.getFullYear(), currentDate.getMonth() - i, 1);
+    const monthName = months[d.getMonth()];
+    const year = d.getFullYear();
+    const monthStr = String(d.getMonth() + 1).padStart(2, '0');
+    
+    const startDate = new Date(`${year}-${monthStr}-01`);
+    const endDate = new Date(year, d.getMonth() + 1, 0, 23, 59, 59);
+
+    // 1. Paid Bills
+    const paidTotal = await prisma.bill.aggregate({
+      where: {
+        status: 'paid',
+        paidAt: { gte: startDate, lte: endDate },
+      },
+      _sum: { totalAmount: true },
+    });
+    const paidNum = Number(paidTotal._sum.totalAmount || 0);
+
+    // 2. Pending Bills
+    const pendingTotal = await prisma.bill.aggregate({
+      where: {
+        status: 'pending',
+        generatedAt: { gte: startDate, lte: endDate },
+      },
+      _sum: { totalAmount: true },
+    });
+    const pendingNum = Number(pendingTotal._sum.totalAmount || 0);
+
+    // 3. Overdue Bills
+    const overdueTotal = await prisma.bill.aggregate({
+      where: {
+        status: 'overdue',
+        generatedAt: { gte: startDate, lte: endDate },
+      },
+      _sum: { totalAmount: true },
+    });
+    const overdueNum = Number(overdueTotal._sum.totalAmount || 0);
+
+    const formatCurrency = (val: number) => 
+      new Intl.NumberFormat('fil-PH', { style: 'currency', currency: 'PHP', maximumFractionDigits: 0 }).format(val);
+
+    chartData.push({
+      month: monthName,
+      paid: paidNum,
+      pending: pendingNum,
+      overdue: overdueNum,
+      paidFormatted: formatCurrency(paidNum),
+      pendingFormatted: formatCurrency(pendingNum),
+      overdueFormatted: formatCurrency(overdueNum),
+    });
+  }
+
+  return chartData;
 }

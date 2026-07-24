@@ -1,8 +1,9 @@
 "use client";
 
 import { PendingReading } from "@/src/types/admin/dashboard";
-import { useState, useEffect, useTransition } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 
 interface PendingApprovalsProps {
   readings?: PendingReading[];
@@ -10,17 +11,15 @@ interface PendingApprovalsProps {
 }
 
 export function PendingApprovals({ readings = [], onAction }: PendingApprovalsProps) {
-  const [items, setItems] = useState<PendingReading[]>(readings);
+  const [optimisticRemovals, setOptimisticRemovals] = useState<string[]>([]);
   const [isPending, startTransition] = useTransition();
-  const [selectedImage, setSelectedImage] = useState<string | null>(null); // ✨ State para sa paglaki ng litrato
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const router = useRouter();
 
-  useEffect(() => {
-    setItems(readings);
-  }, [readings]);
+  const items = readings.filter((item) => !optimisticRemovals.includes(item.id));
 
   const handleAction = async (id: string, actionType: "approve" | "reject") => {
-    setItems((prev) => prev.filter((item) => item.id !== id));
+    setOptimisticRemovals((prev) => [...prev, id]);
 
     startTransition(async () => {
       try {
@@ -30,7 +29,7 @@ export function PendingApprovals({ readings = [], onAction }: PendingApprovalsPr
         router.refresh();
       } catch (error) {
         console.error("Error processing approval:", error);
-        setItems(readings);
+        setOptimisticRemovals((prev) => prev.filter((itemId) => itemId !== id));
       }
     });
   };
@@ -72,16 +71,18 @@ export function PendingApprovals({ readings = [], onAction }: PendingApprovalsPr
               className="flex flex-col gap-3.5 rounded-xl border border-line/60 bg-paper/50 p-3.5 sm:flex-row sm:items-center sm:justify-between transition-colors hover:bg-paper"
             >
               <div className="flex items-start gap-3">
-                {/* ✨ Thumbnail ng Litrato ng Metro */}
+                {/* Thumbnail ng Litrato ng Metro */}
                 {item.proofPhotoUrl ? (
                   <div 
                     onClick={() => setSelectedImage(item.proofPhotoUrl || null)}
                     className="relative h-14 w-14 shrink-0 cursor-pointer overflow-hidden rounded-lg border border-line bg-black/5 hover:opacity-90 transition-opacity"
                   >
-                    <img 
+                    <Image 
                       src={item.proofPhotoUrl} 
                       alt="Metro Reading" 
-                      className="h-full w-full object-cover"
+                      fill
+                      sizes="56px"
+                      className="object-cover"
                     />
                     <div className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 hover:opacity-100 transition-opacity">
                       <span className="text-[9px] font-bold text-white bg-black/60 px-1 rounded">Tingnan</span>
@@ -138,21 +139,35 @@ export function PendingApprovals({ readings = [], onAction }: PendingApprovalsPr
         )}
       </div>
 
-      {/* ✨ Image Preview Modal (Pag-click sa litrato para lumaki) */}
+      {/* Image Preview Modal na gumagamit ng next/image na may maayos na laki */}
       {selectedImage && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
-          <div className="relative max-w-2xl w-full bg-paper rounded-2xl overflow-hidden shadow-2xl p-4 border border-line">
+        <div 
+          onClick={() => setSelectedImage(null)}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()} 
+            className="relative max-w-4xl w-full bg-paper rounded-2xl overflow-hidden shadow-2xl p-4 border border-line flex flex-col"
+          >
             <div className="flex justify-between items-center pb-3 border-b border-line mb-3">
-              <h4 className="font-bold text-forest-deep text-sm">Litrato ng Metro ng Tenant</h4>
+              <h4 className="font-bold text-forest-deep text-base">Litrato ng Metro ng Tenant (Full Preview)</h4>
               <button 
                 onClick={() => setSelectedImage(null)}
-                className="rounded-lg p-1 text-muted hover:bg-muted/10 font-bold text-xs"
+                className="rounded-lg px-3 py-1.5 bg-coral/10 text-coral-deep hover:bg-coral/20 font-bold text-xs transition-colors"
               >
                 ✕ Isara
               </button>
             </div>
-            <div className="flex justify-center bg-black/5 rounded-xl overflow-hidden max-h-[70vh]">
-              <img src={selectedImage} alt="Full Meter Reading" className="object-contain max-h-[65vh]" />
+            
+            {/* Responsive container na may nakatakdang taas para sa next/image fill */}
+            <div className="relative w-full h-[65vh] bg-black/90 rounded-xl overflow-hidden flex items-center justify-center">
+              <Image 
+                src={selectedImage} 
+                alt="Full Meter Reading Preview" 
+                fill
+                sizes="(max-width: 1024px) 100vw, 900px"
+                className="object-contain" 
+              />
             </div>
           </div>
         </div>

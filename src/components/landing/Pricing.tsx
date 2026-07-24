@@ -93,7 +93,7 @@ export function Pricing() {
                     plan.isPopular ? "text-white" : "text-forest-deep"
                   }`}
                 >
-                  {plan.name}
+                  {plan.displayName}
                 </div>
                 <div
                   className={`mt-1 text-[12.5px] leading-snug ${

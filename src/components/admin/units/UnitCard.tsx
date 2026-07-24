@@ -12,10 +12,14 @@ export function UnitCard({ unit, onOpenAddRoom }: UnitCardProps) {
     switch (status) {
       case "Occupied":
         return "bg-forest/10 text-forest border-forest/20";
+      case "Reserved":
+        return "bg-amber-100 text-amber-700 border-amber-200"; // 👈 Kulay Dilaw/Amber para sa Reserved
       case "Vacant":
         return "bg-coral/15 text-coral-deep border-coral/30";
       case "Maintenance":
-        return "bg-amber-100 text-amber-700 border-amber-200";
+        return "bg-gray-100 text-gray-600 border-gray-200";
+      default:
+        return "bg-gray-100 text-gray-600 border-gray-200";
     }
   };
 

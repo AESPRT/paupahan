@@ -3,19 +3,28 @@
 import { useState } from "react";
 import { Invoice } from "@/src/types/admin/billing";
 
+// Uri para sa mga Amenities na naka-assign o nakakabit sa kuwarto/tenant
+interface RoomAmenity {
+  id: string;
+  name: string;
+  amount: number;
+  frequency?: string;
+}
+
 interface ActiveTenantRoom {
   roomId: string;
   roomNumber: string;
   unitName: string;
   tenantName: string;
   monthlyRent: number;
+  amenities?: RoomAmenity[]; // 👈 Mga amenities para sa kuwartong ito
 }
 
 interface CreateInvoiceModalProps {
   isOpen: boolean;
   onClose: () => void;
   onCreate: (invoice: Omit<Invoice, "id" | "invoiceNumber">) => void;
-  roomsWithTenants?: ActiveTenantRoom[]; // Listahan ng mga may active tenant
+  roomsWithTenants?: ActiveTenantRoom[];
 }
 
 export function CreateInvoiceModal({
@@ -29,9 +38,11 @@ export function CreateInvoiceModal({
   const [unitRoom, setUnitRoom] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [rentAmount, setRentAmount] = useState("");
-  const [utilityAmount, setUtilityAmount] = useState("");
+  
+  // State para sa mga napiling amenities at kani-kanilang halaga
+  const [roomAmenities, setRoomAmenities] = useState<RoomAmenity[]>([]);
 
-  // Kapag nagbago ang piniling room, auto-fill ang tenant name at default rent amount
+  // Kapag nagbago ang piniling room, auto-fill ang tenant name, rent, at amenities
   const handleRoomChange = (roomId: string) => {
     setSelectedRoomId(roomId);
     const found = roomsWithTenants.find((r) => r.roomId === roomId);
@@ -39,11 +50,20 @@ export function CreateInvoiceModal({
       setTenantName(found.tenantName);
       setUnitRoom(`${found.unitName} - Room ${found.roomNumber}`);
       setRentAmount(found.monthlyRent ? found.monthlyRent.toString() : "");
+      setRoomAmenities(found.amenities || []); // 👈 Kunin ang amenities kung meron man
     } else {
       setTenantName("");
       setUnitRoom("");
       setRentAmount("");
+      setRoomAmenities([]);
     }
+  };
+
+  // Handler para mabago ang amount ng specific amenity habang nasa modal (kung gusto i-edit ng landlord)
+  const handleAmenityAmountChange = (id: string, amountStr: string) => {
+    setRoomAmenities((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, amount: Number(amountStr) || 0 } : item))
+    );
   };
 
   if (!isOpen) return null;
@@ -55,15 +75,22 @@ export function CreateInvoiceModal({
     const lineItems = [];
     let total = 0;
 
+    // 1. Idagdag ang Renta kung meron
     if (rentAmount && Number(rentAmount) > 0) {
       lineItems.push({ description: "Buwanang Renta (Rent)", amount: Number(rentAmount) });
       total += Number(rentAmount);
     }
 
-    if (utilityAmount && Number(utilityAmount) > 0) {
-      lineItems.push({ description: "Utilities (Kuryente/Tubig)", amount: Number(utilityAmount) });
-      total += Number(utilityAmount);
-    }
+    // 3. ✨ Isama ang lahat ng nakasulat/na-set na Amenities sa Line Items at Total
+    roomAmenities.forEach((amenity) => {
+      if (amenity.amount > 0) {
+        lineItems.push({
+          description: `Amenity: ${amenity.name}${amenity.frequency ? ` (${amenity.frequency})` : ""}`,
+          amount: amenity.amount,
+        });
+        total += amenity.amount;
+      }
+    });
 
     const today = new Date().toISOString().split("T")[0];
 
@@ -83,13 +110,13 @@ export function CreateInvoiceModal({
     setUnitRoom("");
     setDueDate("");
     setRentAmount("");
-    setUtilityAmount("");
+    setRoomAmenities([]);
     onClose();
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-3xl border border-line bg-paper-card p-6 shadow-xl animate-in fade-in zoom-in duration-200">
+      <div className="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-3xl border border-line bg-paper-card p-6 shadow-xl animate-in fade-in zoom-in duration-200">
         <div className="flex items-center justify-between border-b border-line pb-4">
           <h2 className="font-display text-lg font-bold text-forest-deep">
             Lumikha ng Bagong Invoice
@@ -153,12 +180,13 @@ export function CreateInvoiceModal({
             </div>
           </div>
 
+          {/* Seksyon para sa Renta at Utilities */}
           <div className="space-y-2 border-t border-line/60 pt-3">
             <span className="block font-mono-brand text-[11px] font-bold uppercase text-muted">
-              Mga Isasama sa Singil (Line Items)
+              Pangunahing Singil (Base Charges)
             </span>
 
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 gap-2">
               <div>
                 <label className="block text-[11px] font-medium text-muted mb-1">
                   Renta (₱)
@@ -171,23 +199,40 @@ export function CreateInvoiceModal({
                   className="w-full rounded-xl border border-line bg-paper px-3.5 py-2 text-xs font-medium text-ink outline-none focus:border-forest"
                 />
               </div>
-
-              <div>
-                <label className="block text-[11px] font-medium text-muted mb-1">
-                  Utilities / Iba pa (₱)
-                </label>
-                <input
-                  type="number"
-                  placeholder="1200"
-                  value={utilityAmount}
-                  onChange={(e) => setUtilityAmount(e.target.value)}
-                  className="w-full rounded-xl border border-line bg-paper px-3.5 py-2 text-xs font-medium text-ink outline-none focus:border-forest"
-                />
-              </div>
             </div>
           </div>
 
-          <div className="flex items-center justify-end gap-2 pt-4">
+          {/* ✨ DITO LUMALABAS ANG MGA AMENITIES KUNG MERON MANANG NAKATAKDA SA KUWARTO */}
+          {roomAmenities.length > 0 && (
+            <div className="space-y-2 border-t border-line/60 pt-3">
+              <span className="block font-mono-brand text-[11px] font-bold uppercase text-forest">
+                Mga Nakatalagang Amenities para sa Kuwartong Ito
+              </span>
+
+              <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
+                {roomAmenities.map((amenity) => (
+                  <div key={amenity.id} className="flex items-center justify-between gap-2 rounded-xl border border-line bg-paper/50 p-2.5">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-bold text-forest-deep truncate">{amenity.name}</p>
+                      {amenity.frequency && (
+                        <p className="text-[10px] text-muted">{amenity.frequency}</p>
+                      )}
+                    </div>
+                    <div className="w-28 shrink-0">
+                      <input
+                        type="number"
+                        value={amenity.amount}
+                        onChange={(e) => handleAmenityAmountChange(amenity.id, e.target.value)}
+                        className="w-full rounded-lg border border-line bg-paper px-2.5 py-1 text-xs font-medium text-ink text-right outline-none focus:border-forest"
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="flex items-center justify-end gap-2 pt-4 border-t border-line/60">
             <button
               type="button"
               onClick={onClose}

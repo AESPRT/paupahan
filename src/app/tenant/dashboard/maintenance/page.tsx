@@ -1,33 +1,73 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useTransition } from "react";
 import { MaintenanceTicket } from "@/src/types/tenant/tenant-maintenance";
-import { MOCK_MAINTENANCE_TICKETS } from "@/src/data/tenant-maintenance";
 import { MaintenanceHeader } from "@/src/components/tenant/maintenance/MaintenanceHeader";
 import { TicketCard } from "@/src/components/tenant/maintenance/TicketCard";
 import { NewTicketModal } from "@/src/components/tenant/maintenance/NewTicketModal";
 import { Footer } from "@/src/components/landing/Footer";
+import { getTenantMaintenanceTickets, createMaintenanceTicketAction } from "@/src/actions/tenant/tenant-maintenance-actions";
 
 export default function TenantMaintenancePage() {
-  const [tickets, setTickets] = useState<MaintenanceTicket[]>(MOCK_MAINTENANCE_TICKETS);
+  const [tickets, setTickets] = useState<MaintenanceTicket[]>([]);
+  const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isPending, startTransition] = useTransition();
 
-  // Function kapag nag-submit si Tenant ng bagong report
+  // Load ang mga tickets mula sa database sa simula
+  useEffect(() => {
+    async function loadTickets() {
+      try {
+        const result = await getTenantMaintenanceTickets();
+        if (result.success) {
+          setTickets(result.tickets as MaintenanceTicket[]);
+        }
+      } catch (error) {
+        console.error("Nabigong i-load ang maintenance tickets:", error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadTickets();
+  }, []);
+
+  // Function kapag nag-submit si Tenant ng bagong report gamit ang Server Action
   const handleCreateTicket = (
     newTicketData: Omit<MaintenanceTicket, "id" | "createdAt" | "status">
   ) => {
-    const newTicket: MaintenanceTicket = {
-      ...newTicketData,
-      id: `MNT-2026-00${tickets.length + 1}`,
-      createdAt: "Ngayon",
-      status: "Pending",
-    };
+    startTransition(async () => {
+      const result = await createMaintenanceTicketAction({
+        title: newTicketData.title,
+        category: newTicketData.category.toLowerCase() as any,
+        description: newTicketData.description,
+        priority: newTicketData.priority.toLowerCase() as any,
+        photoUrl: newTicketData.photoUrl,
+      });
 
-    setTickets([newTicket, ...tickets]);
+      if (result.success) {
+        // I-refresh ang listahan pagkatapos mag-submit
+        const updatedData = await getTenantMaintenanceTickets();
+        if (updatedData.success) {
+          setTickets(updatedData.tickets as MaintenanceTicket[]);
+        }
+        setIsModalOpen(false);
+      } else {
+        alert(result.error || "May naganap na problema.");
+      }
+    });
   };
 
+  if (loading) {
+    return (
+      <div className="flex h-[60vh] items-center justify-center">
+        <span className="text-sm font-medium text-muted">Nag-a-load ng mga maintenance report...</span>
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-6 p-4 sm:p-6 lg:p-8">
+    <div className={`space-y-6 p-4 sm:p-6 lg:p-8 ${isPending ? 'opacity-75 transition-opacity' : ''}`}>
       {/* 1. Header */}
       <MaintenanceHeader />
 
@@ -68,7 +108,7 @@ export default function TenantMaintenancePage() {
         )}
       </section>
 
-      <Footer showNavLinks = {false} />
+      <Footer showNavLinks={false} />
 
       {/* 4. New Ticket Submission Modal */}
       <NewTicketModal

@@ -1,9 +1,11 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useState, useEffect, useTransition } from "react";
 import { BillingsHeader } from "@/src/components/admin/billings/BillingsHeader";
 import { CreateInvoiceModal } from "@/src/components/admin/billings/CreateInvoiceModal";
 import { InvoicesList } from "@/src/components/admin/billings/InvoicesList";
+import { PendingApprovals } from "@/src/components/admin/dashboard/PendingApprovals";
 import { Invoice } from "@/src/types/admin/billing";
 import { Footer } from "@/src/components/landing/Footer";
 import { 
@@ -12,6 +14,7 @@ import {
   createInvoiceAction, 
   markInvoiceAsPaidAction 
 } from "@/src/actions/billings-actions";
+import { getDashboardData, handleApprovalAction } from "@/src/actions/dashboard-actions";
 
 export default function BillingsPage() {
   interface ActiveTenantRoom {
@@ -22,19 +25,30 @@ export default function BillingsPage() {
     monthlyRent: number;
   }
 
-  // Sa loob ng BillingsPage component:
   const [occupiedRooms, setOccupiedRooms] = useState<ActiveTenantRoom[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [pendingReadings, setPendingReadings] = useState<any[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [isPending, startTransition] = useTransition();
 
-  // Load data mula sa database kapag binuksan ang pahina
+  // Load data mula sa database kapag binuksan ang pahina gamit ang useEffect
   useEffect(() => {
-    getBillingsData().then((data) => {
-      setInvoices(data.invoices as Invoice[]);
-      setLoading(false);
-    });
+    async function loadData() {
+      try {
+        const [billingsData, dashboardData] = await Promise.all([
+          getBillingsData(),
+          getDashboardData(),
+        ]);
+        setInvoices(billingsData.invoices as Invoice[]);
+        setPendingReadings(dashboardData.pendingReadings || []);
+      } catch (error) {
+        console.error("Nabigong i-load ang billings data:", error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadData();
   }, []);
 
   // Function para buksan ang modal at i-fetch ang mga occupied rooms
@@ -64,7 +78,6 @@ export default function BillingsPage() {
     startTransition(async () => {
       const result = await createInvoiceAction(newInvoiceData);
       if (result.success) {
-        // Refresh data para makuha ang bagong listahan galing database
         const data = await getBillingsData();
         setInvoices(data.invoices as Invoice[]);
         setIsModalOpen(false);
@@ -75,7 +88,6 @@ export default function BillingsPage() {
   };
 
   const handleMarkAsPaid = async (id: string) => {
-    // Optimistic UI update para mabilis magbago sa screen
     setInvoices((prev) =>
       prev.map((inv) => (inv.id === id ? { ...inv, status: "Paid" } : inv))
     );
@@ -84,7 +96,6 @@ export default function BillingsPage() {
       const result = await markInvoiceAsPaidAction(id);
       if (!result.success) {
         alert(result.error);
-        // Refresh para ibalik sa tamang data kung nagka-error
         const data = await getBillingsData();
         setInvoices(data.invoices as Invoice[]);
       }
@@ -93,6 +104,24 @@ export default function BillingsPage() {
 
   const handleSendReminder = (invoice: Invoice) => {
     alert(`Nagpadala ng billing reminder kay ${invoice.tenantName} para sa ${invoice.invoiceNumber}`);
+  };
+
+  // Wrapper function para sa pag-apruba/pag-reject ng pending readings
+  const handleActionWrapper = async (id: string, actionType: "approve" | "reject") => {
+    const res = await handleApprovalAction(id, actionType);
+    if (!res.success) {
+      throw new Error(res.error || "Nabigong iproseso ang aksyon.");
+    }
+
+    // ✨ Sabay na i-refresh ang pending readings AT ang invoices list para maging real-time
+    startTransition(async () => {
+      const [dashboardData, billingsData] = await Promise.all([
+        getDashboardData(),
+        getBillingsData(),
+      ]);
+      setPendingReadings(dashboardData.pendingReadings || []);
+      setInvoices(billingsData.invoices as Invoice[]);
+    });
   };
 
   if (loading) {
@@ -110,8 +139,11 @@ export default function BillingsPage() {
         totalCollected={totalCollected}
         totalPending={totalPending}
         totalOverdue={totalOverdue}
-        onCreateInvoice={handleOpenModal} // 👈 Ginamit ang handleOpenModal para ma-fetch muna ang rooms bago buksan ang modal
+        onCreateInvoice={handleOpenModal}
       />
+
+      {/* Pending Approvals Section */}
+      <PendingApprovals readings={pendingReadings} onAction={handleActionWrapper} />
 
       {/* Invoices List */}
       <InvoicesList
@@ -125,7 +157,7 @@ export default function BillingsPage() {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onCreate={handleCreateInvoice}
-        roomsWithTenants={occupiedRooms} // 👈 Ipinasa ang listahan ng occupied rooms papuntang modal
+        roomsWithTenants={occupiedRooms}
       />
 
       <Footer showNavLinks={false} />

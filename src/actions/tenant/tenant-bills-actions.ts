@@ -17,6 +17,24 @@ export async function getTenantBillsData() {
       where: { tenantId },
       include: {
         items: true,
+        // 👇 Kunin ang aktibong lease at ang mga nakatalagang amenities nito para sa tenant na ito
+        tenant: {
+          select: {
+            leases: {
+              where: { status: "active" },
+              include: {
+                amenities: {
+                  include: {
+                    amenity: {
+                      select: { name: true, frequency: true },
+                    },
+                  },
+                },
+              },
+              take: 1,
+            },
+          },
+        },
       },
       orderBy: { generatedAt: "desc" },
     });
@@ -25,16 +43,23 @@ export async function getTenantBillsData() {
       const electricityItem = bill.items.find((i) => i.type === "electricity");
       const waterItem = bill.items.find((i) => i.type === "water");
 
+      // ✨ Kunin ang mga active lease amenities ng tenant
+      const activeLease = bill.tenant?.leases?.[0];
+      const leaseAmenities = activeLease?.amenities || [];
+
+      // Kalkulahin ang kabuuang halaga ng amenities mula sa lease, o mag-fallback sa bill.amenitiesFee kung meron man
+      const calculatedAmenitiesFee = leaseAmenities.length > 0
+        ? leaseAmenities.reduce((sum, item) => sum + Number(item.amount), 0)
+        : Number(bill.amenitiesFee);
+
       let uiStatus = "Pending Tenant Input";
       if (bill.status === "paid") {
         uiStatus = "Paid";
       } else if (bill.status === "overdue") {
         uiStatus = "Overdue";
       } else if (bill.status === "pending") {
-        // ✨ Kapag na-approve na ng landlord at naging 'pending' payment na ang bill
         uiStatus = "Pending Payment"; 
       } else if (bill.status === "draft") {
-        // ✨ Kung draft pa rin, iche-check natin kung nakapag-input na ang tenant ng reading
         if (electricityItem?.currentReading || waterItem?.currentReading) {
           uiStatus = "Pending Landlord Approval";
         } else {
@@ -48,7 +73,12 @@ export async function getTenantBillsData() {
         dueDate: new Date(bill.dueDate).toLocaleDateString("fil-PH", { year: 'numeric', month: 'long', day: 'numeric' }),
         status: uiStatus,
         rentAmount: Number(bill.rentAmount),
-        amenitiesFee: Number(bill.amenitiesFee),
+        amenitiesFee: calculatedAmenitiesFee, // 👈 Dynamic na kabuuang halaga ng amenities
+        amenitiesList: leaseAmenities.map((item) => ({             // 👈 Detalyadong listahan kung gusto mong i-display sa UI
+          name: item.amenity.name,
+          amount: Number(item.amount),
+          frequency: item.amenity.frequency,
+        })),
         totalAmount: Number(bill.totalAmount),
         paidAt: bill.paidAt ? new Date(bill.paidAt).toLocaleDateString("fil-PH", { year: 'numeric', month: 'long', day: 'numeric' }) : undefined,
         electricity: {
@@ -58,10 +88,10 @@ export async function getTenantBillsData() {
           ratePerUnit: electricityItem ? Number(electricityItem.ratePerUnit) : 12.5,
           unitLabel: electricityItem?.unitLabel || "kWh",
           proofPhotoUrl: electricityItem?.proofPhotoUrl || undefined,
-          // ✨ Kung pending payment na ang bill (ibig sabihin inaprubahan na ni landlord), magiging "Approved" na rin ang utility item status
-          status: bill.status === "pending" 
-            ? "Approved" 
-            : (electricityItem?.currentReading ? "Pending Landlord Approval" : "Pending Tenant Input"),
+          status: electricityItem?.status === "approved" ? "Approved" 
+            : electricityItem?.status === "rejected" ? "Rejected (Mag-submit muli)" 
+            : electricityItem?.currentReading ? "Pending Landlord Approval" 
+            : "Pending Tenant Input",
         },
         water: {
           type: "water" as const,
@@ -70,10 +100,10 @@ export async function getTenantBillsData() {
           ratePerUnit: waterItem ? Number(waterItem.ratePerUnit) : 45.0,
           unitLabel: waterItem?.unitLabel || "m³",
           proofPhotoUrl: waterItem?.proofPhotoUrl || undefined,
-          // ✨ Ganun din sa tubig
-          status: bill.status === "pending" 
-            ? "Approved" 
-            : (waterItem?.currentReading ? "Pending Landlord Approval" : "Pending Tenant Input"),
+          status: waterItem?.status === "approved" ? "Approved" 
+            : waterItem?.status === "rejected" ? "Rejected (Mag-submit muli)" 
+            : waterItem?.currentReading ? "Pending Landlord Approval" 
+            : "Pending Tenant Input",
         },
       };
     });
@@ -102,7 +132,7 @@ export async function updateTenantUtilityReadingAction(
       return { success: false, error: "Hindi mahanap ang bill." };
     }
 
-    let billItem = bill.items.find((i) => i.type === utilityType);
+    const billItem = bill.items.find((i) => i.type === utilityType);
 
     const utilityRateConfig = await prisma.utilityRate.findUnique({
       where: { type: utilityType },
@@ -143,6 +173,7 @@ export async function updateTenantUtilityReadingAction(
           unitsUsed,
           amount: newUtilityAmount,
           proofPhotoUrl,
+          // ✨ Tinanggal ang status dito para hindi mag-error sa DB schema
         },
       });
     } else {
@@ -156,6 +187,7 @@ export async function updateTenantUtilityReadingAction(
           unitLabel,
           proofPhotoUrl,
           amount: newUtilityAmount,
+          // ✨ Tinanggal din ang status dito
         },
       });
     }
@@ -177,9 +209,6 @@ export async function updateTenantUtilityReadingAction(
     const amenitiesFee = Number(bill.amenitiesFee || 0);
     const newTotalAmount = rentAmount + amenitiesFee + totalUtilityAmount;
 
-    // ✨ HUWAG GAWING 'pending' ang bill status dito. Dapat manatili itong 'draft' 
-    // habang naghihintay ng apruba ng landlord. Magiging 'pending' (o Pending Payment) lang 
-    // ito kapag inaprubahan na ng landlord sa kaniyang dashboard.
     await prisma.bill.update({
       where: { id: billId },
       data: {

@@ -1,6 +1,9 @@
 "use client";
 
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Tenant, LeaseStatus, BillStatus } from "@/src/types/tenant/tenant";
+import { updateLeaseStatusAction } from "@/src/actions/tenants-actions";
 
 interface TenantsTableProps {
   tenants: Tenant[];
@@ -8,6 +11,12 @@ interface TenantsTableProps {
 }
 
 export function TenantsTable({ tenants, onSelectTenant }: TenantsTableProps) {
+  const router = useRouter();
+  
+  // Gamitin ang local override states para sa instant UI feedback habang umaasa sa prop para sa main data
+  const [statusOverrides, setStatusOverrides] = useState<Record<string, LeaseStatus>>({});
+  const [loadingTenantId, setLoadingTenantId] = useState<string | null>(null);
+
   const getStatusBadge = (status: LeaseStatus) => {
     switch (status) {
       case "active":
@@ -38,7 +47,48 @@ export function TenantsTable({ tenants, onSelectTenant }: TenantsTableProps) {
     }
   };
 
-  if (tenants.length === 0) {
+  // Pagsamahin ang prop data at ang local overrides para laging updated
+  const displayTenants = tenants.map((tenant) => ({
+    ...tenant,
+    leaseStatus: statusOverrides[tenant.id] ?? tenant.leaseStatus,
+  }));
+
+  const handleStatusChange = async (tenantId: string, newStatus: LeaseStatus) => {
+    try {
+      setLoadingTenantId(tenantId);
+
+      // 1. I-update agad ang local override para sa instant real-time feedback
+      setStatusOverrides((prev) => ({ ...prev, [tenantId]: newStatus }));
+
+      // 2. Tawagin ang server action para i-save sa database
+      const result = await updateLeaseStatusAction(tenantId, newStatus);
+      
+      if (!result.success) {
+        alert(result.error || "Nabigo sa pag-update ng status.");
+        // Ibalik sa dati kung nagka-error
+        setStatusOverrides((prev) => {
+          const copy = { ...prev };
+          delete copy[tenantId];
+          return copy;
+        });
+      } else {
+        // 3. I-refresh ang Next.js server data cache
+        router.refresh();
+      }
+    } catch (error) {
+      console.error("Error updating status:", error);
+      alert("Nagkaroon ng hindi inaasahang problema.");
+      setStatusOverrides((prev) => {
+        const copy = { ...prev };
+        delete copy[tenantId];
+        return copy;
+      });
+    } finally {
+      setLoadingTenantId(null);
+    }
+  };
+
+  if (displayTenants.length === 0) {
     return (
       <div className="rounded-2xl border border-dashed border-line bg-paper-card p-8 sm:p-12 text-center text-xs sm:text-sm text-muted">
         Walang nahanap na tenant na tumutugma sa iyong search o filter.
@@ -52,14 +102,14 @@ export function TenantsTable({ tenants, onSelectTenant }: TenantsTableProps) {
       {/* 1. MOBILE VIEW: Stacked Cards (Lalabas lang sa Mobile Screen < md) */}
       {/* ----------------------------------------------------------------- */}
       <div className="grid grid-cols-1 gap-3 md:hidden">
-        {tenants.map((tenant) => (
+        {displayTenants.map((tenant) => (
           <div
             key={tenant.id}
             onClick={() => onSelectTenant(tenant)}
             className="flex flex-col gap-3 rounded-2xl border border-line bg-paper-card p-4 shadow-sm transition-all active:scale-[0.99] cursor-pointer"
           >
-            {/* Header: Avatar, Name, at Action */}
-            <div className="flex items-center justify-between border-b border-line/60 pb-3">
+            {/* Header: Avatar, Name, at Status Select */}
+            <div className="flex items-center justify-between border-b border-line/60 pb-3 gap-2">
               <div className="flex items-center gap-3">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-forest/20 bg-coral/10 font-mono-brand text-xs font-bold text-coral-deep">
                   {tenant.fullName ? tenant.fullName.substring(0, 2).toUpperCase() : "TN"}
@@ -70,9 +120,20 @@ export function TenantsTable({ tenants, onSelectTenant }: TenantsTableProps) {
                 </div>
               </div>
 
-              <span className={`rounded-md border px-2 py-0.5 font-mono-brand text-[10px] font-bold uppercase ${getStatusBadge(tenant.leaseStatus)}`}>
-                {tenant.leaseStatus.replace("_", " ")}
-              </span>
+              {/* Status Dropdown Mobile */}
+              <div onClick={(e) => e.stopPropagation()}>
+                <select
+                  value={tenant.leaseStatus}
+                  disabled={loadingTenantId === tenant.id}
+                  onChange={(e) => handleStatusChange(tenant.id, e.target.value as LeaseStatus)}
+                  className={`rounded-md border px-2 py-1 font-mono-brand text-[10px] font-bold uppercase outline-none cursor-pointer ${getStatusBadge(tenant.leaseStatus)} ${loadingTenantId === tenant.id ? 'opacity-50' : ''}`}
+                >
+                  <option value="active">Active</option>
+                  <option value="pending">Pending</option>
+                  <option value="moving_out">Moving Out</option>
+                  <option value="inactive">Inactive</option>
+                </select>
+              </div>
             </div>
 
             {/* Details Grid */}
@@ -124,7 +185,7 @@ export function TenantsTable({ tenants, onSelectTenant }: TenantsTableProps) {
               </tr>
             </thead>
             <tbody className="divide-y divide-line/60">
-              {tenants.map((tenant) => (
+              {displayTenants.map((tenant) => (
                 <tr
                   key={tenant.id}
                   className="transition-colors hover:bg-paper/60 cursor-pointer"
@@ -147,10 +208,18 @@ export function TenantsTable({ tenants, onSelectTenant }: TenantsTableProps) {
                   <td className="px-5 py-4 font-bold text-forest-deep">
                     ₱{tenant.monthlyRent.toLocaleString()}/mo
                   </td>
-                  <td className="px-5 py-4">
-                    <span className={`rounded-md border px-2.5 py-1 font-mono-brand text-[10px] font-bold uppercase ${getStatusBadge(tenant.leaseStatus)}`}>
-                      {tenant.leaseStatus.replace("_", " ")}
-                    </span>
+                  <td className="px-5 py-4" onClick={(e) => e.stopPropagation()}>
+                    <select
+                      value={tenant.leaseStatus}
+                      disabled={loadingTenantId === tenant.id}
+                      onChange={(e) => handleStatusChange(tenant.id, e.target.value as LeaseStatus)}
+                      className={`rounded-md border px-2.5 py-1 font-mono-brand text-[10px] font-bold uppercase outline-none cursor-pointer ${getStatusBadge(tenant.leaseStatus)} ${loadingTenantId === tenant.id ? 'opacity-50' : ''}`}
+                    >
+                      <option value="active">Active</option>
+                      <option value="pending">Pending</option>
+                      <option value="moving_out">Moving Out</option>
+                      <option value="inactive">Inactive</option>
+                    </select>
                   </td>
                   <td className="px-5 py-4">
                     <span className={`rounded-full px-2.5 py-1 font-mono-brand text-[10px] font-bold uppercase ${getPaymentBadge(tenant.paymentStatus)}`}>

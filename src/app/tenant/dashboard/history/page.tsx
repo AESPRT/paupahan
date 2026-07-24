@@ -1,46 +1,53 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { TenantHistoryHeader } from "@/src/components/tenant/history/TenantHistoryHeader";
 import { PaidBillsList } from "@/src/components/tenant/history/PaidBillsList";
 import { PaidBillHistory } from "@/src/types/tenant/tenant-history";
 import { Footer } from "@/src/components/landing/Footer";
-
-// Mock data para sa history ng mga paid bills ni tenant
-const MOCK_PAID_BILLS: PaidBillHistory[] = [
-  {
-    id: "BILL-2026-06",
-    billingMonth: "Hunyo 2026",
-    paidDate: "Hulyo 2, 2026",
-    totalAmount: 6700.00,
-    rentAmount: 5000.00,
-    electricityAmount: 1100.00,
-    waterAmount: 600.00,
-    paymentMethod: "GCash",
-    referenceNumber: "GCASH-98234123",
-    receiptUrl: "https://images.unsplash.com/photo-1584622650111-993a426fbf0a?auto=format&fit=crop&q=80&w=400",
-  },
-  {
-    id: "BILL-2026-05",
-    billingMonth: "Mayo 2026",
-    paidDate: "Hunyo 3, 2026",
-    totalAmount: 6550.00,
-    rentAmount: 5000.00,
-    electricityAmount: 950.00,
-    waterAmount: 600.00,
-    paymentMethod: "BDO Unibank",
-    referenceNumber: "BDO-REF-445512",
-    receiptUrl: "https://images.unsplash.com/photo-1584622650111-993a426fbf0a?auto=format&fit=crop&q=80&w=400",
-  },
-];
+import { getTenantPaymentHistory } from "@/src/actions/tenant/tenant-history-actions"; // 👈 I-import ang bagong server action
 
 export default function TenantHistoryPage() {
+  const [bills, setBills] = useState<PaidBillHistory[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadHistory() {
+      try {
+        const result = await getTenantPaymentHistory();
+        if (result.success) {
+          setBills(result.history as PaidBillHistory[]);
+        }
+      } catch (error) {
+        console.error("Nabigong i-load ang payment history:", error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadHistory();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex h-[60vh] items-center justify-center">
+        <span className="text-sm font-medium text-muted">Nag-a-load ng payment history...</span>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6 p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
       {/* 1. Header Banner */}
-      <TenantHistoryHeader totalPaidCount={MOCK_PAID_BILLS.length} />
+      <TenantHistoryHeader totalPaidCount={bills.length} />
 
-      {/* 2. Listahan ng mga Paid Bills */}
-      <PaidBillsList bills={MOCK_PAID_BILLS} />
+      {/* 2. Listahan ng mga Paid Bills mula sa Database */}
+      {bills.length === 0 ? (
+        <div className="rounded-3xl border border-line bg-paper-card p-8 text-center text-xs text-muted">
+          Wala ka pang naitalang mga naunang bayarin o payment history.
+        </div>
+      ) : (
+        <PaidBillsList bills={bills} />
+      )}
 
       {/* 3. Footer */}
       <Footer showNavLinks={false} />

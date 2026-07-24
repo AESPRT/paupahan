@@ -1,8 +1,9 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { NavItem } from "@/src/types/admin/navigation";
+import { logoutTenantAction } from "@/src/actions/tenant/tenant-auth-actions"; // ✨ I-import ang ating logout action
 
 // SVG Icons Definition (Inline SVGs for performance and zero external dependencies)
 const Icons = {
@@ -76,6 +77,20 @@ export function TenantNavigationRail() {
   const pathname = usePathname();
   const router = useRouter();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isPending, startTransition] = useTransition();
+
+  // Handler para sa pag-logout gamit ang Server Action
+  const handleLogout = async () => {
+    startTransition(async () => {
+      const result = await logoutTenantAction();
+      if (result.success) {
+        router.push("/tenant/login");
+        router.refresh();
+      } else {
+        alert(result.error || "Nagkaroon ng problema sa pag-logout.");
+      }
+    });
+  };
 
   // Unang 4 items para sa Bottom Nav Bar sa Mobile
   const mobilePrimaryNav = NAV_ITEMS.slice(0, 4);
@@ -131,16 +146,12 @@ export function TenantNavigationRail() {
         {/* Quick User / Logout Footer */}
         <div className="border-t border-line/60 pt-4">
           <button
-            onClick={() => {
-              if (typeof window !== "undefined") {
-                localStorage.removeItem("tenant_code");
-              }
-              router.push("/tenant/login");
-            }}
-            className="flex w-full items-center gap-3 rounded-2xl px-3.5 py-2.5 text-xs font-bold text-coral-deep hover:bg-coral/10 transition-colors"
+            onClick={handleLogout}
+            disabled={isPending}
+            className="flex w-full items-center gap-3 rounded-2xl px-3.5 py-2.5 text-xs font-bold text-coral-deep hover:bg-coral/10 transition-colors disabled:opacity-50"
           >
             <Icons.Logout className="w-5 h-5" />
-            <span>Mag-log Out</span>
+            <span>{isPending ? "Nag-lalog out..." : "Mag-log Out"}</span>
           </button>
         </div>
       </aside>
@@ -225,15 +236,14 @@ export function TenantNavigationRail() {
             <div className="border-t border-line pt-4">
               <button
                 onClick={() => {
-                  if (typeof window !== "undefined") {
-                    localStorage.removeItem("tenant_code");
-                  }
-                  router.push("/tenant/login");
+                  setIsMobileMenuOpen(false);
+                  handleLogout();
                 }}
-                className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-xs font-bold text-coral-deep hover:bg-coral/10"
+                disabled={isPending}
+                className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-xs font-bold text-coral-deep hover:bg-coral/10 disabled:opacity-50"
               >
                 <Icons.Logout className="w-5 h-5" />
-                <span>Mag-log Out</span>
+                <span>{isPending ? "Nag-lalog out..." : "Mag-log Out"}</span>
               </button>
             </div>
           </div>

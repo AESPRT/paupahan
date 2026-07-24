@@ -85,7 +85,7 @@ export function UtilitiesHeader({
         <h2 className="font-mono-brand text-xs font-bold uppercase tracking-wider text-muted mb-3">
           Kasalukuyang Utility Rates (Per Unit / Fixed)
         </h2>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-2">
           {rates.map((rate) => (
             <div
               key={rate.id}

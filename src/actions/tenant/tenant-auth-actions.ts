@@ -76,3 +76,23 @@ export async function loginTenantAction(loginCode: string) {
     return { success: false, error: "Nagkaroon ng problema sa sistema. Subukan muli." };
   }
 }
+
+export async function logoutTenantAction() {
+  try {
+    const cookieStore = await cookies();
+    // Burahin o i-expire ang session cookie
+    cookieStore.set({
+      name: "session_user_id",
+      value: "",
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      path: "/",
+      maxAge: 0, // Agarang pagka-expire
+    });
+
+    return { success: true };
+  } catch (error) {
+    console.error("Error logging out tenant:", error);
+    return { success: false, error: "Nagkaroon ng problema sa pag-logout." };
+  }
+}

@@ -8,26 +8,31 @@ export type PlanTier =
 export interface SubscriptionPlan {
   id: string;
   tag: string;
-  name: PlanTier;
+  name: string; // o PlanTier type
+  displayName: string; // o PlanTier type
   tagline: string;
-  priceMonthly: number; // Numeric value para sa madaling pagkalkula
-  priceDisplay: string; // Halimbawa: "₱0", "₱399", o "Custom"
-  per: string; // Halimbawa: "/buwan" o ""
+  priceMonthly: number;
+  priceDisplay: string;
+  per: string;
   note: string;
-  maxUnits: string;
-  features: string[]; // Ginagamit para sa perks
-  missing?: string[]; // Mga feature na wala sa planong ito
-  isPopular?: boolean;
-  badge?: string | null;
+  maxUnits: number;       // 👈 Ginawa nang number
+  maxRooms: number;       // 👈 Idinagdag
+  maxUnitsDisplay: string; // 👈 Para sa UI text display
+  features: string[];
+  missing: string[];
+  isPopular: boolean;
+  badge: string | null;
   cta: string;
-  ctaVariant?: "primary" | "ghost";
+  ctaVariant: "ghost" | "primary" | string;
 }
 
 export interface CurrentSubscription {
   planName: PlanTier;
-  status: "Active" | "Past Due" | "Trialing";
+  status: "Active" | "Past Due" | "Trialing" | "Canceled";
   renewsOn: string;
   paymentMethod: string;
   unitsUsed: number;
   maxUnitsLimit: number;
+  roomsUsed: number;     // 👈 Idagdag ito para sa real-time counter ng rooms
+  maxRoomLimit: number;  // 👈 Idagdag ito para sa room limit
 }

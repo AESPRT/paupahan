@@ -3,7 +3,7 @@ export interface StatMetric {
   value: string | number;
   change?: string;
   isPositive?: boolean;
-  icon: "rooms" | "units" | "vacant" | "occupied" | "revenue" | "pending";
+  icon: "rooms" | "units" | "vacant" | "occupied" | "revenue" | "pending" | "reserved";
 }
 
 export interface PendingReading {

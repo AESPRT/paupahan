@@ -1,33 +1,72 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useTransition } from "react";
 import { CurrentPlanBanner } from "@/src/components/admin/subscription/CurrentPlanBanner";
 import { PricingCards } from "@/src/components/admin/subscription/PricingCards";
 import { BillingSettings } from "@/src/components/admin/subscription/BillingSettings";
-import { CurrentSubscription, SubscriptionPlan, PlanTier } from "@/src/types/admin/subscription";
+import { CurrentSubscription, SubscriptionPlan } from "@/src/types/admin/subscription";
 import { Footer } from "@/src/components/landing/Footer";
 import { PLANS } from "@/src/data/subscription";
-
-const CURRENT_SUB: CurrentSubscription = {
-  planName: "Panimula",
-  status: "Active",
-  renewsOn: "August 01, 2026",
-  paymentMethod: "GCash",
-  unitsUsed: 8,
-  maxUnitsLimit: 15,
-};
+import { getAdminSubscriptionData, updateLandlordSubscriptionAction } from "@/src/actions/subscription-actions";
 
 export default function SubscriptionPage() {
-  const [currentSub] = useState<CurrentSubscription>(CURRENT_SUB);
+  const [currentSub, setCurrentSub] = useState<CurrentSubscription | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [, startTransition] = useTransition();
+
+  // Kunin ang data mula sa database gamit ang useEffect
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const result = await getAdminSubscriptionData();
+        if (result.success && result.subscription) {
+          setCurrentSub(result.subscription as CurrentSubscription);
+        }
+      } catch (error) {
+        console.error("Nabigong i-load ang subscription data:", error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadData();
+  }, []);
 
   const handleSelectPlan = (plan: SubscriptionPlan) => {
-    alert(`Gusto mong mag-subscribe sa ${plan.name} (₱${plan.priceMonthly}/mo)`);
+    // 👈 Ginamit ang plan.tag o plan.name depende sa UI display mo
+    if (confirm(`Gusto mo bang mag-subscribe sa ${plan.tag} plan (${plan.priceDisplay}/mo)?`)) {
+      startTransition(async () => {
+        // Tuwirang gamitin ang number values mula sa na-update na PLANS data
+        const maxUnits = plan.maxUnits;
+        const maxRooms = plan.maxRooms;
+
+        // Ipinapasa na natin ang plan name, maxUnits, at maxRooms sa server action
+        const result = await updateLandlordSubscriptionAction(plan.name, maxUnits, maxRooms);
+        if (result.success) {
+          alert(`Tagumpay! Nagbago na ang iyong plan sa ${plan.tag}.`);
+          // Refresh data
+          const updated = await getAdminSubscriptionData();
+          if (updated.success && updated.subscription) {
+            setCurrentSub(updated.subscription as CurrentSubscription);
+          }
+        } else {
+          alert(result.error);
+        }
+      });
+    }
   };
 
   const handleScrollToPricing = () => {
     const element = document.getElementById("pricing-section");
     element?.scrollIntoView({ behavior: "smooth" });
   };
+
+  if (loading || !currentSub) {
+    return (
+      <div className="flex h-[60vh] items-center justify-center">
+        <span className="text-sm font-medium text-muted">Nag-a-load ng subscription details...</span>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8 p-4 sm:p-6 lg:p-8">
@@ -49,7 +88,7 @@ export default function SubscriptionPage() {
       {/* Payment Methods & Receipts */}
       <BillingSettings />
 
-      <Footer showNavLinks = {false} />
+      <Footer showNavLinks={false} />
     </div>
   );
 }

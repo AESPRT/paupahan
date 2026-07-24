@@ -144,20 +144,32 @@ export function MaintenanceCards({ requests, onUpdateStatus }: MaintenanceCardsP
                   </span>
                 </div>
 
-                {/* Quick Action Selector */}
-                <div className="flex items-center gap-2">
-                  <select
-                    value={req.status}
-                    onChange={(e) =>
-                      onUpdateStatus(req.id, e.target.value as MaintenanceStatus)
-                    }
-                    className="w-full rounded-xl border border-line bg-paper px-3 py-2 font-mono-brand text-xs font-bold text-forest-deep outline-none focus:border-forest"
-                  >
-                    <option value="Pending">Mark as Pending</option>
-                    <option value="In Progress">Mark as In Progress</option>
-                    <option value="Resolved">Mark as Resolved</option>
-                  </select>
-                </div>
+                {/* Quick Action Selector - Ipakita lang kung hindi pa Resolved */}
+                {req.status !== "Resolved" ? (
+                  <div className="relative">
+                    <select
+                      value={req.status}
+                      onChange={(e) =>
+                        onUpdateStatus(req.id, e.target.value as MaintenanceStatus)
+                      }
+                      className="w-full appearance-none rounded-xl border border-line bg-paper px-3 py-2.5 pr-8 font-mono-brand text-xs font-bold text-forest-deep outline-none transition-all hover:border-forest/50 focus:border-forest focus:ring-1 focus:ring-forest shadow-2xs cursor-pointer"
+                    >
+                      <option value="Pending">Pending</option>
+                      <option value="In Progress">In Progress</option>
+                      <option value="Resolved">Mark as Resolved</option>
+                    </select>
+                    {/* Custom Dropdown Arrow */}
+                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
+                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-forest/20 bg-forest/5 py-2 px-3 text-center font-mono-brand text-[11px] font-bold text-forest">
+                    ✓ Tapos na ang request na ito
+                  </div>
+                )}
               </div>
             </div>
           ))}
