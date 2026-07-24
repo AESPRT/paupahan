@@ -170,7 +170,6 @@ export async function updateTenantUtilityReadingAction(
         where: { id: billItem.id },
         data: {
           currentReading,
-          unitsUsed,
           amount: newUtilityAmount,
           proofPhotoUrl,
           // ✨ Tinanggal ang status dito para hindi mag-error sa DB schema
