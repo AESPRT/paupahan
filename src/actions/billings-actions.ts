@@ -163,7 +163,7 @@ export async function createInvoiceAction(newInvoiceData: Omit<Invoice, "id" | "
     // 1. Hanapin ang tenant na kabilang LAMANG sa landlord na ito at may active lease
     const tenant = await prisma.tenant.findFirst({
       where: {
-        landlordId: adminId,
+        userId: adminId,
         fullName: {
           contains: newInvoiceData.tenantName,
           mode: 'insensitive',
