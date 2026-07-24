@@ -9,6 +9,10 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+
+# I-generate ang Prisma Client bago i-run ang Next.js build
+RUN npx prisma generate
+
 ENV NEXT_TELEMETRY_DISABLED 1
 RUN npm run build
 
