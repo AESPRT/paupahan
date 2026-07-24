@@ -10,7 +10,7 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# I-generate ang Prisma Client bago i-run ang Next.js build
+# I-generate ang Prisma Client
 RUN npx prisma generate
 
 ENV NEXT_TELEMETRY_DISABLED 1
@@ -28,6 +28,8 @@ RUN adduser --system --uid 1001 nextjs
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+# Kopyahin din ang prisma folder para magamit sa migrate/db push sa loob ng container kung kailangan
+COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
 
 USER nextjs
 

@@ -4,9 +4,13 @@ services:
     container_name: paupahan_app
     restart: always
     ports:
-      - "3070:3000" # 👈 Binago mula 3000:3000 patungong 3070:3000 para iwas conflict sa fold_go_backend
+      - "3070:3000"
     environment:
       - NODE_ENV=production
       - PORT=3000
-      - DATABASE_URL=postgresql://aedev_admin:admin123@db:5432/paupahan_db # Palitan ng iyong DB URL
+      - DATABASE_URL=postgresql://aedev_admin:admin123@fold_go_postgres:5432/paupahan_db?schema=public
       - NEXT_PUBLIC_API_URL=https://api.aesprt.com
+    networks:
+      - default
+
+# Kung gumagamit ka ng external network para sa postgres, idagdag dito o i-adjust base sa setup mo
