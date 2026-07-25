@@ -78,7 +78,7 @@ export async function getAdminMaintenanceRequests() {
         dateReported: new Date(req.createdAt).toISOString().split("T")[0],
         imageUrl: req.photoUrl || undefined,
         adminRemark: req.adminRemark || undefined,
-        expenses: req.expenses ?? 0, // 👈 Siguraduhing naipapasa ang expenses mula Prisma
+        expenses: req.expenses ?? 0,
       };
     });
 
@@ -113,13 +113,25 @@ export async function updateMaintenanceStatusAction(
       updateData.expenses = expenses !== undefined ? expenses : 0;
     }
 
-    // 👈 Ginawa nating `any` o sinigurong tugma sa schema ang include (fullName ang ginamit sa halip na name)
+    // 1. I-update ang maintenance request at isama ang relasyon patungo sa landlord para makuha ang pangalan nito
     const updatedRequest = await prisma.maintenanceRequest.update({
       where: { id: requestId },
       data: updateData,
       include: {
         tenant: { select: { id: true, fullName: true, email: true, phone: true, userId: true } },
-        user: { select: { fullName: true } }, 
+        room: {
+          include: {
+            unit: {
+              include: {
+                property: {
+                  include: {
+                    landlord: { select: { fullName: true } },
+                  },
+                },
+              },
+            },
+          },
+        },
       },
     }) as any;
 
@@ -142,8 +154,8 @@ export async function updateMaintenanceStatusAction(
     const tenantPhone = updatedRequest.tenant?.phone;
     const tenantName = updatedRequest.tenant?.fullName || "Tenant";
     
-    // Kunin ang pangalan ng landlord nang ligtas gamit ang fullName
-    const landlordName = updatedRequest.user?.fullName || updatedRequest.landlord?.fullName || "Landlord";
+    // Kunin ang pangalan ng landlord gamit ang tamang property relation path
+    const landlordName = updatedRequest.room?.unit?.property?.landlord?.fullName || "Landlord";
     
     const issueTitle = updatedRequest.title || "Maintenance Request";
     const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api";
