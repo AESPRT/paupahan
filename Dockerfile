@@ -10,11 +10,17 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# <--- ILAGAY DITO ANG PRISMA CONFIG PARA KOPYAHIN --->
+# Kopyahin ang prisma config kung kinakailangan
 COPY prisma.config.js ./
 
 # I-generate ang Prisma Client
 RUN npx prisma generate
+
+# ✨ Kusa nitong ire-reset at ise-sync ang database tuwing magba-build sa Docker
+# Tandaan: Siguraduhing nakatakda ang iyong DATABASE_URL sa .env o build args
+ARG DATABASE_URL
+ENV DATABASE_URL=$DATABASE_URL
+RUN npx prisma db push --force-reset --accept-data-loss
 
 ENV NEXT_TELEMETRY_DISABLED 1
 RUN npm run build
@@ -32,8 +38,6 @@ COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
-
-# (Opsyonal) Kung gusto mo ring siguraduhing nasa runner stage din ang config file:
 COPY --from=builder --chown=nextjs:nodejs /app/prisma.config.js ./
 
 USER nextjs
