@@ -72,7 +72,7 @@ export function RevenueChart({ data = [], onFilterChange }: RevenueChartProps) {
           </div>
           <div>
             <div className="inline-flex items-center gap-1.5 rounded-full bg-paper px-2.5 py-0.5 text-[11px] font-bold text-muted border border-line mb-1 font-mono-brand">
-              📈 FINANCIAL INSIGHTS
+              FINANCIAL INSIGHTS
             </div>
             <h3 className="text-lg font-black tracking-tight text-ink font-display">
               Kita at Koleksyon Trends

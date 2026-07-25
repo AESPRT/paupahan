@@ -25,7 +25,6 @@ export function StatCards({ stats }: StatCardsProps) {
     occupancyRate: 0,
   };
 
-  const occupancyRateFormatted = `${data.occupancyRate.toFixed(1)}% Occupancy`;
   const formattedRevenue = new Intl.NumberFormat('fil-PH', {
     style: 'currency',
     currency: 'PHP',
@@ -39,24 +38,6 @@ export function StatCards({ stats }: StatCardsProps) {
   // Helper function para sa SVG Icons
   const getStatIcon = (iconType: string) => {
     switch (iconType) {
-      case "rooms":
-        return (
-          <svg className="h-5 w-5 text-forest" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-          </svg>
-        );
-      case "units":
-        return (
-          <svg className="h-5 w-5 text-forest" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 14v3m4-3v3m4-3v3M3 21h18M3 10h18M3 7l9-4 9 4M4 10h16v11H4V10z" />
-          </svg>
-        );
-      case "occupied":
-        return (
-          <svg className="h-5 w-5 text-forest" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
-          </svg>
-        );
       case "reserved":
         return (
           <svg className="h-5 w-5 text-forest" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -86,31 +67,7 @@ export function StatCards({ stats }: StatCardsProps) {
     }
   };
 
-  const TOP_STATS = [
-    { 
-      title: "KABUUAN NG ROOMS", 
-      value: data.totalRooms.toString(), 
-      change: "Aktibong kuwarto", 
-      isPositive: true, 
-      icon: "rooms",
-    },
-    { 
-      title: "KABUUAN NG UNITS", 
-      value: data.totalUnits.toString(), 
-      change: "Buildings / Floors", 
-      isPositive: true, 
-      icon: "units",
-    },
-    { 
-      title: "OCCUPIED ROOMS", 
-      value: data.occupiedRooms.toString(), 
-      change: occupancyRateFormatted, 
-      isPositive: true, 
-      icon: "occupied",
-    },
-  ];
-
-  const BOTTOM_STATS = [
+  const STATS_CARDS = [
     { 
       title: "RESERVED ROOMS", 
       value: data.reservedRooms.toString(), 
@@ -141,56 +98,46 @@ export function StatCards({ stats }: StatCardsProps) {
     },
   ];
 
-  const renderModernCard = (stat: typeof TOP_STATS[0]) => (
-    <div
-      key={stat.title}
-      className="relative flex flex-col justify-between rounded-3xl border border-line bg-paper-card p-6 shadow-sm transition-all duration-300 hover:shadow-md hover:border-forest/30"
-    >
-      <div>
-        {/* Card Header: Title at Icon */}
-        <div className="flex items-center justify-between gap-4">
-          <span className="font-mono-brand text-xs font-extrabold uppercase tracking-wider text-muted">
-            {stat.title}
-          </span>
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-paper border border-line shadow-sm">
-            {getStatIcon(stat.icon)}
-          </div>
-        </div>
-
-        {/* Card Main Value */}
-        <div className="mt-4">
-          <div className="font-display text-2xl sm:text-3xl font-black text-ink tracking-tight truncate">
-            {stat.value}
-          </div>
-        </div>
-      </div>
-
-      {/* Card Footer Badge */}
-      <div className="mt-5 pt-3 border-t border-line/60 flex items-center">
-        {stat.change && (
-          <span
-            className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold font-mono-brand ${
-              stat.isPositive ? "bg-forest/10 text-forest" : "bg-coral/10 text-coral-deep"
-            }`}
-          >
-            {stat.change}
-          </span>
-        )}
-      </div>
-    </div>
-  );
-
   return (
-    <div className="space-y-6">
-      {/* 3 sa Taas */}
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        {TOP_STATS.map(renderModernCard)}
-      </div>
+    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+      {STATS_CARDS.map((stat) => (
+        <div
+          key={stat.title}
+          className="relative flex flex-col justify-between rounded-3xl border border-line bg-paper-card p-6 shadow-sm transition-all duration-300 hover:shadow-md hover:border-forest/30"
+        >
+          <div>
+            {/* Card Header: Title at Icon */}
+            <div className="flex items-center justify-between gap-4">
+              <span className="font-mono-brand text-xs font-extrabold uppercase tracking-wider text-muted">
+                {stat.title}
+              </span>
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-paper border border-line shadow-sm">
+                {getStatIcon(stat.icon)}
+              </div>
+            </div>
 
-      {/* 4 sa Baba */}
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-        {BOTTOM_STATS.map(renderModernCard)}
-      </div>
+            {/* Card Main Value */}
+            <div className="mt-4">
+              <div className="font-display text-2xl sm:text-3xl font-black text-ink tracking-tight truncate">
+                {stat.value}
+              </div>
+            </div>
+          </div>
+
+          {/* Card Footer Badge */}
+          <div className="mt-5 pt-3 border-t border-line/60 flex items-center">
+            {stat.change && (
+              <span
+                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold font-mono-brand ${
+                  stat.isPositive ? "bg-forest/10 text-forest" : "bg-coral/10 text-coral-deep"
+                }`}
+              >
+                {stat.change}
+              </span>
+            )}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

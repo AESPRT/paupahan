@@ -15,6 +15,7 @@ export async function getDashboardData() {
       return {
         adminName: 'Admin',
         stats: { totalProperties: 0, totalUnits: 0, totalRooms: 0, occupiedRooms: 0, vacantRooms: 0, reservedRooms: 0, monthlyRevenue: 0, pendingBillsAmount: 0, occupancyRate: 0 },
+        roomsSummary: { totalUnits: 0, availableRooms: 0, occupiedRooms: 0, totalRooms: 0 },
         chartData: [],
         pendingReadings: [],
         recentActivities: [],
@@ -68,6 +69,7 @@ export async function getDashboardData() {
     }) : 0
     
     const occupancyRate = totalRooms > 0 ? (occupiedRooms / totalRooms) * 100 : 0
+    const availableRooms = vacantRooms; // Magagamit para sa roomsSummary
 
     // Kunin ang mga Tenant ID sa ilalim ng landlord na ito para sa pag-filter ng Bills
     const landlordTenants = await prisma.tenant.findMany({
@@ -244,13 +246,12 @@ export async function getDashboardData() {
       });
     });
 
-    // 6. Kunin ang mga notifications para sa landlord na ito (kung sinusuportahan ng schema, o i-filter base sa actor/target)
+    // 6. Kunin ang mga notifications para sa landlord na ito
     const rawNotifications = await prisma.notification.findMany({
-      where: { recipientUserId: userId }, // Sinisigurong sa kanya lang ang notifications
+      where: { recipientUserId: userId },
       orderBy: { createdAt: 'desc' },
       take: 5,
     }).catch(async () => {
-      // Fallback kung walang userId column ang notification table
       return await prisma.notification.findMany({
         orderBy: { createdAt: 'desc' },
         take: 5,
@@ -331,6 +332,12 @@ export async function getDashboardData() {
         pendingBillsAmount,
         occupancyRate,
       },
+      roomsSummary: {
+        totalUnits,
+        availableRooms,
+        occupiedRooms,
+        totalRooms,
+      },
       chartData,
       pendingReadings,
       recentActivities,
@@ -351,6 +358,7 @@ export async function getDashboardData() {
         pendingBillsAmount: 0, 
         occupancyRate: 0 
       },
+      roomsSummary: { totalUnits: 0, availableRooms: 0, occupiedRooms: 0, totalRooms: 0 },
       chartData: [],
       pendingReadings: [],
       recentActivities: [],
