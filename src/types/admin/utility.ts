@@ -1,4 +1,4 @@
-export type UtilityType = "electricity" | "water" | "internet" | "amenities";
+export type UtilityType = "electricity" | "water" | "other" | "amenities";
 
 export interface UtilityRate {
   id: string;
