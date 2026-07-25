@@ -93,7 +93,6 @@ export function StatCards({ stats }: StatCardsProps) {
       change: "Aktibong kuwarto", 
       isPositive: true, 
       icon: "rooms",
-      code: "RMS-01"
     },
     { 
       title: "KABUUAN NG UNITS", 
@@ -101,7 +100,6 @@ export function StatCards({ stats }: StatCardsProps) {
       change: "Buildings / Floors", 
       isPositive: true, 
       icon: "units",
-      code: "UNT-02"
     },
     { 
       title: "OCCUPIED ROOMS", 
@@ -109,7 +107,6 @@ export function StatCards({ stats }: StatCardsProps) {
       change: occupancyRateFormatted, 
       isPositive: true, 
       icon: "occupied",
-      code: "OCC-03"
     },
   ];
 
@@ -120,7 +117,6 @@ export function StatCards({ stats }: StatCardsProps) {
       change: data.reservedRooms > 0 ? "May naghihintay lumipat" : "Walang naka-reserve", 
       isPositive: true, 
       icon: "reserved",
-      code: "RES-04"
     },
     { 
       title: "BAKANTENG ROOMS", 
@@ -128,7 +124,6 @@ export function StatCards({ stats }: StatCardsProps) {
       change: data.vacantRooms > 0 ? "Kailangan punan" : "Puno na lahat", 
       isPositive: data.vacantRooms === 0, 
       icon: "vacant",
-      code: "VAC-05"
     },
     { 
       title: "BUWANANG KITA", 
@@ -136,7 +131,6 @@ export function StatCards({ stats }: StatCardsProps) {
       change: "Koleksyon ngayong buwan", 
       isPositive: true, 
       icon: "revenue",
-      code: "REV-06"
     },
     { 
       title: "PENDING BILLS", 
@@ -144,65 +138,58 @@ export function StatCards({ stats }: StatCardsProps) {
       change: "Kailangang singilin", 
       isPositive: false, 
       icon: "pending",
-      code: "PEN-07"
     },
   ];
 
-  const renderReceiptCard = (stat: typeof TOP_STATS[0]) => (
+  const renderModernCard = (stat: typeof TOP_STATS[0]) => (
     <div
       key={stat.title}
-      className="perforated relative flex flex-col justify-between rounded-2xl border border-line bg-paper-card p-6 pb-6 shadow-[0_8px_24px_rgba(27,58,52,0.08)] transition-all hover:-translate-y-1 hover:shadow-[0_14px_34px_rgba(27,58,52,0.12)]"
+      className="relative flex flex-col justify-between rounded-3xl border border-line bg-paper-card p-6 shadow-sm transition-all duration-300 hover:shadow-md hover:border-forest/30"
     >
       <div>
-        {/* Receipt Header Style */}
-        <div className="mb-4 flex items-start justify-between border-b-[1.5px] border-dashed border-line pb-3.5">
-          <div>
-            <div className="font-mono-brand text-[10px] font-bold tracking-wide text-muted">
-              STAT REPORT • {stat.code}
-            </div>
-            <div className="mt-1 font-mono-brand text-xs font-extrabold uppercase tracking-wider text-forest-deep">
-              {stat.title}
-            </div>
-          </div>
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-forest/10 shadow-sm backdrop-blur-sm">
+        {/* Card Header: Title at Icon */}
+        <div className="flex items-center justify-between gap-4">
+          <span className="font-mono-brand text-xs font-extrabold uppercase tracking-wider text-muted">
+            {stat.title}
+          </span>
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-paper border border-line shadow-sm">
             {getStatIcon(stat.icon)}
           </div>
         </div>
 
-        {/* Receipt Main Value */}
-        <div className="py-2">
-          <div className="font-display text-2xl sm:text-3xl font-extrabold text-forest-deep truncate">
+        {/* Card Main Value */}
+        <div className="mt-4">
+          <div className="font-display text-2xl sm:text-3xl font-black text-ink tracking-tight truncate">
             {stat.value}
           </div>
         </div>
       </div>
 
-      {/* Receipt Footer Status */}
-      <div className="mt-4 border-t-[1.5px] border-dashed border-line pt-3.5">
+      {/* Card Footer Badge */}
+      <div className="mt-5 pt-3 border-t border-line/60 flex items-center">
         {stat.change && (
-          <p
-            className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${
-              stat.isPositive ? "bg-emerald-500/15 text-forest" : "bg-rose-500/15 text-coral-deep"
+          <span
+            className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold font-mono-brand ${
+              stat.isPositive ? "bg-forest/10 text-forest" : "bg-coral/10 text-coral-deep"
             }`}
           >
             {stat.change}
-          </p>
+          </span>
         )}
       </div>
     </div>
   );
 
   return (
-    // ✨ Pinalitan ang gap sa gap-6 para hindi maging dikit-dikit
     <div className="space-y-6">
       {/* 3 sa Taas */}
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        {TOP_STATS.map(renderReceiptCard)}
+        {TOP_STATS.map(renderModernCard)}
       </div>
 
       {/* 4 sa Baba */}
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-        {BOTTOM_STATS.map(renderReceiptCard)}
+        {BOTTOM_STATS.map(renderModernCard)}
       </div>
     </div>
   );

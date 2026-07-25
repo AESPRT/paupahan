@@ -489,7 +489,7 @@ export async function handleApprovalAction(compositeId: string, actionType: "app
   }
 }
 
-export async function getRevenueChartData(filter: "6M" | "1Y" = "6M") {
+export async function getRevenueChartData(filter: "3M" | "6M" | "1Y" | "ALL" = "6M") {
   'use server'
   const cookieStore = await cookies();
   const userId = cookieStore.get("session_user_id")?.value;
@@ -497,7 +497,13 @@ export async function getRevenueChartData(filter: "6M" | "1Y" = "6M") {
   const months = ["Ene", "Peb", "Mar", "Abr", "May", "Hun", "Hul", "Ago", "Set", "Okt", "Nob", "Dis"];
   const currentDate = new Date();
   const chartData = [];
-  const limit = filter === "1Y" ? 12 : 6;
+  
+  // Tinukoy natin ang limit base sa bagong filters
+  let limit = 6;
+  if (filter === "3M") limit = 3;
+  else if (filter === "6M") limit = 6;
+  else if (filter === "1Y") limit = 12;
+  else if (filter === "ALL") limit = 24; // Halimbawa: huling 2 taon para sa 'Lahat'
 
   let tenantIds: string[] = [];
   if (userId) {

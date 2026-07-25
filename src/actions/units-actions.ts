@@ -112,24 +112,29 @@ export async function addUnitAction(name: string) {
       });
     }
 
+    // 3. I-create ang Unit sa ilalim ng property ng landlord at i-save sa variable
+    const newUnit = await prisma.unit.create({
+      data: {
+        propertyId: property.id,
+        name: `${property.name} - ${name}`,
+      },
+      include: {
+        rooms: true, // Para masigurong kasama ang rooms array sa return value
+      },
+    });
+
     await createAuditLog({
       actorId: adminId,
       action: `Gumawa ng bagong Unit/Building: ${name}`,
       entityType: 'Unit',
-      entityId: adminId,
+      entityId: newUnit.id, // Ginamit ang tunay na ID ng bagong unit
       metadata: { actionType: 'ADD' },
-    });
-
-    // 3. I-create ang Unit sa ilalim ng property ng landlord
-    await prisma.unit.create({
-      data: {
-        propertyId: property.id,
-        name,
-      },
     });
     
     revalidatePath('/admin/dashboard/units');
-    return { success: true };
+    
+    // Ibinabalik na ngayon ang success kasama ang mismong unit data mula sa DB
+    return { success: true, unit: newUnit };
   } catch (error) {
     console.error('Error adding unit:', error);
     return { success: false, error: 'May naganap na error sa pagdagdag ng unit/building.' };

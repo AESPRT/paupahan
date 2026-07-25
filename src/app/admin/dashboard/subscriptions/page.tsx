@@ -53,7 +53,8 @@ export default function SubscriptionPage() {
 
           const updatedResult = await getAdminSubscriptionData();
           if (updatedResult.success && updatedResult.subscription) {
-            setCurrentSub(updatedResult.subscription as CurrentSubscription);
+            // Gamitin ang bagong object reference para ma-trigger ang re-render
+            setCurrentSub({ ...(updatedResult.subscription as CurrentSubscription) });
           }
 
           router.replace("/admin/dashboard/subscriptions", { scroll: false });
@@ -72,7 +73,7 @@ export default function SubscriptionPage() {
       try {
         const result = await getAdminSubscriptionData();
         if (result.success && result.subscription) {
-          setCurrentSub(result.subscription as CurrentSubscription);
+          setCurrentSub({ ...(result.subscription as CurrentSubscription) });
         }
       } catch (error) {
         console.error("Nabigong i-load ang subscription data:", error);
@@ -94,7 +95,8 @@ export default function SubscriptionPage() {
           alert(`Tagumpay! Nagbago na ang iyong plan sa ${plan.tag}.`);
           const updated = await getAdminSubscriptionData();
           if (updated.success && updated.subscription) {
-            setCurrentSub(updated.subscription as CurrentSubscription);
+            // Pilitin ang React na makita ang bagong data gamit ang spread operator
+            setCurrentSub({ ...(updated.subscription as CurrentSubscription) });
           }
         } else {
           alert(result.error);
@@ -128,6 +130,8 @@ export default function SubscriptionPage() {
           if (!result.success) {
             throw new Error(result.error);
           }
+          // I-update agad ang local state para mag-reflect live ang auto-renew status nang walang refresh
+          setCurrentSub((prev) => (prev ? { ...prev, autoRenew: newState } : null));
         }}
         onChangePaymentMethod={() => setIsPaymentDialogOpen(true)}
       />
@@ -157,7 +161,7 @@ export default function SubscriptionPage() {
             alert("Tagumpay na na-update ang iyong payment method at numero!");
             const updatedResult = await getAdminSubscriptionData();
             if (updatedResult.success && updatedResult.subscription) {
-              setCurrentSub(updatedResult.subscription as CurrentSubscription);
+              setCurrentSub({ ...(updatedResult.subscription as CurrentSubscription) });
             }
           } else {
             alert(res.error || "Nabigong i-update ang payment details.");

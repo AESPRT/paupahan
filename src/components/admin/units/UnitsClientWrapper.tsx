@@ -25,7 +25,7 @@ export default function UnitsClientWrapper({
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedFilter, setSelectedFilter] = useState<string>("All");
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 3; // Limit na 3 units bawat pahina
+  const itemsPerPage = 4; // Limit na 3 units bawat pahina
 
   // Dynamic calculations para sa stats na magbabago agad kasabay ng state (buong units data)
   const totalUnits = units.length;
@@ -118,22 +118,21 @@ export default function UnitsClientWrapper({
   const handleAddUnit = async (unitName: string) => {
     const result = await addUnitAction(unitName);
 
-    if (result.success) {
-      // 3. Realtime update para sa Units nang walang server page refresh
+    if (result.success && result.unit) {
+      // ✅ Kunin ang totoong unit mula sa server na may tunay na database ID
       const newUnit: Unit = {
-        id: Date.now().toString(),
-        name: `${initialUnits[0]?.name.split(" - ")[0] || "Property"} - ${unitName}`,
-        address: initialUnits[0]?.address || "",
+        id: result.unit.id, // Totoong ID galing sa database!
+        name: result.unit.name,
+        address: "",
         totalRooms: 0,
         rooms: [],
       };
 
       setUnits((prev) => [newUnit, ...prev]);
       setIsAddUnitOpen(false);
-      // I-reset sa page 1 para makita agad ang bagong dagdag na unit
       setCurrentPage(1);
     } else {
-      alert(result.error);
+      alert(result.error || "May error sa pag-add ng unit.");
     }
   };
 
@@ -198,7 +197,7 @@ export default function UnitsClientWrapper({
       <div className="space-y-6">
         {filteredUnits.length > 0 ? (
           <>
-            <div className="grid grid-cols-1 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               {currentUnits.map((unit) => (
                 <UnitCard
                   key={unit.id}

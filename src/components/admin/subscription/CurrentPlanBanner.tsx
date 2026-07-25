@@ -5,7 +5,7 @@ import { CurrentSubscription } from "@/src/types/admin/subscription";
 interface CurrentPlanBannerProps {
   subscription: CurrentSubscription;
   onUpgradeClick: () => void;
-  onRetryPaymentClick?: () => void; // Idinagdag kung sakaling kailanganin ulit magbayad
+  onRetryPaymentClick?: () => void;
 }
 
 export function CurrentPlanBanner({
@@ -13,6 +13,8 @@ export function CurrentPlanBanner({
   onUpgradeClick,
   onRetryPaymentClick,
 }: CurrentPlanBannerProps) {
+  // Direktang gamitin ang subscription prop bilang source of truth.
+  // Kapag nag-update ang parent component, awtomatikong magre-render ito nang walang useEffect.
   const usagePercentage = Math.min(
     100,
     Math.round((subscription.unitsUsed / subscription.maxUnitsLimit) * 100)

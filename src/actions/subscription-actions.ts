@@ -79,6 +79,7 @@ export async function getAdminSubscriptionData() {
         : "Wala pang petsa",
       paymentMethod: subscription.paymentMethod || "GCash",
       paymentMethodId: subscription.paymentMethodId || "",
+      paymentNumber: subscription.paymentNumber || "",
       autoRenew: subscription.autoRenew ?? true, // Ipinapasa na natin ito patungo sa UI
       unitsUsed: totalUnits,         
       maxUnitsLimit: subscription.maxUnitsLimit,
