@@ -30,9 +30,11 @@ interface ChangePlanPayload {
   cancelUrl?: string;
 }
 
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api";
+
 export async function createCheckoutSession(payload: CheckoutPayload): Promise<string> {
   try {
-    const response = await axios.post("https://api.aesprt.com/v1/paupahan-payments/checkout", payload);
+    const response = await axios.post(`${API_BASE_URL}/checkout`, payload);
     const data = response.data;
 
     if (data && data.checkoutUrl) {
@@ -47,7 +49,7 @@ export async function createCheckoutSession(payload: CheckoutPayload): Promise<s
 
 export async function submitCustomInquiry(payload: CustomInquiryPayload): Promise<void> {
   try {
-    await axios.post("https://api.aesprt.com/v1/paupahan-payments/custom-inquiry", payload);
+    await axios.post(`${API_BASE_URL}/custom-inquiry`, payload);
   } catch (err: any) {
     const errorMessage = err.response?.data?.error || err.message || "Nabigong maipadala ang mensahe. Subukan muli.";
     throw new Error(errorMessage);
@@ -56,7 +58,7 @@ export async function submitCustomInquiry(payload: CustomInquiryPayload): Promis
 
 export async function changeLandlordSubscription(payload: ChangePlanPayload): Promise<string> {
   try {
-    const response = await axios.post("https://api.aesprt.com/v1/paupahan-payments/change-plan", payload);
+    const response = await axios.post(`${API_BASE_URL}/change-plan`, payload);
     const data = response.data;
 
     // Kung paid plan, magbabalik ito ng checkout URL para sa PayMongo

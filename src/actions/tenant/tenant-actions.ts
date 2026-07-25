@@ -7,6 +7,8 @@ import prisma from "@/src/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { NotificationChannel, NotificationStatus } from "@prisma/client";
 import { cookies } from "next/headers";
+import axios from 'axios';
+import { detectCarrier } from '@/src/utils/carrierDetector';
 
 export async function getBillDetailsForPayment(billId: string) {
   try {
@@ -115,8 +117,7 @@ export async function submitPaymentAction(formData: FormData) {
       },
     });
 
-    // 3. Hanapin ang Landlord User ID para mapadalhan ng notification
-    // Binaybay natin ang relasyon: Bill -> Lease -> Room -> Unit -> Property -> landlordId (User)
+    // 3. Hanapin ang Landlord User ID at detalye para mapadalhan ng notification (fullName ang ginamit sa halip na name)
     const billDetails = await prisma.bill.findUnique({
       where: { id: billId },
       include: {
@@ -127,7 +128,11 @@ export async function submitPaymentAction(formData: FormData) {
               include: {
                 unit: {
                   include: {
-                    property: true,
+                    property: {
+                      include: {
+                        landlord: { select: { id: true, fullName: true, email: true, phone: true } },
+                      },
+                    },
                   },
                 },
               },
@@ -137,7 +142,12 @@ export async function submitPaymentAction(formData: FormData) {
       },
     });
 
-    const landlordId = billDetails?.lease?.room?.unit?.property?.landlordId;
+    const landlord = billDetails?.lease?.room?.unit?.property?.landlord;
+    const landlordId = landlord?.id;
+    const landlordEmail = landlord?.email;
+    const landlordPhone = landlord?.phone;
+    const landlordName = landlord?.fullName || "Landlord";
+    
     const tenantName = billDetails?.tenant?.fullName || "Isang tenant";
     const billingMonth = billDetails?.billingMonthYear || "buwan na ito";
 
@@ -155,6 +165,41 @@ export async function submitPaymentAction(formData: FormData) {
           status: NotificationStatus.pending,
         },
       });
+    }
+
+    // --- PAGPAPADALA NG EMAIL AT SMS NOTIFICATION KAY LANDLORD (GAMIT ANG AXIOS) ---
+    const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api";
+    const formattedAmount = new Intl.NumberFormat('fil-PH', { style: 'currency', currency: 'PHP' }).format(amount);
+
+    if (landlordEmail) {
+      try {
+        await axios.post(`${API_BASE_URL}/notify/landlord-payment`, {
+          landlordEmail: landlordEmail,
+          landlordName: landlordName,
+          tenantName: tenantName,
+          amountPaid: amount,
+          invoiceNumber: billId,
+          referenceNumber: referenceNo || 'N/A',
+          paymentMethod: paymentMethod,
+        });
+      } catch (emailErr) {
+        console.error(`Error sa pagpapadala ng landlord payment email kay ${landlordEmail}:`, emailErr);
+      }
+    }
+
+    if (landlordPhone) {
+      try {
+        const smsMessage = `Paupahan Alert: Nagbayad si ${tenantName} ng ${formattedAmount} para sa bill (${billId}) gamit ang ${paymentMethod}. Mag-log in para i-verify.`;
+        const detectedCarrier = detectCarrier(landlordPhone);
+
+        await axios.post(`${API_BASE_URL}/notify/sms`, {
+          phoneNumber: landlordPhone,
+          carrier: detectedCarrier,
+          message: smsMessage,
+        });
+      } catch (smsErr) {
+        console.error(`Error sa pagpapadala ng SMS kay landlord (${landlordPhone}):`, smsErr);
+      }
     }
 
     // I-revalidate ang path para mag-update ang UI

@@ -5,6 +5,8 @@ import prisma from "@/src/lib/prisma";
 import { MaintenanceStatus } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
+import axios from 'axios';
+import { detectCarrier } from "@/src/utils/carrierDetector";
 
 type MaintenanceCategoryType = "Plumbing" | "Electrical" | "Appliance" | "Structural" | "Others";
 
@@ -107,18 +109,19 @@ export async function updateMaintenanceStatusAction(
       adminRemark: adminRemark || undefined,
     };
 
-    // 👈 Isama lang ang expenses kung Resolved ang status
     if (newStatus === "Resolved") {
       updateData.expenses = expenses !== undefined ? expenses : 0;
     }
 
+    // 👈 Ginawa nating `any` o sinigurong tugma sa schema ang include (fullName ang ginamit sa halip na name)
     const updatedRequest = await prisma.maintenanceRequest.update({
       where: { id: requestId },
       data: updateData,
       include: {
-        tenant: true,
+        tenant: { select: { id: true, fullName: true, email: true, phone: true, userId: true } },
+        user: { select: { fullName: true } }, 
       },
-    });
+    }) as any;
 
     if (updatedRequest.tenant?.userId) {
       await prisma.notification.create({
@@ -133,6 +136,46 @@ export async function updateMaintenanceStatusAction(
           status: "pending",
         },
       });
+    }
+
+    const tenantEmail = updatedRequest.tenant?.email;
+    const tenantPhone = updatedRequest.tenant?.phone;
+    const tenantName = updatedRequest.tenant?.fullName || "Tenant";
+    
+    // Kunin ang pangalan ng landlord nang ligtas gamit ang fullName
+    const landlordName = updatedRequest.user?.fullName || updatedRequest.landlord?.fullName || "Landlord";
+    
+    const issueTitle = updatedRequest.title || "Maintenance Request";
+    const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api";
+
+    if (tenantEmail) {
+      try {
+        await axios.post(`${API_BASE_URL}/notify/maintenance`, {
+          tenantName: tenantName,
+          tenantEmail: tenantEmail,
+          landlordName: landlordName,
+          issueTitle: issueTitle,
+          status: newStatus,
+          maintenanceNotes: adminRemark || (expenses ? `Gastos sa pag-aayos: ₱${expenses.toLocaleString()}` : undefined),
+        });
+      } catch (emailErr) {
+        console.error(`Error sa pagpapadala ng maintenance email kay ${tenantEmail}:`, emailErr);
+      }
+    }
+
+    if (tenantPhone) {
+      try {
+        const smsMessage = `Paupahan Maintenance: Ang iyong request na "${issueTitle}" ay nasa status na ngayon: ${newStatus}.${adminRemark ? ` Tala: ${adminRemark}` : ''}`;
+        const detectedCarrier = detectCarrier(tenantPhone);
+        
+        await axios.post(`${API_BASE_URL}/notify/sms`, {
+          phoneNumber: tenantPhone,
+          carrier: detectedCarrier,
+          message: smsMessage,
+        });
+      } catch (smsErr) {
+        console.error(`Error sa pagpapadala ng SMS kay ${tenantPhone}:`, smsErr);
+      }
     }
 
     if (userId) {

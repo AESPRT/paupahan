@@ -6,6 +6,8 @@ import { Invoice } from "@/src/types/admin/billing"
 import { revalidatePath } from "next/cache"
 import { cookies } from 'next/headers'
 import { createAuditLog } from '@/src/actions/audit-actions'
+import axios from 'axios';
+import { detectCarrier } from '@/src/utils/carrierDetector';
 
 export async function getBillingsData() {
   try {
@@ -160,6 +162,12 @@ export async function createInvoiceAction(newInvoiceData: Omit<Invoice, "id" | "
       return { success: false, error: "Walang active session." };
     }
 
+    const landlordUser = await prisma.user.findUnique({
+      where: { id: adminId },
+      select: { fullName: true, email: true },
+    });
+    const landlordName = landlordUser?.fullName || "Landlord";
+
     // 1. Hanapin ang tenant na kabilang LAMANG sa landlord na ito at may active lease
     const tenant = await prisma.tenant.findFirst({
       where: {
@@ -186,6 +194,21 @@ export async function createInvoiceAction(newInvoiceData: Omit<Invoice, "id" | "
 
     const activeLease = tenant.leases[0];
     const billingMonthYear = newInvoiceData.issueDate.slice(0, 7);
+
+    // 💡 2. I-check muna kung may existing bill na ang lease na ito ngayong buwan
+    const existingBill = await prisma.bill.findFirst({
+      where: {
+        leaseId: activeLease.id,
+        billingMonthYear: billingMonthYear,
+      },
+    });
+
+    if (existingBill) {
+      return { 
+        success: false, 
+        error: `Mayroon na palang bill ang tenant na ito para sa buwan ng ${billingMonthYear}. Hindi maaaring magkaroon ng dobleng bill sa ihong buwan.` 
+      };
+    }
 
     let rentAmount = 0;
     let amenitiesFee = 0;
@@ -214,7 +237,7 @@ export async function createInvoiceAction(newInvoiceData: Omit<Invoice, "id" | "
       metadata: { actionType: 'ADD' },
     });
 
-    await prisma.bill.create({
+    const newBill = await prisma.bill.create({
       data: {
         leaseId: activeLease.id,
         tenantId: tenant.id,
@@ -248,7 +271,57 @@ export async function createInvoiceAction(newInvoiceData: Omit<Invoice, "id" | "
           }),
         },
       },
+      include: {
+        items: true,
+      },
     });
+
+    // --- PAGPAPADALA NG NOTIFICATIONS (EMAILS & SMS GAMIT ANG AXIOS) ---
+    const tenantEmail = tenant.email;
+    const tenantPhone = tenant.phone;
+    const tenantName = tenant.fullName;
+    const formattedDueDate = new Date(newInvoiceData.dueDate).toLocaleDateString('fil-PH', { year: 'numeric', month: 'long', day: 'numeric' });
+    const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api";
+
+    if (tenantEmail) {
+      try {
+        await axios.post(`${API_BASE_URL}/notify/bill`, {
+          tenantName: tenantName,
+          tenantEmail: tenantEmail,
+          landlordName: landlordName,
+          dueDate: formattedDueDate,
+          totalAmount: newInvoiceData.totalAmount,
+          invoiceNumber: newBill.id,
+          billItems: newBill.items.map(item => ({ type: item.unitLabel, amount: item.amount }))
+        });
+
+        await axios.post(`${API_BASE_URL}/notify/reading-request`, {
+          tenantName: tenantName,
+          tenantEmail: tenantEmail,
+          landlordName: landlordName,
+          invoiceNumber: newBill.id,
+          dueDate: formattedDueDate,
+          utilityType: "Kuryente at Tubig",
+        });
+      } catch (emailErr) {
+        console.error(`Error sa pagpapadala ng email kay ${tenantEmail}:`, emailErr);
+      }
+    }
+
+    if (tenantPhone) {
+      try {
+        const smsMessage = `Paupahan: Bagong bill (${newBill.id}) na nagkakahalaga ng ₱${newInvoiceData.totalAmount.toLocaleString()} ang nilikha. Mag-log in at i-submit ang reading. Due: ${formattedDueDate}`;
+        const detectedCarrier = detectCarrier(tenantPhone);
+
+        await axios.post(`${API_BASE_URL}/notify/sms`, {
+          phoneNumber: tenantPhone,
+          carrier: detectedCarrier,
+          message: smsMessage,
+        });
+      } catch (smsErr) {
+        console.error(`Error sa pagpapadala ng SMS kay ${tenantPhone}:`, smsErr);
+      }
+    }
 
     revalidatePath("/admin/billings");
     return { success: true };
@@ -267,6 +340,13 @@ export async function markInvoiceAsPaidAction(id: string) {
       return { success: false, error: "Walang active session." };
     }
 
+    // Kunin ang pangalan ng Landlord para sa email context (ginamit ang fullName)
+    const landlordUser = await prisma.user.findUnique({
+      where: { id: adminId },
+      select: { fullName: true },
+    });
+    const landlordName = landlordUser?.fullName || "Landlord";
+
     // 1. Seguridad: Siguraduhing ang bill ay pagmamay-ari ng tenant na nasa ilalim ng landlord na ito
     const landlordTenants = await prisma.tenant.findMany({
       where: { userId: adminId },
@@ -279,14 +359,16 @@ export async function markInvoiceAsPaidAction(id: string) {
         id,
         tenantId: { in: tenantIds },
       },
-      select: { id: true },
+      include: {
+        tenant: { select: { fullName: true, email: true, phone: true } },
+      },
     });
 
     if (!billCheck) {
       return { success: false, error: "Hindi natagpuan ang invoice o wala kang pahintulot dito." };
     }
 
-    await prisma.bill.update({
+    const updatedBill = await prisma.bill.update({
       where: { id },
       data: {
         status: "paid",
@@ -301,6 +383,45 @@ export async function markInvoiceAsPaidAction(id: string) {
       entityId: adminId,
       metadata: { actionType: 'ADD' },
     });
+
+    // --- PAGPAPADALA NG PAYMENT CONFIRMATION (EMAIL & SMS GAMIT ANG AXIOS) ---
+    const tenantEmail = billCheck.tenant.email;
+    const tenantPhone = billCheck.tenant.phone;
+    const tenantName = billCheck.tenant.fullName;
+    const totalAmount = Number(updatedBill.totalAmount);
+    const formattedDate = new Date().toLocaleDateString('fil-PH', { year: 'numeric', month: 'long', day: 'numeric' });
+    const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api";
+
+    if (tenantEmail) {
+      try {
+        await axios.post(`${API_BASE_URL}/notify/confirmation`, {
+          tenantName: tenantName,
+          tenantEmail: tenantEmail,
+          landlordName: landlordName,
+          amountPaid: totalAmount,
+          paymentDate: formattedDate,
+          invoiceNumber: updatedBill.id,
+          notes: "Na-verify at tinanggap na ang iyong pagbabayad. Maraming salamat!",
+        });
+      } catch (emailErr) {
+        console.error(`Error sa pagpapadala ng payment confirmation email kay ${tenantEmail}:`, emailErr);
+      }
+    }
+
+    if (tenantPhone) {
+      try {
+        const smsMessage = `Paupahan: Tanggap na ang iyong bayad para sa invoice (${updatedBill.id}) na nagkakahalaga ng ₱${totalAmount.toLocaleString()}. Maraming salamat!`;
+        const detectedCarrier = detectCarrier(tenantPhone);
+
+        await axios.post(`${API_BASE_URL}/notify/sms`, {
+          phoneNumber: tenantPhone,
+          carrier: detectedCarrier,
+          message: smsMessage,
+        });
+      } catch (smsErr) {
+        console.error(`Error sa pagpapadala ng SMS kay ${tenantPhone}:`, smsErr);
+      }
+    }
 
     revalidatePath("/admin/billings");
     return { success: true };
@@ -398,16 +519,23 @@ export async function runAutoBillingForLandlord(adminId: string) {
     // 1. Kunin ang mga tenant ID sa ilalim ng landlord na ito
     const landlordTenants = await prisma.tenant.findMany({
       where: { userId: adminId },
-      select: { id: true },
+      select: { id: true, fullName: true, email: true, phone: true },
     });
     console.log("2. Bilang ng nahanap na tenants:", landlordTenants.length);
     
-    const tenantIds = landlordTenants.map((t) => t.id);
-
-    if (tenantIds.length === 0) {
+    if (landlordTenants.length === 0) {
       console.log("--> HUMINTO: Walang tenants sa ilalim ng landlord na ito.");
       return;
     }
+
+    const tenantIds = landlordTenants.map((t) => t.id);
+
+    // Kunin ang pangalan ng Landlord para sa email/SMS context (ginamit ang fullName)
+    const landlordUser = await prisma.user.findUnique({
+      where: { id: adminId },
+      select: { fullName: true, email: true },
+    });
+    const landlordName = landlordUser?.fullName || "Landlord";
 
     // 2. Kunin ang kasalukuyang buwan at taon (Format: "YYYY-MM")
     const now = new Date();
@@ -416,14 +544,14 @@ export async function runAutoBillingForLandlord(adminId: string) {
     const billingMonthYear = `${currentYear}-${currentMonth}`;
     console.log("3. Kasalukuyang billingMonthYear:", billingMonthYear);
 
-    // 3. Kunin lahat ng active leases ng mga tenant na ito (isinama ang startDate)
+    // 3. Kunin lahat ng active leases ng mga tenant na ito
     const activeLeases = await prisma.lease.findMany({
       where: {
         status: "active",
         tenantId: { in: tenantIds },
       },
       include: {
-        tenant: { select: { fullName: true } },
+        tenant: { select: { fullName: true, email: true, phone: true } },
         room: { include: { unit: { select: { name: true } } } },
         amenities: {
           include: {
@@ -438,6 +566,8 @@ export async function runAutoBillingForLandlord(adminId: string) {
       console.log("--> HUMINTO: Walang active lease na nahanap para sa mga tenants na ito.");
       return;
     }
+
+    const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api";
 
     for (const lease of activeLeases) {
       console.log(`5. Sinusuri ang lease ID: ${lease.id} para sa tenant: ${lease.tenant.fullName}`);
@@ -490,11 +620,9 @@ export async function runAutoBillingForLandlord(adminId: string) {
 
       totalAmount = monthlyRent + amenitiesFeeTotal;
 
-      // 5. Kunin ang araw mula sa lease.startDate (hal. 25 kung July 25) para maging due date bawat buwan
+      // 5. Kunin ang araw mula sa lease.startDate para maging due date bawat buwan
       const leaseStartDate = new Date(lease.startDate);
       const startDay = leaseStartDate.getDate();
-      
-      // Itakda ang due date sa kasalukuyang buwan/taon gamit ang mismong araw ng start date
       const dueDate = new Date(currentYear, Number(currentMonth) - 1, startDay, 23, 59, 59);
 
       const newBill = await prisma.bill.create({
@@ -513,9 +641,65 @@ export async function runAutoBillingForLandlord(adminId: string) {
             create: lineItemsData,
           },
         },
+        include: {
+          items: true,
+        },
       });
 
       console.log(`7. TAGUMPAY! Nalikha na ang bill ID: ${newBill.id} na may Due Date na: ${dueDate.toISOString()}`);
+
+      // --- PAGPAPADALA NG NOTIFICATIONS (EMAILS & SMS GAMIT ANG AXIOS) ---
+      const tenantEmail = lease.tenant.email;
+      const tenantPhone = lease.tenant.phone;
+      const tenantName = lease.tenant.fullName;
+      const formattedDueDate = dueDate.toLocaleDateString('fil-PH', { year: 'numeric', month: 'long', day: 'numeric' });
+
+      if (tenantEmail) {
+        try {
+          // 1. Ipadala ang unang email: Bill / Invoice Notification (`/notify/bill`)
+          await axios.post(`${API_BASE_URL}/notify/bill`, {
+            tenantName: tenantName,
+            tenantEmail: tenantEmail,
+            landlordName: landlordName,
+            dueDate: formattedDueDate,
+            totalAmount: totalAmount,
+            invoiceNumber: newBill.id,
+            billItems: newBill.items.map(item => ({ type: item.unitLabel, amount: item.amount }))
+          });
+          console.log(`--> Naipadala ang Bill Notification Email kay ${tenantEmail}`);
+
+          // 2. Ipadala ang pangalawang email: Reading Request Notification (`/notify/reading-request`)
+          await axios.post(`${API_BASE_URL}/notify/reading-request`, {
+            tenantName: tenantName,
+            tenantEmail: tenantEmail,
+            landlordName: landlordName,
+            invoiceNumber: newBill.id,
+            dueDate: formattedDueDate,
+            utilityType: "Kuryente at Tubig",
+          });
+          console.log(`--> Naipadala ang Reading Request Email kay ${tenantEmail}`);
+
+        } catch (emailErr) {
+          console.error(`Error sa pagpapadala ng emails kay ${tenantEmail}:`, emailErr);
+        }
+      }
+
+      if (tenantPhone) {
+        try {
+          // 3. Ipadala ang SMS notification via Email-to-SMS gateway
+          const smsMessage = `Paupahan: Nabuo na ang draft bill (${newBill.id}) na nagkakahalaga ng ₱${totalAmount.toLocaleString()}. Mangyaring mag-log in at i-submit ang iyong meter reading. Due: ${formattedDueDate}`;
+          const detectedCarrier = detectCarrier(tenantPhone);
+
+          await axios.post(`${API_BASE_URL}/notify/sms`, {
+            phoneNumber: tenantPhone,
+            carrier: detectedCarrier, 
+            message: smsMessage,
+          });
+          console.log(`--> Naipadala ang SMS notification kay ${tenantPhone}`);
+        } catch (smsErr) {
+          console.error(`Error sa pagpapadala ng SMS kay ${tenantPhone}:`, smsErr);
+        }
+      }
     }
     console.log("-----------------------------------------");
   } catch (error) {
