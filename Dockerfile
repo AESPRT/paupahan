@@ -10,6 +10,12 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
+# 💡 Kopyahin ang prisma config kung mayroon man
+COPY prisma.config.js ./
+
+# 💡 I-generate ang Prisma Client habang nagbi-build para maisama sa node_modules
+RUN npx prisma generate
+
 ENV NEXT_TELEMETRY_DISABLED 1
 RUN npm run build
 
@@ -25,6 +31,10 @@ RUN adduser --system --uid 1001 nextjs
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+
+# 💡 NAPAKAHALAGA: Kopyahin ang prisma folder at config sa runner para mabasa ng client ang schema at enums
+COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
+COPY --from=builder --chown=nextjs:nodejs /app/prisma.config.js ./
 
 USER nextjs
 
