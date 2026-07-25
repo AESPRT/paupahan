@@ -220,7 +220,6 @@ export async function addTenantAction(formData: {
 
     const newTenant = await prisma.tenant.create({
       data: {
-        userId: adminId,
         fullName: formData.fullName,
         email: formData.email,
         phone: formData.phoneNumber,
@@ -373,7 +372,85 @@ export async function updateLeaseStatusAction(tenantId: string, newStatus: "acti
   }
 }
 
-export async function assignAmenitiesToLease(leaseId: string, amenitiesPayload: { amenityId: string; amount: number; quantity?: number }[]) {
+export async function getUnitsAndRoomsForTenantByTenantId(tenantId?: string) {
+  try {
+    const cookieStore = await cookies();
+    const adminId = cookieStore.get("session_user_id")?.value;
+
+    if (!adminId) {
+      return { unitsData: [], amenities: [], currentTenantAmenities: [] };
+    }
+
+    const landlordProperties = await prisma.property.findMany({
+      where: { landlordId: adminId },
+      select: { id: true },
+    });
+    const propertyIds = landlordProperties.map((p) => p.id);
+
+    if (propertyIds.length === 0) {
+      return { unitsData: [], amenities: [], currentTenantAmenities: [] };
+    }
+
+    const units = await prisma.unit.findMany({
+      where: { propertyId: { in: propertyIds } },
+      include: {
+        rooms: {
+          where: tenantId ? {} : { status: 'vacant' },
+          select: { id: true, roomNumber: true, monthlyRent: true, status: true }
+        }
+      }
+    });
+
+    const serializedUnits = units.map((unit) => ({
+      ...unit,
+      rooms: unit.rooms.map((room) => ({
+        ...room,
+        monthlyRent: Number(room.monthlyRent),
+      })),
+    }));
+
+    // 👇 I-filter ang mga amenities para sa mga property lamang ng landlord na ito
+    const amenities = await prisma.amenity.findMany({
+      where: { 
+        isActive: true,
+        propertyId: { in: propertyIds } // Siguraduhing may propertyId field ang iyong Amenity model, o i-adjust base sa schema mo kung paano sila konektado
+      },
+    });
+
+    const serializedAmenities = amenities.map((item) => ({
+      ...item,
+      amount: Number(item.amount),
+    }));
+
+    let currentTenantAmenities: string[] = [];
+    if (tenantId) {
+      const activeLease = await prisma.lease.findFirst({
+        where: { tenantId, status: 'active' },
+        include: { amenities: true },
+      });
+      if (activeLease) {
+        currentTenantAmenities = activeLease.amenities.map((la) => la.amenityId);
+      }
+    }
+
+    return { 
+      unitsData: serializedUnits, 
+      amenities: serializedAmenities, 
+      currentTenantAmenities 
+    };
+  } catch (error) {
+    console.error('Error fetching units and amenities by tenant ID:', error);
+    return { unitsData: [], amenities: [], currentTenantAmenities: [] };
+  }
+}
+
+export async function updateTenantAction(formData: {
+  tenantId: string;
+  fullName: string;
+  email?: string;
+  phoneNumber?: string;
+  amenities?: { amenityId: string; amount: number; quantity?: number }[];
+}): Promise<{ success: boolean; updatedTenant?: Tenant; error?: string }> {
   try {
     const cookieStore = await cookies();
     const adminId = cookieStore.get("session_user_id")?.value;
@@ -382,47 +459,106 @@ export async function assignAmenitiesToLease(leaseId: string, amenitiesPayload: 
       return { success: false, error: "Walang active session." };
     }
 
-    // 1. Seguridad: Suriin kung ang lease ay pag-aari ng landlord na ito
-    const leaseCheck = await prisma.lease.findFirst({
+    const tenantCheck = await prisma.tenant.findFirst({
       where: {
-        id: leaseId,
-        room: {
-          unit: {
-            property: {
-              landlordId: adminId,
-            },
-          },
-        },
+        id: formData.tenantId,
+        leases: {
+          some: {
+            room: {
+              unit: {
+                property: { landlordId: adminId }
+              }
+            }
+          }
+        }
       },
-      select: { id: true },
+      include: {
+        leases: {
+          where: { status: 'active' },
+          take: 1
+        }
+      }
     });
 
-    if (!leaseCheck) {
-      return { success: false, error: "Wala kang pahintulot na baguhin ang lease na ito." };
+    if (!tenantCheck) {
+      return { success: false, error: "Hindi nahanap ang tenant o wala kang pahintulot." };
     }
 
-    // 2. Burahin muna ang lumang nakatalagang amenities ng lease na ito
-    await prisma.leaseAmenity.deleteMany({
-      where: { leaseId },
+    await createAuditLog({
+        actorId: adminId,
+        action: `Nag-update ng impormasyon ng tenant: ${formData.fullName}`,
+        entityType: 'Tenant',
+        entityId: formData.tenantId,
+        metadata: { actionType: 'UPDATE' },
     });
 
-    // 3. I-save ang mga bagong piniling amenities
-    if (amenitiesPayload.length > 0) {
-      const dataToCreate = amenitiesPayload.map((item) => ({
-        leaseId,
-        amenityId: item.amenityId,
-        amount: item.amount,
-        quantity: item.quantity ?? 1,
-      }));
+    await prisma.tenant.update({
+      where: { id: formData.tenantId },
+      data: {
+        fullName: formData.fullName,
+        email: formData.email,
+        phone: formData.phoneNumber,
+      }
+    });
 
-      await prisma.leaseAmenity.createMany({
-        data: dataToCreate,
+    const activeLease = tenantCheck.leases[0];
+    if (activeLease && formData.amenities) {
+      await prisma.leaseAmenity.deleteMany({
+        where: { leaseId: activeLease.id }
       });
+
+      if (formData.amenities.length > 0) {
+        await prisma.leaseAmenity.createMany({
+          data: formData.amenities.map((item) => ({
+            leaseId: activeLease.id,
+            amenityId: item.amenityId,
+            amount: item.amount,
+            quantity: item.quantity ?? 1,
+          })),
+        });
+      }
     }
 
-    return { success: true };
+    const updatedLeaseData = await prisma.lease.findFirst({
+      where: { tenantId: formData.tenantId },
+      include: {
+        tenant: true,
+        room: {
+          include: {
+            unit: { include: { property: true } }
+          }
+        }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    const formattedUpdatedTenant: Tenant | null = updatedLeaseData ? {
+      id: updatedLeaseData.tenant.id,
+      userId: updatedLeaseData.tenant.userId,
+      loginCode: updatedLeaseData.tenant.loginCode,
+      fullName: updatedLeaseData.tenant.fullName,
+      email: updatedLeaseData.tenant.email,
+      phone: updatedLeaseData.tenant.phone,
+      emergencyContactName: updatedLeaseData.tenant.emergencyContactName,
+      emergencyContactPhone: updatedLeaseData.tenant.emergencyContactPhone,
+      createdAt: updatedLeaseData.tenant.createdAt,
+      updatedAt: updatedLeaseData.tenant.updatedAt,
+      unitName: updatedLeaseData.room.unit.name,
+      roomNumber: updatedLeaseData.room.roomNumber,
+      monthlyRent: Number(updatedLeaseData.monthlyRent),
+      depositAmount: Number(updatedLeaseData.depositAmount),
+      leaseStatus: updatedLeaseData.status,
+      paymentStatus: 'paid',
+    } : null;
+
+    revalidatePath('/admin/tenants');
+
+    return { 
+      success: true, 
+      updatedTenant: formattedUpdatedTenant ?? undefined 
+    };
   } catch (error) {
-    console.error("Error assigning amenities to lease:", error);
-    return { success: false, error: "Nabigong i-save ang mga amenities sa lease." };
+    console.error('Error updating tenant:', error);
+    return { success: false, error: 'May naganap na error sa pag-update ng tenant.' };
   }
 }

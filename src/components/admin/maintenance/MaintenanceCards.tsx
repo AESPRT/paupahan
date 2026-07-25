@@ -13,6 +13,10 @@ interface MaintenanceCardsProps {
 export function MaintenanceCards({ requests, onUpdateStatus }: MaintenanceCardsProps) {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   
+  // Pagination State - Nakatakda sa 3 items bawat pahina
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 3; 
+  
   // States para sa pag-handle ng status changes, expenses, at admin remarks per request ID
   const [statusInput, setStatusInput] = useState<{ [key: string]: MaintenanceStatus }>({});
   const [expensesInput, setExpensesInput] = useState<{ [key: string]: string }>({});
@@ -78,11 +82,23 @@ export function MaintenanceCards({ requests, onUpdateStatus }: MaintenanceCardsP
     }
   };
 
+  // Pagination Logic
+  const totalPages = Math.ceil(requests.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const currentRequests = requests.slice(startIndex, startIndex + itemsPerPage);
+
   return (
     <div className="space-y-4">
-      <h2 className="font-mono-brand text-xs font-bold uppercase tracking-wider text-muted">
-        Mga Nakatalang Ulat ng Sira ({requests.length})
-      </h2>
+      <div className="flex items-center justify-between">
+        <h2 className="font-mono-brand text-xs font-bold uppercase tracking-wider text-muted">
+          Mga Nakatalang Ulat ng Sira ({requests.length})
+        </h2>
+        {totalPages > 1 && (
+          <span className="font-mono-brand text-[11px] text-muted">
+            Pahina {currentPage} ng {totalPages}
+          </span>
+        )}
+      </div>
 
       {requests.length === 0 ? (
         <div className="flex items-center justify-center gap-2 rounded-3xl border border-dashed border-line bg-paper-card p-8 text-center text-xs text-muted">
@@ -93,7 +109,7 @@ export function MaintenanceCards({ requests, onUpdateStatus }: MaintenanceCardsP
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {requests.map((req) => {
+          {currentRequests.map((req) => {
             const currentSelectedStatus = statusInput[req.id] || req.status;
             const isResolved = currentSelectedStatus === "Resolved";
             const reqExpenses = (req as any).expenses;
@@ -266,7 +282,6 @@ export function MaintenanceCards({ requests, onUpdateStatus }: MaintenanceCardsP
                       <button
                         type="button"
                         onClick={() => {
-                          // Kumuha direkta mula sa state gamit ang exact req.id
                           const rawExpense = expensesInput[req.id];
                           const expenseVal = rawExpense && rawExpense.trim() !== "" ? parseFloat(rawExpense) : 0;
                           const remarkVal = remarkInput[req.id] ? remarkInput[req.id].trim() : "";
@@ -278,7 +293,7 @@ export function MaintenanceCards({ requests, onUpdateStatus }: MaintenanceCardsP
                             isResolved ? remarkVal : undefined
                           );
                         }}
-                        className="w-full rounded-xl bg-forest py-2 text-center font-mono-brand text-xs font-bold text-white shadow-sm transition-all hover:bg-forest-deep"
+                        className="w-full rounded-xl bg-forest py-2 text-center font-mono-brand text-xs font-bold text-white shadow-sm transition-all hover:bg-forest-deep cursor-pointer"
                       >
                         I-save ang Pagbabago
                       </button>
@@ -295,6 +310,52 @@ export function MaintenanceCards({ requests, onUpdateStatus }: MaintenanceCardsP
         </div>
       )}
 
+      {/* Playful Pagination Controls */}
+      {totalPages > 1 && (
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-line mt-6">
+          <span className="font-mono-brand text-xs text-muted">
+            Nagpapakita ng <span className="font-bold text-forest-deep">{startIndex + 1}</span> hanggang <span className="font-bold text-forest-deep">{Math.min(startIndex + itemsPerPage, requests.length)}</span> sa <span className="font-bold text-forest-deep">{requests.length}</span> ulat
+          </span>
+
+          <div className="flex items-center gap-1.5 bg-paper-card border border-line rounded-2xl p-1.5 shadow-2xs">
+            <button
+              type="button"
+              onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+              disabled={currentPage === 1}
+              className="px-3 py-1.5 rounded-xl font-mono-brand text-xs font-bold text-muted hover:bg-paper disabled:opacity-30 disabled:hover:bg-transparent transition-all cursor-pointer"
+            >
+              ← Nakaraan
+            </button>
+
+            <div className="flex items-center gap-1 px-1 max-w-[200px] overflow-x-auto">
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                <button
+                  key={page}
+                  type="button"
+                  onClick={() => setCurrentPage(page)}
+                  className={`h-8 w-8 shrink-0 rounded-xl font-mono-brand text-xs font-bold transition-all cursor-pointer flex items-center justify-center ${
+                    currentPage === page
+                      ? "bg-forest text-white shadow-sm scale-105"
+                      : "text-muted hover:bg-paper hover:text-forest-deep"
+                  }`}
+                >
+                  {page}
+                </button>
+              ))}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+              disabled={currentPage === totalPages}
+              className="px-3 py-1.5 rounded-xl font-mono-brand text-xs font-bold text-muted hover:bg-paper disabled:opacity-30 disabled:hover:bg-transparent transition-all cursor-pointer"
+            >
+              Sunod →
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Lightbox Modal */}
       {selectedImage && (
         <div 
@@ -304,7 +365,7 @@ export function MaintenanceCards({ requests, onUpdateStatus }: MaintenanceCardsP
           <div className="relative max-h-[90vh] max-w-[90vw] overflow-hidden rounded-2xl bg-paper-card p-2 shadow-2xl">
             <button
               onClick={() => setSelectedImage(null)}
-              className="absolute right-3 top-3 z-10 rounded-full bg-black/60 p-2 text-white hover:bg-black"
+              className="absolute right-3 top-3 z-10 rounded-full bg-black/60 p-2 text-white hover:bg-black cursor-pointer"
             >
               <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />

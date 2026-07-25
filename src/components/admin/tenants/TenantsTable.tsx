@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Tenant, LeaseStatus, BillStatus } from "@/src/types/tenant/tenant";
 import { updateLeaseStatusAction } from "@/src/actions/tenants-actions";
@@ -8,14 +8,34 @@ import { updateLeaseStatusAction } from "@/src/actions/tenants-actions";
 interface TenantsTableProps {
   tenants: Tenant[];
   onSelectTenant: (tenant: Tenant) => void;
+  onEditTenant: (tenant: Tenant) => void;
 }
 
-export function TenantsTable({ tenants, onSelectTenant }: TenantsTableProps) {
+export function TenantsTable({ tenants, onSelectTenant, onEditTenant }: TenantsTableProps) {
   const router = useRouter();
   
+  // States para sa pagination at responsive itemsPerPage (3 kapag mobile, 5 kapag desktop)
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(3);
+
   // Gamitin ang local override states para sa instant UI feedback habang umaasa sa prop para sa main data
   const [statusOverrides, setStatusOverrides] = useState<Record<string, LeaseStatus>>({});
   const [loadingTenantId, setLoadingTenantId] = useState<string | null>(null);
+
+  // I-detect ang screen size para i-set ang itemsPerPage (3 sa mobile, 5 sa md pataas)
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth >= 768) { // md breakpoint sa Tailwind (768px)
+        setItemsPerPage(5);
+      } else {
+        setItemsPerPage(3);
+      }
+    };
+
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   const getStatusBadge = (status: LeaseStatus) => {
     switch (status) {
@@ -48,10 +68,26 @@ export function TenantsTable({ tenants, onSelectTenant }: TenantsTableProps) {
   };
 
   // Pagsamahin ang prop data at ang local overrides para laging updated
-  const displayTenants = tenants.map((tenant) => ({
-    ...tenant,
-    leaseStatus: statusOverrides[tenant.id] ?? tenant.leaseStatus,
-  }));
+  const displayTenants = useMemo(() => {
+    return tenants.map((tenant) => ({
+      ...tenant,
+      leaseStatus: statusOverrides[tenant.id] ?? tenant.leaseStatus,
+    }));
+  }, [tenants, statusOverrides]);
+
+  // Kalkulahin ang pagination
+  const totalPages = Math.ceil(displayTenants.length / itemsPerPage);
+  
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const currentTenants = displayTenants.slice(startIndex, startIndex + itemsPerPage);
+
+  const handlePrevPage = () => {
+    if (currentPage > 1) setCurrentPage(currentPage - 1);
+  };
+
+  const handleNextPage = () => {
+    if (currentPage < totalPages) setCurrentPage(currentPage + 1);
+  };
 
   const handleStatusChange = async (tenantId: string, newStatus: LeaseStatus) => {
     try {
@@ -65,14 +101,12 @@ export function TenantsTable({ tenants, onSelectTenant }: TenantsTableProps) {
       
       if (!result.success) {
         alert(result.error || "Nabigo sa pag-update ng status.");
-        // Ibalik sa dati kung nagka-error
         setStatusOverrides((prev) => {
           const copy = { ...prev };
           delete copy[tenantId];
           return copy;
         });
       } else {
-        // 3. I-refresh ang Next.js server data cache
         router.refresh();
       }
     } catch (error) {
@@ -102,7 +136,7 @@ export function TenantsTable({ tenants, onSelectTenant }: TenantsTableProps) {
       {/* 1. MOBILE VIEW: Stacked Cards (Lalabas lang sa Mobile Screen < md) */}
       {/* ----------------------------------------------------------------- */}
       <div className="grid grid-cols-1 gap-3 md:hidden">
-        {displayTenants.map((tenant) => (
+        {currentTenants.map((tenant) => (
           <div
             key={tenant.id}
             onClick={() => onSelectTenant(tenant)}
@@ -148,21 +182,26 @@ export function TenantsTable({ tenants, onSelectTenant }: TenantsTableProps) {
               </div>
             </div>
 
-            {/* Footer: Payment Status & Button */}
+            {/* Footer: Payment Status & Action Buttons */}
             <div className="flex items-center justify-between pt-1">
               <span className={`rounded-full px-2.5 py-0.5 font-mono-brand text-[10px] font-bold uppercase ${getPaymentBadge(tenant.paymentStatus)}`}>
                 Bayad: {tenant.paymentStatus}
               </span>
 
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onSelectTenant(tenant);
-                }}
-                className="rounded-lg border border-line bg-paper px-3 py-1 text-[11px] font-bold text-forest-deep hover:bg-paper-card cursor-pointer"
-              >
-                Tignan Details
-              </button>
+              <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                <button
+                  onClick={() => onEditTenant(tenant)}
+                  className="rounded-lg border border-forest/30 bg-forest/5 px-3 py-1 text-[11px] font-bold text-forest hover:bg-forest/10 cursor-pointer"
+                >
+                  I-edit
+                </button>
+                <button
+                  onClick={() => onSelectTenant(tenant)}
+                  className="rounded-lg border border-line bg-paper px-3 py-1 text-[11px] font-bold text-forest-deep hover:bg-paper-card cursor-pointer"
+                >
+                  Tignan
+                </button>
+              </div>
             </div>
           </div>
         ))}
@@ -185,7 +224,7 @@ export function TenantsTable({ tenants, onSelectTenant }: TenantsTableProps) {
               </tr>
             </thead>
             <tbody className="divide-y divide-line/60">
-              {displayTenants.map((tenant) => (
+              {currentTenants.map((tenant) => (
                 <tr
                   key={tenant.id}
                   className="transition-colors hover:bg-paper/60 cursor-pointer"
@@ -227,12 +266,20 @@ export function TenantsTable({ tenants, onSelectTenant }: TenantsTableProps) {
                     </span>
                   </td>
                   <td className="px-5 py-4 text-right" onClick={(e) => e.stopPropagation()}>
-                    <button
-                      onClick={() => onSelectTenant(tenant)}
-                      className="rounded-lg border border-line px-3 py-1.5 text-[11px] font-bold text-forest-deep hover:bg-paper cursor-pointer"
-                    >
-                      Tignan
-                    </button>
+                    <div className="flex items-center justify-end gap-2">
+                      <button
+                        onClick={() => onEditTenant(tenant)}
+                        className="rounded-lg border border-forest/30 bg-forest/5 px-3 py-1.5 text-[11px] font-bold text-forest hover:bg-forest/10 cursor-pointer"
+                      >
+                        I-edit
+                      </button>
+                      <button
+                        onClick={() => onSelectTenant(tenant)}
+                        className="rounded-lg border border-line px-3 py-1.5 text-[11px] font-bold text-forest-deep hover:bg-paper cursor-pointer"
+                      >
+                        Tignan
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -240,6 +287,45 @@ export function TenantsTable({ tenants, onSelectTenant }: TenantsTableProps) {
           </table>
         </div>
       </div>
+
+      {/* ----------------------------------------------------------------- */}
+      {/* 3. PLAYFUL PAGINATION CONTROLS                                    */}
+      {/* ----------------------------------------------------------------- */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between rounded-2xl border border-line bg-paper-card px-4 sm:px-6 py-3 shadow-sm">
+          <button
+            onClick={handlePrevPage}
+            disabled={currentPage === 1}
+            className={`group flex items-center gap-1.5 sm:gap-2 rounded-xl px-3 sm:px-4 py-2 font-mono-brand text-xs font-bold transition-all ${
+              currentPage === 1
+                ? "cursor-not-allowed opacity-40 bg-line/20 text-muted"
+                : "bg-forest/10 text-forest hover:bg-forest hover:text-white active:scale-95"
+            }`}
+          >
+            <span className="transition-transform group-hover:-translate-x-0.5">←</span> Nakaraan
+          </button>
+
+          <div className="flex items-center gap-2 font-mono-brand text-xs font-bold text-forest-deep">
+            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-forest text-white shadow-sm">
+              {currentPage}
+            </span>
+            <span className="text-muted">ng</span>
+            <span className="rounded-lg bg-line/40 px-2 py-1 text-ink">{totalPages}</span>
+          </div>
+
+          <button
+            onClick={handleNextPage}
+            disabled={currentPage === totalPages}
+            className={`group flex items-center gap-1.5 sm:gap-2 rounded-xl px-3 sm:px-4 py-2 font-mono-brand text-xs font-bold transition-all ${
+              currentPage === totalPages
+                ? "cursor-not-allowed opacity-40 bg-line/20 text-muted"
+                : "bg-forest/10 text-forest hover:bg-forest hover:text-white active:scale-95"
+            }`}
+          >
+            Susunod <span className="transition-transform group-hover:translate-x-0.5">→</span>
+          </button>
+        </div>
+      )}
     </div>
   );
 }

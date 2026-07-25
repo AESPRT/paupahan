@@ -27,12 +27,19 @@ export interface SubscriptionPlan {
 }
 
 export interface CurrentSubscription {
+  userId: string;        // 👈 Idagdag ito
+  userName?: string;     // 👈 Idagdag ito
+  userEmail?: string;    // 👈 Idagdag ito
+  userPhone?: string;    // 👈 Idagdag ito
   planName: PlanTier;
   status: "Active" | "Past Due" | "Trialing" | "Canceled";
+  autoRenew: boolean;
   renewsOn: string;
   paymentMethod: string;
+  paymentNumber?: string; // Idinagdag
+  paymentMethodId?: string;
   unitsUsed: number;
   maxUnitsLimit: number;
-  roomsUsed: number;     // 👈 Idagdag ito para sa real-time counter ng rooms
-  maxRoomLimit: number;  // 👈 Idagdag ito para sa room limit
+  roomsUsed: number;     
+  maxRoomLimit: number;  
 }

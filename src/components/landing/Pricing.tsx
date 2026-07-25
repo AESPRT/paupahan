@@ -4,7 +4,7 @@
 import { useState, FormEvent } from "react";
 import { Button } from "./Button";
 import { PLANS } from "@/src/data/subscription";
-import axios from "axios";
+import { createCheckoutSession, submitCustomInquiry } from "@/src/actions/subscription";
 
 function CardDots({ featured, free }: { featured: boolean; free: boolean }) {
   const circleCls = featured
@@ -25,7 +25,7 @@ export function Pricing() {
   const [showAll, setShowAll] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<any>(null);
   
-  // State para sa Custom / Eksklusibo Modal
+  // Custom Modal State
   const [showCustomModal, setShowCustomModal] = useState(false);
   const [customName, setCustomName] = useState("");
   const [customEmail, setCustomEmail] = useState("");
@@ -36,6 +36,7 @@ export function Pricing() {
 
   const [billingCycle] = useState<"MONTHLY" | "ANNUAL">("MONTHLY");
   
+  // Checkout Form State
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
@@ -50,25 +51,20 @@ export function Pricing() {
     setErrorMsg("");
 
     try {
-      const response = await axios.post("https://api.aesprt.com/v1/paupahan-payments/checkout", {
-        userId: `USR-${Date.now()}`, 
-        packageId: selectedPlan.name, 
+      const checkoutUrl = await createCheckoutSession({
+        userId: `USR-${Date.now()}`,
+        packageId: selectedPlan.name,
         cycle: billingCycle,
         cusName: name,
         cusEmail: email,
         cusPhone: phone,
         successUrl: `${window.location.origin}/admin/register?plan=${selectedPlan.name}`,
-        cancelUrl: `${window.location.origin}/#pricing`
+        cancelUrl: `${window.location.origin}/#pricing`,
       });
 
-      const data = response.data;
-
-      if (data && data.checkoutUrl) {
-        window.location.href = data.checkoutUrl;
-      }
+      window.location.href = checkoutUrl;
     } catch (err: any) {
-      const errorMessage = err.response?.data?.error || err.message || "May nangyaring error sa pag-checkout.";
-      setErrorMsg(errorMessage);
+      setErrorMsg(err.message);
       setLoading(false);
     }
   };
@@ -79,7 +75,7 @@ export function Pricing() {
     setCustomError("");
 
     try {
-      await axios.post("https://api.aesprt.com/v1/paupahan-payments/custom-inquiry", {
+      await submitCustomInquiry({
         name: customName,
         email: customEmail,
         message: customMessage,
@@ -87,10 +83,9 @@ export function Pricing() {
       });
 
       setCustomSuccess(true);
-      setCustomLoading(false);
     } catch (err: any) {
-      const errorMessage = err.response?.data?.error || err.message || "Nabigong maipadala ang mensahe. Subukan muli.";
-      setCustomError(errorMessage);
+      setCustomError(err.message);
+    } finally {
       setCustomLoading(false);
     }
   };
@@ -113,7 +108,7 @@ export function Pricing() {
         {/* Cards grid */}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3 lg:gap-6">
           {PLANS.map((plan, i) => {
-            const isHiddenOnDesktop = !showAll && i >= 3;
+            const isHidden = !showAll && i >= 3;
             const isFree = plan.priceMonthly === 0 && plan.priceDisplay === "₱0";
             
             const isCustomPlan = 
@@ -126,7 +121,7 @@ export function Pricing() {
               <div
                 key={plan.name}
                 className={`relative flex flex-col rounded-2xl border-[1.5px] p-5 pb-6 sm:p-[22px] sm:pb-6 ${
-                  isHiddenOnDesktop ? "hidden lg:hidden" : "flex"
+                  isHidden ? "hidden" : "flex"
                 } ${
                   plan.isPopular
                     ? "border-forest bg-forest text-white shadow-[0_20px_44px_rgba(31,75,63,0.30)] lg:-translate-y-2"
@@ -160,14 +155,20 @@ export function Pricing() {
                   {plan.per && <span className={`text-[13px] ${plan.isPopular ? "text-white/60" : "text-muted"}`}>{plan.per}</span>}
                 </div>
 
+                {/* Feature List (kasama na ang included at missing/excluded features) */}
                 <ul className={`mt-4 mb-5 flex flex-1 flex-col gap-2.5 border-t-[1.5px] border-dashed pt-4 ${plan.isPopular ? "border-white/20" : "border-line"}`}>
                   {plan.features.map((perk) => (
                     <li key={perk} className={`flex items-start gap-2.5 text-[13px] leading-snug ${plan.isPopular ? "text-white/85" : "text-ink"}`}>
-                      {/* SVG Checkmark Icon */}
                       <svg className={`mt-0.5 h-4 w-4 shrink-0 ${plan.isPopular ? "text-marigold" : "text-forest"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                       </svg>
                       <span>{perk}</span>
+                    </li>
+                  ))}
+                  {plan.missing && plan.missing.map((miss) => (
+                    <li key={miss} className={`flex items-start gap-2.5 text-[13px] leading-snug line-through ${plan.isPopular ? "text-white/40" : "text-muted/60"}`}>
+                      <span className={`mt-0.5 shrink-0 ${plan.isPopular ? "text-white/30" : "text-muted/40"}`}>✕</span>
+                      <span>{miss}</span>
                     </li>
                   ))}
                 </ul>
@@ -198,10 +199,9 @@ export function Pricing() {
           <div className="mt-10 text-center">
             <button
               onClick={() => setShowAll(!showAll)}
-              className="inline-flex items-center gap-2 rounded-xl border-[1.5px] border-line bg-paper-card px-6 py-3 font-mono-brand text-[13px] font-semibold text-forest-deep shadow-[0_4px_12px_rgba(27,58,52,0.06)] hover:bg-forest/[0.04] transition-colors"
+              className="inline-flex items-center gap-2 rounded-xl border-[1.5px] border-line bg-paper-card px-6 py-3 font-mono-brand text-[13px] font-semibold text-forest-deep shadow-[0_4px_12px_rgba(27,58,52,0.06)] hover:bg-forest/[0.04] transition-colors cursor-pointer"
             >
               <span>{showAll ? "Itago ang ibang plano" : `Tingnan ang iba pang plano (${PLANS.length - 3})`}</span>
-              {/* SVG Chevron Icon */}
               <svg className={`h-4 w-4 transition-transform duration-200 ${showAll ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
               </svg>
@@ -210,7 +210,7 @@ export function Pricing() {
         )}
       </div>
 
-      {/* PLAYFUL & MODERN PAYMENT MODAL (For regular paid plans) */}
+      {/* CHECKOUT MODAL */}
       {selectedPlan && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-forest-deep/60 p-4 backdrop-blur-sm animate-fade-in">
           <div className="relative w-full max-w-md overflow-hidden rounded-3xl border-[1.5px] border-line bg-paper-card p-6 shadow-[0_24px_60px_rgba(27,58,52,0.25)] sm:p-8">
@@ -225,10 +225,8 @@ export function Pricing() {
                 <button 
                   type="button" 
                   onClick={() => setSelectedPlan(null)}
-                  className="rounded-full p-1.5 text-muted hover:bg-line/40 hover:text-forest-deep transition-colors"
-                  aria-label="Isara"
+                  className="rounded-full p-1.5 text-muted hover:bg-line/40 hover:text-forest-deep transition-colors cursor-pointer"
                 >
-                  {/* SVG Close Icon */}
                   <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                   </svg>
@@ -295,7 +293,7 @@ export function Pricing() {
                   <button 
                     type="button" 
                     onClick={() => setSelectedPlan(null)} 
-                    className="flex-1 rounded-xl border-[1.5px] border-line py-3 text-sm font-semibold text-muted hover:bg-line/30 hover:text-forest-deep transition-all"
+                    className="flex-1 rounded-xl border-[1.5px] border-line py-3 text-sm font-semibold text-muted hover:bg-line/30 hover:text-forest-deep transition-all cursor-pointer"
                   >
                     Kanselahin
                   </button>
@@ -337,10 +335,8 @@ export function Pricing() {
                     setShowCustomModal(false);
                     setCustomSuccess(false);
                   }}
-                  className="rounded-full p-1.5 text-muted hover:bg-line/40 hover:text-forest-deep transition-colors"
-                  aria-label="Isara"
+                  className="rounded-full p-1.5 text-muted hover:bg-line/40 hover:text-forest-deep transition-colors cursor-pointer"
                 >
-                  {/* SVG Close Icon */}
                   <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                   </svg>
@@ -350,7 +346,6 @@ export function Pricing() {
               {customSuccess ? (
                 <div className="py-8 text-center space-y-4">
                   <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-forest/10 text-forest">
-                    {/* SVG Checkmark Success Icon */}
                     <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                     </svg>
@@ -437,7 +432,7 @@ export function Pricing() {
                       <button 
                         type="button" 
                         onClick={() => setShowCustomModal(false)} 
-                        className="flex-1 rounded-xl border-[1.5px] border-line py-3 text-sm font-semibold text-muted hover:bg-line/30 hover:text-forest-deep transition-all"
+                        className="flex-1 rounded-xl border-[1.5px] border-line py-3 text-sm font-semibold text-muted hover:bg-line/30 hover:text-forest-deep transition-all cursor-pointer"
                       >
                         Kanselahin
                       </button>

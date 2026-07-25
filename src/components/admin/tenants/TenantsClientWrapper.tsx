@@ -20,10 +20,12 @@ export default function TenantsClientWrapper({ initialTenants }: TenantsClientWr
   const [paymentFilter, setPaymentFilter] = useState<BillStatus | "All">("All");
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [tenantToEdit, setTenantToEdit] = useState<Tenant | null>(null); // State para sa tenant na ine-edit
+
   const [selectedTenant, setSelectedTenant] = useState<Tenant | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
 
-  // Filtering Logic na naka-align sa bagong keys
+  // Filtering Logic
   const filteredTenants = tenants.filter((tenant) => {
     const matchesSearch =
       tenant.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -39,13 +41,33 @@ export default function TenantsClientWrapper({ initialTenants }: TenantsClientWr
   const activeCount = tenants.filter((t) => t.leaseStatus === "active").length;
   const overdueCount = tenants.filter((t) => t.paymentStatus === "overdue").length;
 
-  const handleTenantAdded = (newTenant: Tenant) => {
-    setTenants((prevTenants) => [newTenant, ...prevTenants]);
+  const handleTenantSaved = (savedTenant: Tenant) => {
+    setTenants((prevTenants) => {
+      const exists = prevTenants.some((t) => t.id === savedTenant.id);
+      if (exists) {
+        // Kung na-update, i-replace ang lumang data
+        return prevTenants.map((t) => (t.id === savedTenant.id ? savedTenant : t));
+      }
+      // Kung bago, idagdag sa unahan
+      return [savedTenant, ...prevTenants];
+    });
   };
 
   const handleSelectTenant = (tenant: Tenant) => {
     setSelectedTenant(tenant);
     setIsDetailModalOpen(true);
+  };
+
+  // Function para buksan ang modal para sa pag-edit
+  const handleOpenEditModal = (tenant: Tenant) => {
+    setTenantToEdit(tenant);
+    setIsAddModalOpen(true);
+  };
+
+  // Function para buksan ang modal para sa pagdaragdag ng bago
+  const handleOpenAddModal = () => {
+    setTenantToEdit(null);
+    setIsAddModalOpen(true);
   };
 
   return (
@@ -54,7 +76,7 @@ export default function TenantsClientWrapper({ initialTenants }: TenantsClientWr
         totalTenants={tenants.length}
         activeCount={activeCount}
         overdueCount={overdueCount}
-        onAddTenant={() => setIsAddModalOpen(true)}
+        onAddTenant={handleOpenAddModal}
       />
 
       <TenantsFilter
@@ -69,12 +91,17 @@ export default function TenantsClientWrapper({ initialTenants }: TenantsClientWr
       <TenantsTable
         tenants={filteredTenants}
         onSelectTenant={handleSelectTenant}
+        onEditTenant={handleOpenEditModal} // I-pass ito sa table kung mayroon kang edit button doon
       />
 
       <AddTenantModal
         isOpen={isAddModalOpen}
-        onClose={() => setIsAddModalOpen(false)}
-        onTenantAdded={handleTenantAdded}
+        onClose={() => {
+          setIsAddModalOpen(false);
+          setTenantToEdit(null);
+        }}
+        onTenantSaved={handleTenantSaved}
+        tenantToEdit={tenantToEdit}
       />
 
       <TenantDetailModal

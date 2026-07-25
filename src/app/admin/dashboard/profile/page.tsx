@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { ProfileClientView } from "@/src/components/admin/profile/ProfileClientView";
 import { AdminProfileData } from "@/src/types/admin/profile";
 import { logoutUser } from "@/src/actions/auth-actions";
-import { getUserAuditLogs } from "@/src/actions/audit-actions"; // ✨ Import ang audit log action
+import { getUserAuditLogs } from "@/src/actions/audit-actions";
 
 export default async function ProfilePage() {
   const cookieStore = await cookies();
@@ -14,11 +14,25 @@ export default async function ProfilePage() {
     redirect("/admin/login");
   }
 
-  // Kunin ang totoong impormasyon ng user mula sa database
+  // Kunin ang user pati na ang mga properties at mga unit/rooms nito
   const user = await prisma.user.findUnique({
     where: { id: userId },
     include: {
-      properties: true,
+      properties: {
+        include: {
+          units: {
+            include: {
+              rooms: {
+                include: {
+                  leases: {
+                    where: { status: "active" },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
     },
   });
 
@@ -27,6 +41,22 @@ export default async function ProfilePage() {
   }
 
   const managedPropertiesCount = user.properties.length;
+
+  // ✨ Kalkulahin ang total rooms at active tenants mula sa mga property ng landlord na ito
+  let totalRoomsCount = 0;
+  let activeTenantsCount = 0;
+
+  user.properties.forEach((property) => {
+    property.units.forEach((unit) => {
+      totalRoomsCount += unit.rooms.length;
+      unit.rooms.forEach((room) => {
+        // Kung ang kwarto ay may active lease, ibig sabihin ay may active tenant ito
+        if (room.leases && room.leases.length > 0) {
+          activeTenantsCount += room.leases.length;
+        }
+      });
+    });
+  });
   
   const joinedDate = new Intl.DateTimeFormat("fil-PH", {
     month: "long",
@@ -41,17 +71,17 @@ export default async function ProfilePage() {
     phone: user.phone || "Walang numero",
     joinedDate: joinedDate,
     managedPropertiesCount: managedPropertiesCount,
-    totalRoomsCount: 0,
-    activeTenantsCount: 0,
+    totalRoomsCount: totalRoomsCount,       // ✨ Dynamic na total rooms
+    activeTenantsCount: activeTenantsCount, // ✨ Dynamic na active tenants
   };
 
-  // 🌟 Kunin na ang totoong dynamic logs mula sa database gamit ang user id
+  // Kunin ang totoong dynamic logs mula sa database gamit ang user id
   const logs = await getUserAuditLogs(user.id);
 
   return (
     <ProfileClientView
       profileData={profileData}
-      mockLogs={logs} // Ipasa ang totoong logs sa client view
+      mockLogs={logs}
       onConfirmLogout={logoutUser}
     />
   );

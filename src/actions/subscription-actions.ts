@@ -1,8 +1,8 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 'use server'
 
 import { cookies } from "next/headers";
 import prisma from "@/src/lib/prisma";
+import { PlanTier } from "@prisma/client";
 
 export async function getAdminSubscriptionData() {
   try {
@@ -13,26 +13,28 @@ export async function getAdminSubscriptionData() {
       return { success: false, error: "Walang active session." };
     }
 
-    // 1. Kunin ang subscription ng landlord sa database
+    const user = await prisma.user.findUnique({
+      where: { id: landlordId },
+    });
+
     let subscription = await prisma.subscription.findUnique({
       where: { landlordId },
     });
 
-    // Kung wala pang record, gawan natin ng default (Panimula tier)
     if (!subscription) {
       subscription = await prisma.subscription.create({
         data: {
           landlordId,
-          planTier: "panimula",
+          planTier: PlanTier.panimula,
           status: "active",
           maxUnitsLimit: 1,
           maxRoomLimit: 3,
           paymentMethod: "GCash",
+          autoRenew: true, // Default value
         },
       });
     }
 
-    // 2. Bilangin ang kabuuang units at rooms sa lahat ng properties ng landlord
     const properties = await prisma.property.findMany({
       where: { landlordId },
       include: {
@@ -54,17 +56,20 @@ export async function getAdminSubscriptionData() {
       });
     });
 
-    // I-map ang plan tier sa pangalang nakasanayan sa UI
-    const planNameMap: Record<string, string> = {
-      panimula: "Panimula",
-      bahay_upa: "Bahay-Upa",
-      maalam: "Maalam",
-      negosyante: "Negosyante",
-      custom: "Ayon sa'yo",
+    const planNameMap: Record<PlanTier, string> = {
+      [PlanTier.panimula]: "Silong",
+      [PlanTier.bahay_upa]: "Bahay-Upa",
+      [PlanTier.maalam]: "Pasilidad",
+      [PlanTier.negosyante]: "Kompleto",
+      [PlanTier.custom]: "Eksklusibo",
     };
 
     const formattedSubscription = {
-      planName: planNameMap[subscription.planTier] || "Panimula",
+      userId: landlordId,                              
+      userName: user?.fullName || "",     
+      userEmail: user?.email || "",                     
+      userPhone: user?.phone || "",
+      planName: planNameMap[subscription.planTier] || "Silong",
       status: 
         subscription.status === "active" ? "Active" : 
         subscription.status === "past_due" ? "Past Due" : 
@@ -73,10 +78,12 @@ export async function getAdminSubscriptionData() {
         ? new Date(subscription.renewsOn).toLocaleDateString("en-US", { month: 'long', day: 'numeric', year: 'numeric' })
         : "Wala pang petsa",
       paymentMethod: subscription.paymentMethod || "GCash",
-      unitsUsed: totalUnits,         // 👈 Bilang ng nagawang units
+      paymentMethodId: subscription.paymentMethodId || "",
+      autoRenew: subscription.autoRenew ?? true, // Ipinapasa na natin ito patungo sa UI
+      unitsUsed: totalUnits,         
       maxUnitsLimit: subscription.maxUnitsLimit,
-      roomsUsed: totalRooms,         // 👈 Bilang ng nagawang rooms
-      maxRoomLimit: subscription.maxRoomLimit, // 👈 Limit ng rooms base sa plan
+      roomsUsed: totalRooms,         
+      maxRoomLimit: subscription.maxRoomLimit, 
     };
 
     return { success: true, subscription: formattedSubscription };
@@ -86,7 +93,6 @@ export async function getAdminSubscriptionData() {
   }
 }
 
-// Server Action para sa pag-upgrade ng plan (Tumatanggap na ngayon ng maxUnits at maxRooms)
 export async function updateLandlordSubscriptionAction(
   newPlanTier: string, 
   maxUnits: number, 
@@ -100,23 +106,29 @@ export async function updateLandlordSubscriptionAction(
       return { success: false, error: "Walang active session." };
     }
 
-    // I-convert ang pangalan patungong enum format ng database
-    const tierMapping: Record<string, any> = {
-      "Panimula": "panimula",
-      "Bahay-Upa": "bahay_upa",
-      "Maalam": "maalam",
-      "Negosyante": "negosyante",
-      "Ayon sa'yo": "custom",
+    const tierMapping: Record<string, PlanTier> = {
+      "panimula": PlanTier.panimula,
+      "bahay_upa": PlanTier.bahay_upa,
+      "maalam": PlanTier.maalam,
+      "negosyante": PlanTier.negosyante,
+      "custom": PlanTier.custom,
+
+      "Silong": PlanTier.panimula,
+      "Bahay-Upa": PlanTier.bahay_upa,
+      "Pasilidad": PlanTier.maalam,
+      "Kompleto": PlanTier.negosyante,
+      "Eksklusibo": PlanTier.custom,
     };
 
-    const dbTier = tierMapping[newPlanTier] || "panimula";
+    const trimmedTier = newPlanTier.trim();
+    const dbTier = tierMapping[trimmedTier] || PlanTier.panimula;
 
     await prisma.subscription.update({
       where: { landlordId },
       data: {
         planTier: dbTier,
         maxUnitsLimit: maxUnits,
-        maxRoomLimit: maxRooms, // 👈 Na-save na nang diretso ang bagong room limit
+        maxRoomLimit: maxRooms, 
         status: "active",
         renewsOn: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // +30 days
       },
@@ -126,5 +138,67 @@ export async function updateLandlordSubscriptionAction(
   } catch (error) {
     console.error("Error updating subscription:", error);
     return { success: false, error: "Nabigong i-update ang subscription." };
+  }
+}
+
+// Bagong Server Action para i-update ang Auto-Renew status
+export async function updateAutoRenewAction(autoRenew: boolean) {
+  try {
+    const cookieStore = await cookies();
+    const landlordId = cookieStore.get("session_user_id")?.value;
+
+    if (!landlordId) {
+      return { success: false, error: "Walang active session." };
+    }
+
+    await prisma.subscription.upsert({
+      where: { landlordId },
+      update: { autoRenew },
+      create: {
+        landlordId,
+        planTier: PlanTier.panimula,
+        status: "active",
+        autoRenew,
+        maxUnitsLimit: 1,
+        maxRoomLimit: 3,
+        paymentMethod: "GCash",
+      },
+    });
+
+    return { success: true };
+  } catch (error) {
+    // I-print ang totoong error sa terminal/server console
+    console.error("DETALYADONG ERROR SA AUTO-RENEW:", error);
+    return { success: false, error: error instanceof Error ? error.message : "Nabigong i-update ang auto-renew status." };
+  }
+}
+
+// Bagong Server Action para i-update ang Payment Method (hal. pagkatapos mag-link sa PayMongo)
+export async function updatePaymentMethodAction(
+  paymentMethod: string, 
+  paymentNumber: string, 
+  paymentMethodId?: string
+) {
+  try {
+    const cookieStore = await cookies();
+    const landlordId = cookieStore.get("session_user_id")?.value;
+
+    if (!landlordId) {
+      return { success: false, error: "Walang active session." };
+    }
+
+    await prisma.subscription.update({
+      where: { landlordId },
+      data: { 
+        paymentMethod,
+        paymentNumber,
+        ...(paymentMethodId ? { paymentMethodId } : {})
+      },
+    });
+
+    return { success: true };
+  } catch (error) {
+    console.error("Error updating payment method:", error);
+    return { success: false, error: "Nabigong i-update ang payment method." };
   }
 }

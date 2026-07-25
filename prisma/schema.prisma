@@ -381,16 +381,19 @@ model AuditLog {
 }
 
 model Subscription {
-  id            String             @id @default(uuid())
-  landlordId    String             @unique @map("landlord_id")
-  planTier      PlanTier           @default(panimula) @map("plan_tier")
-  status        SubscriptionStatus @default(trialing)
-  renewsOn      DateTime?          @map("renews_on")
-  paymentMethod String?            @map("payment_method")
-  maxUnitsLimit Int                @default(1) @map("max_units_limit")
-  maxRoomLimit  Int                @default(3) @map("max_room_limit")
-  createdAt     DateTime           @default(now()) @map("created_at")
-  updatedAt     DateTime           @updatedAt @map("updated_at")
+  id              String             @id @default(uuid())
+  landlordId      String             @unique @map("landlord_id")
+  planTier        PlanTier           @default(panimula) @map("plan_tier")
+  status          SubscriptionStatus @default(trialing)
+  renewsOn        DateTime?          @map("renews_on")
+  paymentMethod   String?            @map("payment_method") // Halimbawa: "gcash" o "card"
+  paymentNumber   String?            @map("payment_number") // Para sa GCash number o Card details
+  paymentMethodId String?            @map("payment_method_id") // ID mula sa PayMongo
+  autoRenew       Boolean            @default(true) @map("auto_renew")
+  maxUnitsLimit   Int                @default(1) @map("max_units_limit")
+  maxRoomLimit    Int                @default(3) @map("max_room_limit")
+  createdAt       DateTime           @default(now()) @map("created_at")
+  updatedAt       DateTime           @updatedAt @map("updated_at")
 
   landlord User @relation(fields: [landlordId], references: [id], onDelete: Cascade)
 

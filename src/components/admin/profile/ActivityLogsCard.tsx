@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { ActivityLog } from "@/src/types/admin/profile";
 
 interface ActivityLogsCardProps {
@@ -7,6 +8,9 @@ interface ActivityLogsCardProps {
 }
 
 export function ActivityLogsCard({ logs }: ActivityLogsCardProps) {
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 5; // Pwede mong baguhin kung ilang logs bawat pahina
+
   const getBadgeStyle = (category: ActivityLog["category"]) => {
     switch (category) {
       case "Billing":
@@ -19,6 +23,23 @@ export function ActivityLogsCard({ logs }: ActivityLogsCardProps) {
         return "bg-purple-50 text-purple-700 border-purple-200";
       default:
         return "bg-gray-50 text-gray-700 border-gray-200";
+    }
+  };
+
+  // Kalkulahin ang mga logs para sa kasalukuyang pahina
+  const totalPages = Math.ceil(logs.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const currentLogs = logs.slice(startIndex, startIndex + itemsPerPage);
+
+  const handlePrevPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1);
+    }
+  };
+
+  const handleNextPage = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(currentPage + 1);
     }
   };
 
@@ -41,7 +62,7 @@ export function ActivityLogsCard({ logs }: ActivityLogsCardProps) {
             Walang kamakailang aktibidad na naitala.
           </div>
         ) : (
-          logs.map((log) => (
+          currentLogs.map((log) => (
             <div
               key={log.id}
               className="flex flex-col gap-1.5 rounded-2xl border border-line/60 bg-paper p-3 transition-colors hover:bg-paper/80 sm:flex-row sm:items-center sm:justify-between sm:p-3.5"
@@ -85,6 +106,33 @@ export function ActivityLogsCard({ logs }: ActivityLogsCardProps) {
           ))
         )}
       </div>
+
+      {/* Pagination Controls */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between pt-2 border-t border-line text-xs">
+          <span className="text-[11px] text-muted font-mono-brand">
+            Pahina {currentPage} ng {totalPages}
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handlePrevPage}
+              disabled={currentPage === 1}
+              className="rounded-xl border border-line px-3 py-1.5 font-bold text-muted hover:bg-paper disabled:opacity-40 transition-all cursor-pointer"
+            >
+              Nakaraan
+            </button>
+            <button
+              type="button"
+              onClick={handleNextPage}
+              disabled={currentPage === totalPages}
+              className="rounded-xl border border-line px-3 py-1.5 font-bold text-muted hover:bg-paper disabled:opacity-40 transition-all cursor-pointer"
+            >
+              Sunod
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
