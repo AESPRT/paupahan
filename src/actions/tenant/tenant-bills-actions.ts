@@ -197,10 +197,12 @@ export async function updateTenantUtilityReadingAction(
 
     let totalUtilityAmount = 0;
     updatedItems.forEach((item) => {
-      if (item.type === utilityType) {
-        totalUtilityAmount += newUtilityAmount;
-      } else {
-        totalUtilityAmount += Number(item.amount);
+      if (item.type === "electricity" || item.type === "water" || item.type === "amenities") {
+        if (item.type === utilityType) {
+          totalUtilityAmount += newUtilityAmount;
+        } else {
+          totalUtilityAmount += Number(item.amount);
+        }
       }
     });
 

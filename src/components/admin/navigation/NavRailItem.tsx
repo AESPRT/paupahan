@@ -87,6 +87,15 @@ function NavIcon({ name }: { name: string }) {
   }
 }
 
+// Maliit na Lock SVG Icon para sa naka-lock o disabled items
+function LockIcon() {
+  return (
+    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+    </svg>
+  );
+}
+
 interface NavRailItemProps {
   item: NavItem;
   isMobile?: boolean;
@@ -96,15 +105,18 @@ interface NavRailItemProps {
 export function NavRailItem({ item, isMobile = false, onSelect }: NavRailItemProps) {
   const pathname = usePathname();
   const isActive = pathname === item.href || pathname?.startsWith(`${item.href}/`);
+  const isLocked = item.disabled; // 👈 Ginamit ang disabled property mula sa NavItem
 
   // Mobile Row Layout
   if (isMobile) {
     return (
       <Link
-        href={item.href}
+        href={isLocked ? "/admin/dashboard/subscriptions" : item.href}
         onClick={onSelect}
         className={`flex items-center justify-between rounded-xl px-3.5 py-2.5 transition-all ${
-          isActive
+          isLocked
+            ? "opacity-60 bg-paper/50 text-muted hover:bg-paper"
+            : isActive
             ? "bg-coral font-bold text-white shadow-sm"
             : "text-muted hover:bg-paper hover:text-forest-deep"
         }`}
@@ -114,14 +126,21 @@ export function NavRailItem({ item, isMobile = false, onSelect }: NavRailItemPro
           <span className="text-sm">{item.label}</span>
         </div>
 
-        {item.badge && (
-          <span
-            className={`rounded-full px-2 py-0.5 font-mono-brand text-[10px] font-bold ${
-              isActive ? "bg-white text-coral-deep" : "bg-marigold text-forest-deep"
-            }`}
-          >
-            {item.badge}
+        {/* Badge o kaya ay Lock Icon kung naka-lock */}
+        {isLocked ? (
+          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-forest/10 text-forest-deep">
+            <LockIcon />
           </span>
+        ) : (
+          item.badge && (
+            <span
+              className={`rounded-full px-2 py-0.5 font-mono-brand text-[10px] font-bold ${
+                isActive ? "bg-white text-coral-deep" : "bg-marigold text-forest-deep"
+              }`}
+            >
+              {item.badge}
+            </span>
+          )
         )}
       </Link>
     );
@@ -130,36 +149,45 @@ export function NavRailItem({ item, isMobile = false, onSelect }: NavRailItemPro
   // Desktop Vertical Rail Layout
   return (
     <Link
-      href={item.href}
+      href={isLocked ? "/admin/dashboard/subscriptions" : item.href}
       className="group relative flex flex-col items-center justify-center gap-1 focus:outline-none"
     >
       <div
-        className={`relative flex h-11 w-11 items-center justify-center rounded-2xl transition-all duration-200 group-hover:scale-105 active:scale-95 ${
-          isActive
-            ? "bg-coral text-white shadow-[0_6px_16px_rgba(225,91,78,0.35)]"
-            : "text-muted hover:bg-forest/10 hover:text-forest-deep"
+        className={`relative flex h-11 w-11 items-center justify-center rounded-2xl transition-all duration-200 ${
+          isLocked
+            ? "opacity-60 bg-forest/5 text-muted grayscale"
+            : isActive
+            ? "bg-coral text-white shadow-[0_6px_16px_rgba(225,91,78,0.35)] group-hover:scale-105 active:scale-95"
+            : "text-muted hover:bg-forest/10 hover:text-forest-deep group-hover:scale-105 active:scale-95"
         }`}
       >
         <NavIcon name={item.icon} />
 
-        {item.badge && (
-          <span className="absolute -top-1 -right-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-marigold px-1 font-mono-brand text-[10px] font-extrabold text-forest-deep shadow-sm">
-            {item.badge}
+        {/* Lock badge kung naka-lock, o notification badge kung active */}
+        {isLocked ? (
+          <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-forest-deep text-white shadow-sm">
+            <LockIcon />
           </span>
+        ) : (
+          item.badge && (
+            <span className="absolute -top-1 -right-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-marigold px-1 font-mono-brand text-[10px] font-extrabold text-forest-deep shadow-sm">
+              {item.badge}
+            </span>
+          )
         )}
       </div>
 
       <span
         className={`font-mono-brand text-[10.5px] font-semibold tracking-tight transition-colors ${
-          isActive ? "font-bold text-forest-deep" : "text-muted/80 group-hover:text-forest-deep"
+          isLocked
+            ? "text-muted/60"
+            : isActive
+            ? "font-bold text-forest-deep"
+            : "text-muted/80 group-hover:text-forest-deep"
         }`}
       >
         {item.label}
       </span>
-
-      {/* <div className="pointer-events-none absolute left-full z-50 ml-3 hidden rounded-xl border border-line bg-forest-deep px-3 py-1.5 text-xs font-semibold text-white shadow-lg group-hover:block whitespace-nowrap">
-        {item.label}
-      </div> */}
     </Link>
   );
 }

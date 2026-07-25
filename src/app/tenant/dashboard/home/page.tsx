@@ -24,8 +24,8 @@ export default function TenantDashboardPage() {
         setData(res.data as TenantDashboardData);
       } else {
         setErrorMessage(res.error || "May naganap na error.");
-        // Kung walang session, ibalik sa login page
-        router.push("/tenant/login");
+        // 👈 I-redirect sa unauthorized page kapag nagka-error o walang sapat na akses
+        router.push("/unauthorized");
       }
       setLoading(false);
     });
@@ -42,10 +42,10 @@ export default function TenantDashboardPage() {
           <h2 className="font-display text-base font-bold text-coral-deep">Access Error</h2>
           <p className="text-xs text-muted">{errorMessage || "Hindi ma-load ang iyong dashboard."}</p>
           <button
-            onClick={() => router.push("/tenant/login")}
+            onClick={() => router.push("/unauthorized")}
             className="rounded-xl bg-forest px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-forest-deep"
           >
-            Mag-log in Ulit
+            Pumunta sa Unauthorized
           </button>
         </div>
       </div>

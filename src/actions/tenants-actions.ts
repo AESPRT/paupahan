@@ -218,8 +218,10 @@ export async function addTenantAction(formData: {
 
     const leaseStatus = start > today ? 'pending' : 'active';
 
+    // I-create ang Tenant at isama ang userId (Landlord ID)
     const newTenant = await prisma.tenant.create({
       data: {
+        userId: adminId, // <--- Dito naisama ang ID ni landlord para hindi na blangko sa susunod
         fullName: formData.fullName,
         email: formData.email,
         phone: formData.phoneNumber,

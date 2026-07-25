@@ -1,6 +1,18 @@
+"use client";
+
+import { useEffect } from "react";
 import Link from "next/link";
 
 export function UnauthorizedCard() {
+  useEffect(() => {
+    // I-clear o burahin ang mga session cookies sa pamamagitan ng pag-expire nito
+    const cookiesToClear = ["session_user_id", "token", "next-auth.session-token"]; // Idagdag pa ang ibang cookie pangalan kung meron man
+    
+    cookiesToClear.forEach((cookieName) => {
+      document.cookie = `${cookieName}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT;`;
+    });
+  }, []);
+
   return (
     <div className="mx-auto w-full max-w-[480px] rounded-2xl border border-line bg-paper-card p-6 text-center shadow-[0_12px_32px_rgba(27,58,52,0.08)] sm:p-10">
       {/* Playful Bouncing Lock Icon */}
@@ -38,7 +50,7 @@ export function UnauthorizedCard() {
       {/* Action Buttons */}
       <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
         <Link
-          href="/admin-login"
+          href="/admin/login"
           className="flex items-center justify-center rounded-full bg-coral px-6 py-3.5 text-sm font-bold text-white shadow-[0_8px_20px_rgba(225,91,78,0.35)] transition-all hover:-translate-y-0.5 hover:shadow-[0_12px_26px_rgba(225,91,78,0.42)] active:translate-y-0"
         >
           Mag-login bilang Admin
@@ -55,7 +67,7 @@ export function UnauthorizedCard() {
       {/* Footer link inside card */}
       <p className="mt-6 text-xs text-muted">
         Maling account ba ang gamit mo?{" "}
-        <Link href="/login" className="font-bold text-forest-deep underline hover:text-forest">
+        <Link href="/tenant/login" className="font-bold text-forest-deep underline hover:text-forest">
           Lumipat ng Account
         </Link>
       </p>

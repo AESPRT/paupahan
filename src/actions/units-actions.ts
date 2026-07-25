@@ -4,6 +4,7 @@ import prisma from '@/src/lib/prisma'
 import { revalidatePath } from 'next/cache'
 import { cookies } from 'next/headers'
 import { createAuditLog } from '@/src/actions/audit-actions'
+import { checkUserSubscriptionLimits } from "@/src/actions/subscription-actions";
 
 export async function getUnitsData() {
   try {
@@ -95,6 +96,17 @@ export async function addUnitAction(name: string) {
       return { success: false, error: "Walang active session." };
     }
 
+    // 1. Suriin ang subscription limits ng user
+    const limits = await checkUserSubscriptionLimits();
+    
+    // 🛑 DITO ANG PAGBABAGO: Kapag hindi na kaya magdagdag (umabot na sa max units), harangin agad anuman ang plan!
+    if (!limits.canAddMoreUnits) {
+      return { 
+        success: false, 
+        error: `Naabot mo na ang limit ng iyong plan (${limits.planDisplayName}: ${limits.maxUnitsDisplay}). Mag-upgrade para makapagdagdag pa ng unit!` 
+      };
+    }
+
     // 1. Hanapin muna kung mayroon nang property ang landlord na ito
     let property = await prisma.property.findFirst({
       where: { landlordId: adminId },
@@ -148,6 +160,15 @@ export async function addRoomAction(propertyOrUnitId: string, roomNumber: string
     
     if (!adminId) {
       return { success: false, error: "Walang active session." };
+    }
+
+    const limits = await checkUserSubscriptionLimits();
+    
+    if (!limits.canAddMoreRooms) {
+      return { 
+        success: false, 
+        error: `Naabot mo na ang limit ng iyong plan (${limits.planDisplayName}: ${limits.maxRoomLimit}). Mag-upgrade sa Standard o Pro para magdagdag pa!` 
+      };
     }
 
     let targetUnitId = propertyOrUnitId;

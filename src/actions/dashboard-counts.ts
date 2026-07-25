@@ -2,6 +2,7 @@
 
 import prisma from '@/src/lib/prisma'
 import { cookies } from 'next/headers'
+import { checkUserSubscriptionLimits } from "@/src/actions/subscription-actions";
 
 export async function getDashboardBadgeCounts() {
   try {
@@ -15,16 +16,28 @@ export async function getDashboardBadgeCounts() {
         maintenance: undefined,
         userName: "Admin",
         userEmail: "",
-        userInitials: "AD"
+        userInitials: "AD",
+        canAccessAutoBilling: false,
+        canAccessSmsReminders: false,
+        canAccessMaintenance: false,
+        canAccessAnalytics: false,
+        canAccessStaffAccounts: false,
+        canAccessNotifications: false,
+        canAccessAuditLogs: false,
+        canAccessTenantModule: false,
       };
     }
 
-    // Kunin ang detalye ng user (Landlord)
+    // 1. Kunin ang detalye ng user (Landlord)
     const currentUser = await prisma.user.findUnique({
       where: { id: userId },
       select: { fullName: true, email: true, role: true }
     });
 
+    // 2. Kunin ang Subscription Limits & Features
+    const limits = await checkUserSubscriptionLimits();
+
+    // 3. Kunin ang badge counts
     const unreadNotificationsCount = await prisma.notification.count({
       where: {
         recipientUserId: userId,
@@ -58,6 +71,16 @@ export async function getDashboardBadgeCounts() {
       userName: fullName,
       userRole: currentUser?.role ? currentUser.role.replace("_", " ").toUpperCase() : "PROPERTY ADMIN",
       userInitials: initials,
+      
+      // 👉 Idinagdag ang feature flags mula sa subscription
+      canAccessAutoBilling: limits.canAccessAutoBilling,
+      canAccessSmsReminders: limits.canAccessSmsReminders,
+      canAccessMaintenance: limits.canAccessMaintenance,
+      canAccessAnalytics: limits.canAccessAnalytics,
+      canAccessStaffAccounts: limits.canAccessStaffAccounts,
+      canAccessNotifications: limits.canAccessNotifications,
+      canAccessAuditLogs: limits.canAccessAuditLogs,
+      canAccessTenantModule: limits.canAccessTenantModule,
     };
   } catch (error) {
     console.error("Error fetching dashboard data:", error);
@@ -67,7 +90,14 @@ export async function getDashboardBadgeCounts() {
       maintenance: undefined,
       userName: "Juan Dela Cruz",
       userRole: "Property Admin",
-      userInitials: "JD"
+      userInitials: "JD",
+      
+      // Default false kung may error
+      canAccessAutoBilling: false,
+      canAccessSmsReminders: false,
+      canAccessMaintenance: false,
+      canAccessAnalytics: false,
+      canAccessStaffAccounts: false,
     };
   }
 }

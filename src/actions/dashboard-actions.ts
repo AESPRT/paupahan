@@ -210,18 +210,18 @@ export async function getDashboardData() {
       }).format(new Date(bill.generatedAt));
 
       bill.items.forEach((item) => {
-        if (item.status == 'pending' && !item.type.toLowerCase().includes('amenities')) {
-          let type: "water" | "electricity" | "rent" | "amenities" = "electricity";
+        if (item.status == 'pending' && !item.type.toLowerCase().includes('other')) {
+          let type: "water" | "electricity" | "amenities" | "other" = "other";
           const itemType = item.type.toLowerCase();
           
           if (itemType.includes('water')) {
             type = "water";
           } else if (itemType.includes('electric')) {
             type = "electricity";
-          } else if (itemType.includes('amenit') || itemType.includes('parking')) {
+          } else if (itemType.includes('amenities')) {
             type = "amenities";
           } else {
-            type = "rent";
+            type = "other";
           }
 
           const itemAmountFormatted = new Intl.NumberFormat('fil-PH', {
@@ -415,7 +415,7 @@ export async function handleApprovalAction(compositeId: string, actionType: "app
         }
 
         const hasRemainingPending = bill.items.some(
-          item => item.type.toLowerCase() !== targetUtilityType?.toLowerCase() && item.status === "pending" && !item.type.toLowerCase().includes('amenities')
+          item => item.type.toLowerCase() !== targetUtilityType?.toLowerCase() && item.status === "pending" && !item.type.toLowerCase().includes('other')
         );
 
         if (!hasRemainingPending) {

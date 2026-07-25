@@ -4,6 +4,179 @@ import { cookies } from "next/headers";
 import prisma from "@/src/lib/prisma";
 import { PlanTier } from "@prisma/client";
 
+export interface PlanLimits {
+  planTier: string;           // Prisma enum name (e.g., 'panimula', 'bahay_upa')
+  planDisplayName: string;    // UI Name (e.g., 'Silong', 'Bahay-Upa')
+  status: string;             // 'active', 'past_due', 'canceled', etc.
+  maxUnitsLimit: number;      
+  maxRoomLimit: number;       
+  maxUnitsDisplay: string;
+  canAddMoreUnits: boolean;
+  canAddMoreRooms: boolean;
+  currentUnitsCount: number;
+  currentRoomsCount: number;
+  canAccessAutoBilling: boolean;
+  canAccessSmsReminders: boolean;
+  canAccessMaintenance: boolean;
+  canAccessAnalytics: boolean;
+  canAccessStaffAccounts: boolean;
+  canAccessNotifications: boolean;
+  canAccessAuditLogs: boolean;
+  canAccessTenantModule: boolean;
+}
+
+export async function checkUserSubscriptionLimits(): Promise<PlanLimits> {
+  const cookieStore = await cookies();
+  const userId = cookieStore.get("session_user_id")?.value;
+
+  // Default Fallback para sa 'Silong' (Free Plan)
+  const defaultFreeLimits: PlanLimits = {
+    planTier: 'panimula',
+    planDisplayName: 'Silong',
+    status: 'active',
+    maxUnitsLimit: 1,
+    maxRoomLimit: 3,
+    maxUnitsDisplay: 'Hanggang 1 unit (Max na 3 rooms)',
+    canAddMoreUnits: false,
+    canAddMoreRooms: false,
+    currentUnitsCount: 0,
+    currentRoomsCount: 0,
+    canAccessAutoBilling: false,
+    canAccessSmsReminders: false,
+    canAccessMaintenance: false,
+    canAccessAnalytics: false,
+    canAccessStaffAccounts: false,
+    canAccessNotifications: false,
+    canAccessAuditLogs: false,
+    canAccessTenantModule: false,
+  };
+
+  if (!userId) {
+    return defaultFreeLimits;
+  }
+
+  try {
+    // 1. Kunin ang subscription ng landlord
+    const subscription = await prisma.subscription.findFirst({
+      where: { landlordId: userId },
+    });
+
+    // 2. Bilangin ang kasalukuyang units at rooms ng user mula sa database
+    const units = await prisma.unit.findMany({
+      where: { property: { landlordId: userId } },
+      include: { rooms: true },
+    });
+
+    const currentUnitsCount = units.length;
+    const currentRoomsCount = units.reduce((acc, unit) => acc + unit.rooms.length, 0);
+
+    // Tukuyin ang aktibong tier (default sa 'panimula' kung walang active subscription)
+    const tier = subscription && subscription.status === 'active' 
+      ? subscription.planTier.toLowerCase() 
+      : 'panimula';
+
+    // 3. I-map ang mga limitasyon batay sa iyong PLANS configuration
+    let maxUnits = 1;
+    let maxRooms = 3;
+    let displayName = 'Silong';
+    let maxDisplay = 'Hanggang 1 unit (Max na 3 rooms)';
+
+    let autoBilling = false;
+    let smsReminders = false;
+    let maintenance = false;
+    let analytics = false;
+    let staffAccounts = false;
+    let notifications = false;
+    let auditLogs = false;
+    let tenantModule = false;
+
+    switch (tier) {
+      case 'bahay_upa': // Basic
+        maxUnits = 3;
+        maxRooms = 15;
+        displayName = 'Bahay-Upa';
+        maxDisplay = 'Hanggang 3 units (Max na 15 rooms)';
+        auditLogs = true;
+        notifications = true;
+        break;
+        
+      case 'maalam': // Pasilidad (Premium)
+        maxUnits = 10;
+        maxRooms = 60;
+        displayName = 'Pasilidad';
+        maxDisplay = 'Hanggang 10 units (Max na 60 rooms)';
+        auditLogs = true;
+        notifications = true;
+        smsReminders = true;
+        maintenance = true;
+        analytics = true;
+        break;
+        
+      case 'negosyante': // Kompleto (Business)
+        maxUnits = 30;
+        maxRooms = 300;
+        displayName = 'Kompleto';
+        maxDisplay = 'Hanggang 30 units (Max na 300 rooms)';
+        auditLogs = true;
+        notifications = true;
+        tenantModule = true;
+        autoBilling = true;
+        smsReminders = true;
+        maintenance = true;
+        analytics = true;
+        break;
+        
+      case 'custom': // Eksklusibo
+        maxUnits = 999999;
+        maxRooms = 999999;
+        displayName = 'Eksklusibo';
+        maxDisplay = 'Unlimited units at rooms';
+        auditLogs = true;
+        notifications = true;
+        tenantModule = true;
+        autoBilling = true;
+        smsReminders = true;
+        maintenance = true;
+        analytics = true;
+        staffAccounts = true;
+        break;
+        
+      case 'panimula':
+      default:
+        maxUnits = 1;
+        maxRooms = 3;
+        displayName = 'Silong';
+        maxDisplay = 'Hanggang 1 unit (Max na 3 rooms)';
+        break;
+    }
+
+    return {
+      planTier: tier,
+      planDisplayName: displayName,
+      status: subscription?.status || 'active',
+      maxUnitsLimit: maxUnits,
+      maxRoomLimit: maxRooms,
+      maxUnitsDisplay: maxDisplay,
+      canAddMoreUnits: currentUnitsCount < maxUnits,
+      canAddMoreRooms: currentRoomsCount < maxRooms,
+      currentUnitsCount,
+      currentRoomsCount,
+      canAccessAutoBilling: autoBilling,
+      canAccessSmsReminders: smsReminders,
+      canAccessMaintenance: maintenance,
+      canAccessAnalytics: analytics,
+      canAccessStaffAccounts: staffAccounts,
+      canAccessNotifications: notifications,
+      canAccessAuditLogs: auditLogs,
+      canAccessTenantModule: tenantModule
+    };
+
+  } catch (error) {
+    console.error("Error checking subscription limits:", error);
+    return defaultFreeLimits;
+  }
+}
+
 export async function getAdminSubscriptionData() {
   try {
     const cookieStore = await cookies();

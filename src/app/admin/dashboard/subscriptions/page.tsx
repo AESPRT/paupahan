@@ -34,26 +34,34 @@ export default function SubscriptionPage() {
     if (success === "true" && planNameParam) {
       async function handlePaymentSuccess() {
         try {
+          const queryParamLower = planNameParam?.toLowerCase().trim() || "";
+
+          // Mas pinalawak na pag-match para saluhin ang db name, display name, o tag
           const matchedPlan = PLANS.find(
-            (p) => p.name.toLowerCase() === planNameParam?.toLowerCase() || 
-                   p.tag.toLowerCase() === planNameParam?.toLowerCase()
+            (p) => 
+              p.name.toLowerCase() === queryParamLower || 
+              p.displayName.toLowerCase() === queryParamLower || 
+              p.tag.toLowerCase() === queryParamLower
           );
 
           if (matchedPlan) {
             const result = await updateLandlordSubscriptionAction(
-              matchedPlan.name, 
+              matchedPlan.name, // Ipasa ang tamang Prisma enum name (hal. 'negosyante')
               matchedPlan.maxUnits, 
               matchedPlan.maxRooms
             );
 
             if (result.success) {
               console.log("Tagumpay na na-update ang subscription pagkatapos magbayad!");
+            } else {
+              console.error("Error sa action:", result.error);
             }
+          } else {
+            console.error("Hindi mahanap ang plan na tumutugma sa param:", planNameParam);
           }
 
           const updatedResult = await getAdminSubscriptionData();
           if (updatedResult.success && updatedResult.subscription) {
-            // Gamitin ang bagong object reference para ma-trigger ang re-render
             setCurrentSub({ ...(updatedResult.subscription as CurrentSubscription) });
           }
 

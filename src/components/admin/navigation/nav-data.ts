@@ -4,6 +4,7 @@ export interface NavItem {
   href: string;
   icon: string; // Key para sa Icon lookup
   badge?: string;
+  disabled?: boolean; // 👈 Idinagdag para ma-support ang subscription lock feature
 }
 
 export const DASHBOARD_NAV_ITEMS: NavItem[] = [

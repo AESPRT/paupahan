@@ -95,7 +95,7 @@ export async function getBillingsData() {
           const isUtility = item.type === "electricity" || item.type === "water";
           const isApproved = item.status === "approved";
 
-          if (itemAmount > 0 && item.type && item.type.toUpperCase() !== "AMENITIES") {
+          if (itemAmount > 0 && item.type) {
             if (!isUtility) {
               computedTotalAmount += itemAmount;
               lineItems.push({
@@ -230,7 +230,7 @@ export async function createInvoiceAction(newInvoiceData: Omit<Invoice, "id" | "
           create: newInvoiceData.lineItems.map(item => {
             const desc = item.description.toLowerCase();
             
-            let itemType: "electricity" | "water" | "internet" | "amenities" = "amenities";
+            let itemType: "electricity" | "water" | "amenities" | "other" = "other";
             if (desc.includes('tubig') || desc.includes('water')) {
               itemType = 'water';
             } else if (desc.includes('kuryente') || desc.includes('electric')) {
@@ -387,5 +387,138 @@ export async function getOccupiedRoomsForBilling() {
   } catch (error) {
     console.error("Error fetching occupied rooms with lease amenities:", error);
     return { success: false, roomsWithTenants: [], error: "Nabigong kunin ang mga occupied rooms." };
+  }
+}
+
+export async function runAutoBillingForLandlord(adminId: string) {
+  try {
+    console.log("-----------------------------------------");
+    console.log("1. Tumatakbo ang auto-billing para sa adminId:", adminId);
+
+    // 1. Kunin ang mga tenant ID sa ilalim ng landlord na ito
+    const landlordTenants = await prisma.tenant.findMany({
+      where: { userId: adminId },
+      select: { id: true },
+    });
+    console.log("2. Bilang ng nahanap na tenants:", landlordTenants.length);
+    
+    const tenantIds = landlordTenants.map((t) => t.id);
+
+    if (tenantIds.length === 0) {
+      console.log("--> HUMINTO: Walang tenants sa ilalim ng landlord na ito.");
+      return;
+    }
+
+    // 2. Kunin ang kasalukuyang buwan at taon (Format: "YYYY-MM")
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = String(now.getMonth() + 1).padStart(2, '0');
+    const billingMonthYear = `${currentYear}-${currentMonth}`;
+    console.log("3. Kasalukuyang billingMonthYear:", billingMonthYear);
+
+    // 3. Kunin lahat ng active leases ng mga tenant na ito (isinama ang startDate)
+    const activeLeases = await prisma.lease.findMany({
+      where: {
+        status: "active",
+        tenantId: { in: tenantIds },
+      },
+      include: {
+        tenant: { select: { fullName: true } },
+        room: { include: { unit: { select: { name: true } } } },
+        amenities: {
+          include: {
+            amenity: { select: { name: true, frequency: true } },
+          },
+        },
+      },
+    });
+    console.log("4. Bilang ng nahanap na active leases:", activeLeases.length);
+
+    if (activeLeases.length === 0) {
+      console.log("--> HUMINTO: Walang active lease na nahanap para sa mga tenants na ito.");
+      return;
+    }
+
+    for (const lease of activeLeases) {
+      console.log(`5. Sinusuri ang lease ID: ${lease.id} para sa tenant: ${lease.tenant.fullName}`);
+
+      // 4. Suriin kung mayroon nang bill ang lease na ito para sa kasalukuyang buwan
+      const existingBill = await prisma.bill.findFirst({
+        where: {
+          leaseId: lease.id,
+          billingMonthYear: billingMonthYear,
+        },
+      });
+
+      if (existingBill) {
+        console.log(`--> LALAMPASAN: Mayroon na palang bill ang lease ID: ${lease.id} ngayong ${billingMonthYear}`);
+        continue;
+      }
+
+      console.log(`6. Gagawa na ng bill para sa lease ID: ${lease.id}...`);
+
+      const monthlyRent = Number(lease.monthlyRent ?? lease.room.monthlyRent ?? 0);
+      let totalAmount = monthlyRent;
+
+      const lineItemsData: { type: "electricity" | "water" | "other" | "amenities"; unitLabel: string; amount: number; ratePerUnit: number }[] = [];
+
+      if (monthlyRent > 0) {
+        lineItemsData.push({
+          type: "other",
+          unitLabel: "Buwanang Renta",
+          amount: monthlyRent,
+          ratePerUnit: monthlyRent,
+        });
+      }
+
+      let amenitiesFeeTotal = 0;
+      if (lease.amenities && lease.amenities.length > 0) {
+        lease.amenities.forEach((leaseAmenity) => {
+          const amenityAmount = Number(leaseAmenity.amount);
+          if (amenityAmount > 0) {
+            amenitiesFeeTotal += amenityAmount;
+
+            lineItemsData.push({
+              type: "amenities",
+              unitLabel: `Amenity: ${leaseAmenity.amenity.name}${leaseAmenity.amenity.frequency ? ` (${leaseAmenity.amenity.frequency})` : ""}`,
+              amount: amenityAmount,
+              ratePerUnit: amenityAmount,
+            });
+          }
+        });
+      }
+
+      totalAmount = monthlyRent + amenitiesFeeTotal;
+
+      // 5. Kunin ang araw mula sa lease.startDate (hal. 25 kung July 25) para maging due date bawat buwan
+      const leaseStartDate = new Date(lease.startDate);
+      const startDay = leaseStartDate.getDate();
+      
+      // Itakda ang due date sa kasalukuyang buwan/taon gamit ang mismong araw ng start date
+      const dueDate = new Date(currentYear, Number(currentMonth) - 1, startDay, 23, 59, 59);
+
+      const newBill = await prisma.bill.create({
+        data: {
+          leaseId: lease.id,
+          tenantId: lease.tenantId,
+          billingMonthYear: billingMonthYear,
+          dueDate: dueDate,
+          rentAmount: monthlyRent,
+          amenitiesFee: amenitiesFeeTotal,
+          utilityAmount: 0,
+          totalAmount: totalAmount,
+          status: 'draft',
+          generatedAt: new Date(),
+          items: {
+            create: lineItemsData,
+          },
+        },
+      });
+
+      console.log(`7. TAGUMPAY! Nalikha na ang bill ID: ${newBill.id} na may Due Date na: ${dueDate.toISOString()}`);
+    }
+    console.log("-----------------------------------------");
+  } catch (error) {
+    console.error("Error sa auto-billing process:", error);
   }
 }

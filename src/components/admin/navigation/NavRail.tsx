@@ -20,16 +20,37 @@ export function NavRail() {
     async function fetchDashboardData() {
       const data = await getDashboardBadgeCounts();
       
-      // I-update ang nav items gamit ang string conversion para sa badge
+      // I-update ang nav items gamit ang badge at locked/disabled state batay sa plan
       const updatedItems = DASHBOARD_NAV_ITEMS.map((item) => {
         let badgeVal: string | undefined = undefined;
         if (item.id === "notifications") badgeVal = data.notifications;
         if (item.id === "billings") badgeVal = data.billings;
         if (item.id === "maintenance") badgeVal = data.maintenance;
 
+        // 🛑 Tukuyin kung naka-lock ang menu item base sa feature permissions ng plan
+        let isLocked = false;
+        
+        // Halimbawa: I-lock ang maintenance kung walang access
+        if (item.id === "maintenance" && data.canAccessMaintenance === false) {
+          isLocked = true;
+        }
+        // Halimbawa: I-lock ang analytics o reports kung walang access
+        if ((item.id === "analytics" || item.id === "reports") && data.canAccessAnalytics === false) {
+          isLocked = true;
+        }
+
+        if (item.id === "notifications" && data.canAccessNotifications === false) {
+          isLocked = true;
+        }
+
+        if (item.id === "audit_logs" && data.canAccessAuditLogs === false) {
+          isLocked = true;
+        }
+
         return {
           ...item,
           badge: badgeVal,
+          disabled: isLocked, // 👈 Idagdag o gamitin ito para ma-handle ng NavRailItem
         };
       });
 
@@ -117,7 +138,6 @@ export function NavRail() {
               ))}
             </nav>
 
-            {/* Dynamic Mobile Footer Profile */}
             <div className="border-t border-line pt-4">
               <Link
                 href="/admin/dashboard/profile"
@@ -157,7 +177,6 @@ export function NavRail() {
           ))}
         </nav>
 
-        {/* Dynamic Desktop Footer Profile with Tooltip */}
         <div className="flex shrink-0 flex-col items-center gap-3">
           <div className="h-[1px] w-8 bg-line" />
           <Link

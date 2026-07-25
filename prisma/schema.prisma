@@ -74,7 +74,7 @@ enum MaintenanceCategory {
 enum UtilityType {
   electricity
   water
-  internet
+  other
   amenities
 }
 
@@ -122,7 +122,7 @@ model User {
   notifications      Notification[]
   analyticsSnapshots AnalyticsSnapshot[]
   auditLogs          AuditLog[]
-  tenant             Tenant?
+  tenants            Tenant[]
   subscription       Subscription?
 
   @@map("users")
@@ -200,7 +200,7 @@ model Room {
 
 model Tenant {
   id                    String   @id @default(uuid())
-  userId                String?  @unique @map("user_id")
+  userId                String?  @map("user_id")
   loginCode             String   @unique @map("login_code")
   fullName              String   @map("full_name")
   email                 String?
