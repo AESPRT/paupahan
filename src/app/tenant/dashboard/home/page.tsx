@@ -10,6 +10,7 @@ import { TenantDashboardData } from "@/src/types/tenant/tenant-dashboard";
 import { Footer } from "@/src/components/landing/Footer";
 import { getTenantDashboardData } from "@/src/actions/tenant/tenant-dashboard-actions";
 import { useRouter } from "next/navigation";
+import FullPageLoader from "@/src/components/ui/FullPageLoader";
 
 export default function TenantDashboardPage() {
   const router = useRouter();
@@ -31,14 +32,7 @@ export default function TenantDashboardPage() {
   }, [router]);
 
   if (loading) {
-    return (
-      <div className="flex h-screen items-center justify-center bg-paper">
-        <div className="flex flex-col items-center gap-3">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-forest border-t-transparent" />
-          <span className="text-xs font-bold text-muted uppercase tracking-wider">Binubuksan ang Tenant Portal...</span>
-        </div>
-      </div>
-    );
+    return <FullPageLoader message="Binubuksan ang Tenant Portal..." />;
   }
 
   if (errorMessage || !data) {

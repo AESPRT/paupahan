@@ -8,6 +8,7 @@ import { BillDetailModal } from "@/src/components/tenant/bills/BillDetailModal";
 import { Footer } from "@/src/components/landing/Footer";
 import { getTenantBillsData, updateTenantUtilityReadingAction } from "@/src/actions/tenant/tenant-bills-actions";
 import { useRouter } from "next/navigation";
+import FullPageLoader from "@/src/components/ui/FullPageLoader";
 
 export default function TenantBillsPage() {
   const router = useRouter();
@@ -57,14 +58,7 @@ export default function TenantBillsPage() {
   };
 
   if (loading) {
-    return (
-      <div className="flex h-screen items-center justify-center bg-paper">
-        <div className="flex flex-col items-center gap-3">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-forest border-t-transparent" />
-          <span className="text-xs font-bold text-muted uppercase tracking-wider">Nag-a-load ng mga resibo...</span>
-        </div>
-      </div>
-    );
+    return <FullPageLoader message="Nag-a-load ng mga resibo..." />;
   }
 
   return (

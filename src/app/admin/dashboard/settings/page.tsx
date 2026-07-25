@@ -16,6 +16,7 @@ import {
   updatePaymentSettings, 
   updateSecuritySettings 
 } from "@/src/actions/admin-settings";
+import FullPageLoader from "@/src/components/ui/FullPageLoader";
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<TabType>("profile");
@@ -133,9 +134,7 @@ export default function SettingsPage() {
       {/* Active Tab Content */}
       <div className="mt-4">
         {isLoading ? (
-          <div className="py-12 text-center font-mono-brand text-xs text-muted">
-            Kinukuha ang mga setting mula sa database...
-          </div>
+          <FullPageLoader message="Kinukuha ang mga setting mula sa database..." />
         ) : (
           <>
             {activeTab === "profile" && (

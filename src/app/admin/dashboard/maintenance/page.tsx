@@ -6,6 +6,7 @@ import { MaintenanceCards } from "@/src/components/admin/maintenance/Maintenance
 import { MaintenanceRequest, MaintenanceStatus } from "@/src/types/admin/maintenance";
 import { Footer } from "@/src/components/landing/Footer";
 import { getAdminMaintenanceRequests, updateMaintenanceStatusAction } from "@/src/actions/admin-maintenance";
+import FullPageLoader from "@/src/components/ui/FullPageLoader";
 
 export default function MaintenancePage() {
   const [requests, setRequests] = useState<MaintenanceRequest[]>([]);
@@ -94,9 +95,7 @@ export default function MaintenancePage() {
 
       {/* Loading o Requests Cards */}
       {isLoading ? (
-        <div className="py-20 text-center font-mono-brand text-sm text-muted">
-          Kinukuha ang mga maintenance requests...
-        </div>
+        <FullPageLoader message="Kinukuha ang mga maintenance requests..." />
       ) : (
         <MaintenanceCards
           requests={filteredRequests}

@@ -6,6 +6,7 @@ import { PaidBillsList } from "@/src/components/tenant/history/PaidBillsList";
 import { PaidBillHistory } from "@/src/types/tenant/tenant-history";
 import { Footer } from "@/src/components/landing/Footer";
 import { getTenantPaymentHistory } from "@/src/actions/tenant/tenant-history-actions"; // 👈 I-import ang bagong server action
+import FullPageLoader from "@/src/components/ui/FullPageLoader";
 
 export default function TenantHistoryPage() {
   const [bills, setBills] = useState<PaidBillHistory[]>([]);
@@ -28,11 +29,7 @@ export default function TenantHistoryPage() {
   }, []);
 
   if (loading) {
-    return (
-      <div className="flex h-[60vh] items-center justify-center">
-        <span className="text-sm font-medium text-muted">Nag-a-load ng payment history...</span>
-      </div>
-    );
+    return <FullPageLoader message="Nag-a-load ng payment history..." />;
   }
 
   return (

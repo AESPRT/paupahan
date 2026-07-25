@@ -15,6 +15,7 @@ import {
   updateAutoRenewAction,
   updatePaymentMethodAction 
 } from "@/src/actions/subscription-actions";
+import FullPageLoader from "@/src/components/ui/FullPageLoader";
 
 export default function SubscriptionPage() {
   const [currentSub, setCurrentSub] = useState<CurrentSubscription | null>(null);
@@ -108,11 +109,7 @@ export default function SubscriptionPage() {
   };
 
   if (loading || !currentSub) {
-    return (
-      <div className="flex h-[60vh] items-center justify-center">
-        <span className="text-sm font-medium text-muted">Nag-a-load ng subscription details...</span>
-      </div>
-    );
+    return <FullPageLoader message="Nag-a-load ng subscription details..." />;
   }
 
   return (

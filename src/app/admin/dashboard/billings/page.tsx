@@ -15,6 +15,7 @@ import {
   markInvoiceAsPaidAction 
 } from "@/src/actions/billings-actions";
 import { getDashboardData, handleApprovalAction } from "@/src/actions/dashboard-actions";
+import FullPageLoader from "@/src/components/ui/FullPageLoader";
 
 export default function BillingsPage() {
   interface ActiveTenantRoom {
@@ -125,11 +126,7 @@ export default function BillingsPage() {
   };
 
   if (loading) {
-    return (
-      <div className="flex h-[60vh] items-center justify-center">
-        <span className="text-sm font-medium text-muted">Nag-a-load ng billings at invoices...</span>
-      </div>
-    );
+    return <FullPageLoader message="Nag-a-load ng billings at invoices..." />;
   }
 
   return (

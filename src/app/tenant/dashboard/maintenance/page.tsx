@@ -8,6 +8,7 @@ import { TicketCard } from "@/src/components/tenant/maintenance/TicketCard";
 import { NewTicketModal } from "@/src/components/tenant/maintenance/NewTicketModal";
 import { Footer } from "@/src/components/landing/Footer";
 import { getTenantMaintenanceTickets, createMaintenanceTicketAction } from "@/src/actions/tenant/tenant-maintenance-actions";
+import FullPageLoader from "@/src/components/ui/FullPageLoader";
 
 export default function TenantMaintenancePage() {
   const [tickets, setTickets] = useState<MaintenanceTicket[]>([]);
@@ -59,11 +60,7 @@ export default function TenantMaintenancePage() {
   };
 
   if (loading) {
-    return (
-      <div className="flex h-[60vh] items-center justify-center">
-        <span className="text-sm font-medium text-muted">Nag-a-load ng mga maintenance report...</span>
-      </div>
-    );
+    return <FullPageLoader message="Nag-a-load ng mga maintenance report..." />;
   }
 
   return (

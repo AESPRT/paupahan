@@ -8,6 +8,7 @@ import { UtilityCalculator } from "@/src/components/tenant/utilities/UtilityCalc
 import { AmenityCard } from "@/src/components/tenant/utilities/AmenityCard";
 import { Footer } from "@/src/components/landing/Footer";
 import { getTenantUtilitiesAndAmenities } from "@/src/actions/tenant/utility-actions"; // 👈 I-import ang tamang action
+import FullPageLoader from "@/src/components/ui/FullPageLoader";
 
 export default function TenantUtilitiesPage() {
   const [rates, setRates] = useState<any[]>([]);
@@ -32,11 +33,7 @@ export default function TenantUtilitiesPage() {
   }, []);
 
   if (loading) {
-    return (
-      <div className="flex h-[60vh] items-center justify-center">
-        <span className="text-sm font-medium text-muted">Nag-a-load ng utility rates...</span>
-      </div>
-    );
+    return <FullPageLoader message="Nag-load ng utility rates..." />;
   }
 
   return (

@@ -8,6 +8,7 @@ import { ExportHistory } from "@/src/components/admin/reports/ExportHistory";
 import { FinancialReportSummary, ReportCategory, ExportFormat } from "@/src/types/admin/report";
 import { Footer } from "@/src/components/landing/Footer";
 import { getAdminReportsData, generateReportAction, generateAllReportsAction } from "@/src/actions/admin-reports";
+import FullPageLoader from "@/src/components/ui/FullPageLoader";
 
 // Helper function para ibalik ang tamang SVG icon batay sa report id
 const getReportIconSvg = (id: string) => {
@@ -142,7 +143,7 @@ export default function ReportsPage() {
 
         {isLoading ? (
           <div className="py-12 text-center font-mono-brand text-xs text-muted">
-            Kinukuha ang mga ulat at datos mula sa database...
+            <FullPageLoader message="Kinukuha ang mga ulat at datos mula sa database..." />
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
