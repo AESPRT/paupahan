@@ -1,13 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { UtilityRate, UtilityType } from "@/src/types/admin/utility";
+import { useState } from "react";
+import { UtilityRate } from "@/src/types/admin/utility";
 
 interface AssignBillModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onAssign: (data: { id: string; ratePerUnit: number }) => void; // O ang update handler para sa rate
-  currentRates?: UtilityRate[]; // Mga kasalukuyang rates para ma-edit
+  onAssign: (data: { id: string; ratePerUnit: number }) => void;
+  currentRates?: UtilityRate[];
 }
 
 export function AssignBillModal({
@@ -16,35 +16,26 @@ export function AssignBillModal({
   onAssign,
   currentRates = [],
 }: AssignBillModalProps) {
-  const [selectedRateId, setSelectedRateId] = useState("");
-  const [utilityName, setUtilityName] = useState("");
-  const [unitLabel, setUnitLabel] = useState("");
-  const [ratePerUnit, setRatePerUnit] = useState("");
+  // Gamitin ang unang rate bilang default state values kung available
+  const [selectedRateId, setSelectedRateId] = useState(() => currentRates[0]?.id || "");
+  const [ratePerUnit, setRatePerUnit] = useState(() => currentRates[0]?.ratePerUnit.toString() || "");
 
-  // Kapag binuksan ang modal, piliin ang unang utility rate bilang default
-  useEffect(() => {
-    if (isOpen && currentRates.length > 0) {
-      setSelectedRateId(currentRates[0].id);
-      setUtilityName(currentRates[0].name);
-      setUnitLabel(currentRates[0].unitLabel);
-      setRatePerUnit(currentRates[0].ratePerUnit.toString());
-    }
-  }, [isOpen, currentRates]);
+  // Kunin ang kasalukuyang piniling rate item para sa unitLabel at iba pang detalye
+  const currentSelectedRate = currentRates.find((r) => r.id === selectedRateId) || currentRates[0];
+  const unitLabel = currentSelectedRate?.unitLabel || "";
 
   // Kapag nagbago ang piniling utility rate sa dropdown
   const handleRateChange = (id: string) => {
     setSelectedRateId(id);
     const rateItem = currentRates.find((r) => r.id === id);
     if (rateItem) {
-      setUtilityName(rateItem.name);
-      setUnitLabel(rateItem.unitLabel);
       setRatePerUnit(rateItem.ratePerUnit.toString());
     }
   };
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.SubmitEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedRateId || !ratePerUnit) return;
 
@@ -93,7 +84,7 @@ export function AssignBillModal({
             </select>
           </div>
 
-          {/* Unit Label (Basal kung paano sinusukat e.g. kWh, m³, Flat) */}
+          {/* Unit Label (Basal kung paano sinusukat e.g. kWh, m³) */}
           <div>
             <label className="block text-xs font-bold text-forest-deep mb-1">
               Unit of Measurement (Basihan)
