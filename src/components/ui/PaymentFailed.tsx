@@ -1,13 +1,26 @@
 "use client";
 
 import { useSearchParams, useRouter } from "next/navigation";
+import { useEffect } from "react";
 import { XCircle, RefreshCcw, ArrowLeft } from "lucide-react";
 
 export default function PaymentFailed() {
   const searchParams = useSearchParams();
-  const referenceNumber = searchParams.get("ref") || "TXN-RENTAL-XXXXXX";
-
   const router = useRouter();
+
+  const referenceNumber = searchParams.get("ref") || searchParams.get("referenceNumber");
+
+  // 🛡️ SECURITY GUARD: Kung walang referenceNumber, ilegal ang pag-access (tinype sa browser)
+  useEffect(() => {
+    if (!referenceNumber) {
+      router.replace("/unauthorized");
+    }
+  }, [referenceNumber, router]);
+
+  // Habang sinusuri o kung walang reference, huwag munang i-render ang pahina
+  if (!referenceNumber) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-[var(--paper)] flex items-center justify-center p-4 sm:p-6">

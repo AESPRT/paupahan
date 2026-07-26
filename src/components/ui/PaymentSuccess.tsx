@@ -1,25 +1,35 @@
 "use client";
 
 import { useSearchParams, useRouter } from "next/navigation";
+import { useEffect } from "react";
 import { CheckCircle2, ArrowRight, ReceiptText } from "lucide-react";
 
 export default function PaymentSuccess() {
   const searchParams = useSearchParams();
   const router = useRouter();
 
-  const referenceNumber = searchParams.get("ref") || searchParams.get("referenceNumber") || "TXN-RENTAL-XXXXXX";
+  const referenceNumber = searchParams.get("ref") || searchParams.get("referenceNumber");
   const planId = searchParams.get("plan") || "";
   const planName = searchParams.get("planName") || "Subscription Plan";
   const name = searchParams.get("name") || "";
   const email = searchParams.get("email") || "";
   const phone = searchParams.get("phone") || "";
+  const isChangedPlan = searchParams.get("isChangedPlan") === "true";
 
-  // Alamin kung ito ay galing sa registration (may kasamang pangalan/email o hindi pa registered user)
-  // O kaya ay kung ito ay nagmula sa loob ng admin dashboard subscription upgrade.
-  const isNewRegistrationFlow = Boolean(name || email || (planId && planId !== "panimula" && planId !== "free"));
+  // 🛡️ SECURITY GUARD: Kung walang referenceNumber o plan, ibig sabihin ilegal ang pag-access (tinype sa browser)
+  useEffect(() => {
+    if (!referenceNumber || !planId) {
+      router.replace("/unauthorized");
+    }
+  }, [referenceNumber, planId, router]);
+
+  // Habang sinusuri o kung walang reference, huwag munang i-render ang pahina para maiwasan ang flash ng UI
+  if (!referenceNumber || !planId) {
+    return null;
+  }
 
   const handleButtonClick = () => {
-    if (isNewRegistrationFlow) {
+    if (!isChangedPlan) {
       // Dalhin sa registration page at ipasa ang lahat ng detalye para automatic mag-fill
       const params = new URLSearchParams({
         referenceNumber,
@@ -49,7 +59,7 @@ export default function PaymentSuccess() {
             Tagumpay ang Pagbabayad!
           </h1>
           <p className="text-sm text-[var(--muted)] mt-1 font-body">
-            {isNewRegistrationFlow 
+            {!isChangedPlan 
               ? "Matagumpay ang iyong bayad. Mangyaring ituloy ang paggawa ng iyong account."
               : "Maraming salamat. Na-proseso na ang iyong transaksyon at na-update ang iyong subscription."}
           </p>
@@ -99,7 +109,7 @@ export default function PaymentSuccess() {
           onClick={handleButtonClick}
           className="w-full flex items-center justify-center gap-2 bg-[var(--forest)] hover:bg-[var(--forest-deep)] text-[var(--paper)] font-bold py-3 px-4 rounded-xl transition-all shadow-md cursor-pointer font-display"
         >
-          {isNewRegistrationFlow ? "Kumpletuhin ang Account" : "Magtungo sa Dashboard"} <ArrowRight className="w-4 h-4" />
+          {!isChangedPlan ? "Kumpletuhin ang Account" : "Magtungo sa Dashboard"} <ArrowRight className="w-4 h-4" />
         </button>
       </div>
     </div>

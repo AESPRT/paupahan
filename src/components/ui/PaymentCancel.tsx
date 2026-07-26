@@ -1,10 +1,26 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
+import { useEffect } from "react";
 import { AlertTriangle, ArrowLeft } from "lucide-react";
 
 export default function PaymentCancel() {
+  const searchParams = useSearchParams();
   const router = useRouter();
+
+  const referenceNumber = searchParams.get("ref") || searchParams.get("referenceNumber");
+
+  // 🛡️ SECURITY GUARD: Kung walang referenceNumber, ilegal ang pag-access (tinype sa browser)
+  useEffect(() => {
+    if (!referenceNumber) {
+      router.replace("/unauthorized");
+    }
+  }, [referenceNumber, router]);
+
+  // Habang sinusuri o kung walang reference, huwag munang i-render ang pahina
+  if (!referenceNumber) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-[var(--paper)] flex items-center justify-center p-4 sm:p-6">
@@ -21,6 +37,12 @@ export default function PaymentCancel() {
           <p className="text-sm text-[var(--muted)] mt-1 font-body">
             Itinigil mo ang proseso ng pagbabayad. Walang anumang halaga ang ibinawas sa iyong account.
           </p>
+        </div>
+
+        {/* Reference ID display para mas sigurado */}
+        <div className="bg-[var(--paper)] border border-[var(--line)] rounded-xl p-3 mb-6 text-center font-mono text-xs">
+          <span className="text-[var(--muted)] block">Reference ID:</span>
+          <span className="font-bold text-[var(--ink)]">{referenceNumber}</span>
         </div>
 
         {/* Action Button */}
