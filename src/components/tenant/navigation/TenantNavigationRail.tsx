@@ -3,7 +3,7 @@
 import { usePathname, useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { NavItem } from "@/src/types/admin/navigation";
-import { logoutTenantAction } from "@/src/actions/tenant/tenant-auth-actions"; // ✨ I-import ang ating logout action
+import { logoutTenantAction } from "@/src/actions/tenant/tenant-auth-actions";
 
 // SVG Icons Definition (Inline SVGs for performance and zero external dependencies)
 const Icons = {
@@ -73,7 +73,11 @@ const NAV_ITEMS: TenantNavItem[] = [
   { id: "settings", label: "Settings", path: "/tenant/dashboard/settings", icon: Icons.Settings },
 ];
 
-export function TenantNavigationRail() {
+interface TenantNavigationRailProps {
+  hasPendingBills?: boolean; // 👈 Prop para malaman kung may draft/pending bills na need ng readings
+}
+
+export function TenantNavigationRail({ hasPendingBills = false }: TenantNavigationRailProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -121,22 +125,32 @@ export function TenantNavigationRail() {
           {NAV_ITEMS.map((item) => {
             const isActive = pathname === item.path;
             const IconComponent = item.icon;
+            const isBillsTab = item.id === "bills";
 
             return (
               <button
                 key={item.id}
                 onClick={() => router.push(item.path)}
-                className={`group flex w-full items-center gap-3.5 rounded-2xl px-3.5 py-3 text-xs font-bold transition-all ${
+                className={`group relative flex w-full items-center gap-3.5 rounded-2xl px-3.5 py-3 text-xs font-bold transition-all ${
                   isActive
                     ? "bg-forest text-white shadow-sm"
                     : "text-muted hover:bg-paper hover:text-forest-deep"
                 }`}
               >
-                <IconComponent
-                  className={`w-5 h-5 transition-transform group-hover:scale-110 ${
-                    isActive ? "text-white" : "text-muted group-hover:text-forest-deep"
-                  }`}
-                />
+                <div className="relative">
+                  <IconComponent
+                    className={`w-5 h-5 transition-transform group-hover:scale-110 ${
+                      isActive ? "text-white" : "text-muted group-hover:text-forest-deep"
+                    }`}
+                  />
+                  {/* ✨ Pulse Badge para sa Bills kapag may pending/draft */}
+                  {isBillsTab && hasPendingBills && (
+                    <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-rose-500 ring-2 ring-paper-card"></span>
+                    </span>
+                  )}
+                </div>
                 <span>{item.label}</span>
               </button>
             );
@@ -163,16 +177,26 @@ export function TenantNavigationRail() {
         {mobilePrimaryNav.map((item) => {
           const isActive = pathname === item.path;
           const IconComponent = item.icon;
+          const isBillsTab = item.id === "bills";
 
           return (
             <button
               key={item.id}
               onClick={() => router.push(item.path)}
-              className={`flex flex-col items-center gap-1 rounded-xl px-3 py-1.5 transition-all ${
+              className={`relative flex flex-col items-center gap-1 rounded-xl px-3 py-1.5 transition-all ${
                 isActive ? "text-forest" : "text-muted"
               }`}
             >
-              <IconComponent className={`w-5 h-5 ${isActive ? "text-forest" : "text-muted"}`} />
+              <div className="relative">
+                <IconComponent className={`w-5 h-5 ${isActive ? "text-forest" : "text-muted"}`} />
+                {/* ✨ Pulse Badge para sa Mobile Bills Tab */}
+                {isBillsTab && hasPendingBills && (
+                  <span className="absolute -top-1 -right-1 flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500 ring-2 ring-paper-card"></span>
+                  </span>
+                )}
+              </div>
               <span className="font-mono-brand text-[10px] font-bold">
                 {item.label}
               </span>
@@ -212,6 +236,7 @@ export function TenantNavigationRail() {
               {NAV_ITEMS.map((item) => {
                 const isActive = pathname === item.path;
                 const IconComponent = item.icon;
+                const isBillsTab = item.id === "bills";
 
                 return (
                   <button
@@ -220,14 +245,31 @@ export function TenantNavigationRail() {
                       setIsMobileMenuOpen(false);
                       router.push(item.path);
                     }}
-                    className={`flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-xs font-bold transition-all ${
+                    className={`flex w-full items-center justify-between rounded-2xl px-4 py-3 text-xs font-bold transition-all ${
                       isActive
                         ? "bg-forest text-white"
                         : "text-muted hover:bg-paper hover:text-forest-deep"
                     }`}
                   >
-                    <IconComponent className={`w-5 h-5 ${isActive ? "text-white" : "text-muted"}`} />
-                    <span>{item.label}</span>
+                    <div className="flex items-center gap-3">
+                      <div className="relative">
+                        <IconComponent className={`w-5 h-5 ${isActive ? "text-white" : "text-muted"}`} />
+                        {isBillsTab && hasPendingBills && (
+                          <span className="absolute -top-1 -right-1 flex h-2 w-2">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500 ring-2 ring-paper-card"></span>
+                          </span>
+                        )}
+                      </div>
+                      <span>{item.label}</span>
+                    </div>
+
+                    {/* Malinis na indicator badge sa Drawer kung may pending bills */}
+                    {isBillsTab && hasPendingBills && (
+                      <span className="rounded-full bg-rose-500/20 px-2 py-0.5 text-[9px] text-rose-500 font-mono-brand">
+                        May bago
+                      </span>
+                    )}
                   </button>
                 );
               })}

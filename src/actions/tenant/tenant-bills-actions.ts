@@ -226,3 +226,33 @@ export async function updateTenantUtilityReadingAction(
     return { success: false, error: "Nagkaroon ng problema sa pag-save ng reading." };
   }
 }
+
+export async function checkTenantHasPendingBillsAction() {
+  try {
+    const cookieStore = await cookies();
+    const tenantId = cookieStore.get("tenantId")?.value; // O kung paano man nakukuha ang session ng tenant mo
+
+    if (!tenantId) {
+      return { success: true, hasPending: false };
+    }
+
+    // Halimbawa ng query sa database kung saan ang status ay "draft" o "pending_reading"
+    // Baguhin ang prisma model name at condition base sa iyong schema structure
+    const pendingBill = await prisma.bill.findFirst({
+      where: {
+        tenantId: tenantId,
+        status: {
+          in: ["draft", "pending", "overdue"], // I-adjust depende sa status enums mo
+        },
+      },
+    });
+
+    return {
+      success: true,
+      hasPending: !!pendingBill,
+    };
+  } catch (error) {
+    console.error("Error checking pending bills:", error);
+    return { success: false, hasPending: false };
+  }
+}

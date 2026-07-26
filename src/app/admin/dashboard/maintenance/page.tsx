@@ -67,6 +67,11 @@ export default function MaintenancePage() {
       ? requests
       : requests.filter((r) => r.status === filterStatus);
 
+  // ✨ FullPageLoader sa pinakataas bago i-render ang buong layout
+  if (isLoading) {
+    return <FullPageLoader message="Kinukuha ang mga maintenance requests..." />;
+  }
+
   return (
     <div className="space-y-6 p-4 sm:p-6 lg:p-8">
       {/* Admin Header Overview */}
@@ -93,15 +98,11 @@ export default function MaintenancePage() {
         ))}
       </div>
 
-      {/* Loading o Requests Cards */}
-      {isLoading ? (
-        <FullPageLoader message="Kinukuha ang mga maintenance requests..." />
-      ) : (
-        <MaintenanceCards
-          requests={filteredRequests}
-          onUpdateStatus={handleUpdateStatus}
-        />
-      )}
+      {/* Maintenance Cards */}
+      <MaintenanceCards
+        requests={filteredRequests}
+        onUpdateStatus={handleUpdateStatus}
+      />
 
       <Footer showNavLinks={false} />
     </div>

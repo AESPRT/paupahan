@@ -4,7 +4,6 @@
 import { useState, useEffect, useTransition } from "react";
 import { ReportsHeader } from "@/src/components/admin/reports/ReportsHeader";
 import { ReportCard } from "@/src/components/admin/reports/ReportCard";
-import { ExportHistory } from "@/src/components/admin/reports/ExportHistory";
 import { FinancialReportSummary, ReportCategory, ExportFormat } from "@/src/types/admin/report";
 import { Footer } from "@/src/components/landing/Footer";
 import { getAdminReportsData, generateReportAction, generateAllReportsAction } from "@/src/actions/admin-reports";
@@ -130,6 +129,10 @@ export default function ReportsPage() {
     });
   };
 
+  if (isLoading) {
+    return <FullPageLoader message="Kinukuha ang mga ulat at datos mula sa database..." />;
+  }
+
   return (
     <div className="space-y-6 p-4 sm:p-6 lg:p-8">
       {/* Header & Quick Financial Overview */}
@@ -141,17 +144,11 @@ export default function ReportsPage() {
           Mga Pwedeng I-download na Ulat
         </h2>
 
-        {isLoading ? (
-          <div className="py-12 text-center font-mono-brand text-xs text-muted">
-            <FullPageLoader message="Kinukuha ang mga ulat at datos mula sa database..." />
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {reportsList.map((report) => (
-              <ReportCard key={report.id} report={report} onDownload={handleDownload} />
-            ))}
-          </div>
-        )}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {reportsList.map((report) => (
+            <ReportCard key={report.id} report={report} onDownload={handleDownload} />
+          ))}
+        </div>
       </div>
 
       {/* Recent Download Logs */}

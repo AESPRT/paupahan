@@ -32,81 +32,95 @@ export function TicketCard({ ticket }: TicketCardProps) {
   };
 
   return (
-    <div className="flex flex-col gap-4 rounded-3xl border border-line bg-paper-card p-5 shadow-sm transition-all hover:border-forest/40 md:flex-row md:items-start md:justify-between">
+    <div className="flex flex-col justify-between gap-4 rounded-3xl border border-line bg-paper-card p-5 shadow-sm transition-all hover:border-forest/40">
       
-      {/* Details Container */}
-      <div className="space-y-3 flex-1">
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Ticket ID */}
-          <span className="font-mono-brand text-[10px] font-bold text-muted">
-            {ticket.id}
-          </span>
-
-          {/* Status Badge */}
-          <span className={`rounded-md border px-2 py-0.5 font-mono-brand text-[10px] font-bold ${getStatusBadge(ticket.status)}`}>
-            {ticket.status}
-          </span>
-
-          {/* Priority Badge */}
-          <span className={`rounded-md px-2 py-0.5 font-mono-brand text-[9px] font-bold ${getPriorityBadge(ticket.priority)}`}>
-            {ticket.priority} Priority
-          </span>
-        </div>
-
-        <div>
-          <h3 className="font-display text-base font-bold text-forest-deep">
-            {ticket.title}
-          </h3>
-          <p className="mt-1 text-xs text-muted leading-relaxed">
-            {ticket.description}
-          </p>
-        </div>
-
-        {/* Admin Remarks if any */}
-        {ticket.adminRemark && (
-          <div className="flex items-start gap-2 rounded-2xl bg-paper p-3 border border-line/60 text-xs">
-            {/* Chat / Speech Bubble SVG Icon */}
-            <svg className="h-4 w-4 shrink-0 text-forest mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-            </svg>
-            <div>
-              <span className="font-bold text-forest">Sagot ng Landlord: </span>
-              <span className="text-forest-deep">{ticket.adminRemark}</span>
-            </div>
-          </div>
-        )}
-
-        {/* Footer Meta Info */}
-        <div className="flex flex-wrap items-center gap-4 text-[10px] text-muted font-mono-brand pt-1">
-          {/* Category with Folder SVG Icon */}
-          <div className="flex items-center gap-1">
-            <svg className="h-3.5 w-3.5 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-            </svg>
-            <span>Category: {ticket.category}</span>
-          </div>
-
-          {/* Date with Calendar SVG Icon */}
-          <div className="flex items-center gap-1">
-            <svg className="h-3.5 w-3.5 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
-            <span>Petsa: {ticket.createdAt}</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Photo Attachment Preview if present */}
+      {/* 🖼️ Playful Hover Image Container */}
       {ticket.photoUrl && (
-        <div className="shrink-0">
+        <div className="group relative w-full overflow-hidden rounded-2xl border border-line bg-paper shadow-xs">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={ticket.photoUrl}
             alt={ticket.title}
-            className="h-28 w-full rounded-2xl object-cover border border-line md:w-28"
+            className="h-36 w-full object-cover transition-transform duration-500 ease-out group-hover:scale-110"
           />
+          
+          {/* Playful Gradient Overlay with Icon on Hover */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100 flex items-end p-3">
+            <span className="flex items-center gap-1.5 rounded-xl bg-white/90 backdrop-blur-md px-2.5 py-1 font-mono-brand text-[10px] font-bold text-forest-deep shadow-md transform translate-y-2 transition-transform duration-300 group-hover:translate-y-0">
+              <svg className="h-3.5 w-3.5 text-forest" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
+              </svg>
+              I-hover para sa full view
+            </span>
+          </div>
         </div>
       )}
+
+      {/* Details Container */}
+      <div className="space-y-3 flex-1 flex flex-col justify-between">
+        <div className="space-y-2">
+          <div className="flex flex-wrap items-center gap-1.5">
+            {/* Ticket ID */}
+            <span className="font-mono-brand text-[10px] font-bold text-muted">
+              {ticket.id}
+            </span>
+
+            {/* Status Badge */}
+            <span className={`rounded-md border px-2 py-0.5 font-mono-brand text-[10px] font-bold ${getStatusBadge(ticket.status)}`}>
+              {ticket.status}
+            </span>
+
+            {/* Priority Badge */}
+            <span className={`rounded-md px-2 py-0.5 font-mono-brand text-[9px] font-bold ${getPriorityBadge(ticket.priority)}`}>
+              {ticket.priority}
+            </span>
+          </div>
+
+          <div>
+            <h3 className="font-display text-sm font-bold text-forest-deep line-clamp-1">
+              {ticket.title}
+            </h3>
+            <p className="mt-1 text-xs text-muted leading-relaxed line-clamp-2">
+              {ticket.description}
+            </p>
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          {/* Admin Remarks if any */}
+          {ticket.adminRemark && (
+            <div className="flex items-start gap-2 rounded-2xl bg-paper p-3 border border-line/60 text-xs">
+              {/* Chat / Speech Bubble SVG Icon */}
+              <svg className="h-4 w-4 shrink-0 text-forest mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+              </svg>
+              <div className="line-clamp-2">
+                <span className="font-bold text-forest">Sagot: </span>
+                <span className="text-forest-deep">{ticket.adminRemark}</span>
+              </div>
+            </div>
+          )}
+
+          {/* Footer Meta Info */}
+          <div className="flex flex-col gap-1.5 text-[10px] text-muted font-mono-brand pt-1 border-t border-line/50">
+            {/* Category with Folder SVG Icon */}
+            <div className="flex items-center gap-1">
+              <svg className="h-3.5 w-3.5 text-muted shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+              </svg>
+              <span className="truncate">Category: {ticket.category}</span>
+            </div>
+
+            {/* Date with Calendar SVG Icon */}
+            <div className="flex items-center gap-1">
+              <svg className="h-3.5 w-3.5 text-muted shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              <span className="truncate">Petsa: {ticket.createdAt}</span>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

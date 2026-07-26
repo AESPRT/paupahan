@@ -1,10 +1,33 @@
 "use server";
 
 import prisma from "@/src/lib/prisma";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
+
+// Simple in-memory rate limiter store (Para sa production, mas mainam ang Redis ngunit epektibo na ito sa Next.js server instances)
+const loginAttemptsMap = new Map<string, { count: number; lockUntil: number }>();
+
+const MAX_ATTEMPTS = 5; // Pinakamaraming beses na pwedeng sumubok
+const LOCK_TIME_MS = 60 * 1000; // 1 minuto na bawal mag-login kapag sumobra
 
 export async function loginTenantAction(loginCode: string) {
   try {
+    // 1. Kunin ang IP address ng user para sa rate limiting
+    const headersList = await headers();
+    const forwardedFor = headersList.get("x-forwarded-for");
+    const clientIp = forwardedFor ? forwardedFor.split(",")[0].trim() : "unknown_ip";
+
+    const now = Date.now();
+    const attemptRecord = loginAttemptsMap.get(clientIp);
+
+    // 2. Suriin kung naka-lock ang IP dahil sa sunod-sunod na spam/maling try
+    if (attemptRecord && attemptRecord.lockUntil > now) {
+      const remainingSeconds = Math.ceil((attemptRecord.lockUntil - now) / 1000);
+      return {
+        success: false,
+        error: `Tinatantya ang masyadong maraming pagtatangka. Mangyaring maghintay ng ${remainingSeconds} segundo bago muling subukan.`,
+      };
+    }
+
     const trimmedCode = loginCode.trim();
 
     if (!trimmedCode) {
@@ -41,15 +64,36 @@ export async function loginTenantAction(loginCode: string) {
       },
     });
 
+    // Kapag nagkamali sa pag-login, i-update ang attempt count
     if (!tenantRecord || tenantRecord.leases.length === 0) {
+      const currentAttempts = attemptRecord ? attemptRecord.count + 1 : 1;
+      
+      if (currentAttempts >= MAX_ATTEMPTS) {
+        loginAttemptsMap.set(clientIp, {
+          count: currentAttempts,
+          lockUntil: now + LOCK_TIME_MS, // I-lock ng 1 minuto
+        });
+        return {
+          success: false,
+          error: "Labis na beses na nagkamali. Pansamantalang hinarangan ang pag-login sa loob ng 1 minuto.",
+        };
+      }
+
+      loginAttemptsMap.set(clientIp, {
+        count: currentAttempts,
+        lockUntil: 0,
+      });
+
       return { 
         success: false, 
-        error: "Hindi nakita ang aktibong account o mali ang iyong Login Code." 
+        error: `Hindi nakita ang aktibong account o mali ang iyong Login Code. (${MAX_ATTEMPTS - currentAttempts} na tira na lang)` 
       };
     }
 
-    const activeLease = tenantRecord.leases[0];
+    // Kung nagtagumpay ang pag-login, i-reset ang attempt counter ng IP na ito
+    loginAttemptsMap.delete(clientIp);
 
+    const activeLease = tenantRecord.leases[0];
     const cookieStore = await cookies();
     
     // I-set ang session_user_id
@@ -62,7 +106,7 @@ export async function loginTenantAction(loginCode: string) {
       maxAge: 60 * 60 * 24 * 7, // 1 Linggo
     });
 
-    // 👈 I-set din ang role cookie para madaling mabasa ng proxy
+    // I-set ang role cookie para sa proxy
     cookieStore.set({
       name: "user_role",
       value: "tenant",
@@ -91,7 +135,6 @@ export async function logoutTenantAction() {
   try {
     const cookieStore = await cookies();
     
-    // Burahin ang session cookie
     cookieStore.set({
       name: "session_user_id",
       value: "",
@@ -101,7 +144,6 @@ export async function logoutTenantAction() {
       maxAge: 0,
     });
 
-    // 👈 Burahin din ang role cookie
     cookieStore.set({
       name: "user_role",
       value: "",

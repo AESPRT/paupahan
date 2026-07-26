@@ -17,6 +17,21 @@ export function NewTicketModal({ isOpen, onClose, onSubmit }: NewTicketModalProp
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // 🧹 Helper function para i-reset ang lahat ng form fields
+  const resetForm = () => {
+    setTitle("");
+    setCategory("Plumbing");
+    setPriority("Medium");
+    setDescription("");
+    setPhotoPreview(null);
+    setIsSubmitting(false);
+  };
+
+  const handleClose = () => {
+    resetForm();
+    onClose();
+  };
+
   if (!isOpen) return null;
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -30,7 +45,7 @@ export function NewTicketModal({ isOpen, onClose, onSubmit }: NewTicketModalProp
     }
   };
 
-  const handleSubmit = (e: React.SubmitEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim() || !description.trim()) return;
 
@@ -44,7 +59,7 @@ export function NewTicketModal({ isOpen, onClose, onSubmit }: NewTicketModalProp
         description,
         photoUrl: photoPreview || undefined,
       });
-      setIsSubmitting(false);
+      resetForm(); // ✨ I-reset ang form pagkatapos i-submit
       onClose();
     }, 600);
   };
@@ -64,7 +79,7 @@ export function NewTicketModal({ isOpen, onClose, onSubmit }: NewTicketModalProp
               Mag-submit ng Repair Report
             </h3>
           </div>
-          <button onClick={onClose} className="rounded-full p-1.5 text-muted hover:bg-paper">
+          <button onClick={handleClose} className="rounded-full p-1.5 text-muted hover:bg-paper">
             {/* Close SVG Icon */}
             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -159,7 +174,6 @@ export function NewTicketModal({ isOpen, onClose, onSubmit }: NewTicketModalProp
                     onClick={() => setPhotoPreview(null)}
                     className="w-full rounded-xl bg-coral/10 py-1.5 font-mono-brand text-[11px] font-bold text-coral-deep flex items-center justify-center gap-1"
                   >
-                    {/* Trash SVG Icon */}
                     <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                     </svg>
@@ -168,7 +182,6 @@ export function NewTicketModal({ isOpen, onClose, onSubmit }: NewTicketModalProp
                 </div>
               ) : (
                 <label className="flex flex-col items-center cursor-pointer text-center">
-                  {/* Camera SVG Icon */}
                   <div className="rounded-full bg-forest/10 p-3 text-forest">
                     <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
@@ -193,7 +206,7 @@ export function NewTicketModal({ isOpen, onClose, onSubmit }: NewTicketModalProp
           <div className="flex gap-2 pt-2">
             <button
               type="button"
-              onClick={onClose}
+              onClick={handleClose}
               className="w-1/2 rounded-2xl border border-line py-3 font-mono-brand text-xs font-bold text-muted hover:bg-paper"
             >
               Kanselahin
@@ -205,7 +218,6 @@ export function NewTicketModal({ isOpen, onClose, onSubmit }: NewTicketModalProp
             >
               <span>{isSubmitting ? "Ipinapadala..." : "I-submit Report"}</span>
               {!isSubmitting && (
-                /* Arrow Right SVG Icon */
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
                 </svg>
