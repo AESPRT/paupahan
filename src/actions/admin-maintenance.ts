@@ -171,7 +171,7 @@ export async function updateMaintenanceStatusAction(
           maintenanceNotes: adminRemark || (expenses ? `Gastos sa pag-aayos: ₱${expenses.toLocaleString()}` : undefined),
         }, {
           headers: {
-            Authorization: `Bearer ${process.env.API_SECRET_TOKEN}` // O kaya ay galing sa public env kung client-side
+            Authorization: `Bearer ${process.env.NEXT_PUBLIC_API_SECRET_TOKEN}` // O kaya ay galing sa public env kung client-side
           }
         });
       } catch (emailErr) {

@@ -295,7 +295,7 @@ export async function createInvoiceAction(newInvoiceData: Omit<Invoice, "id" | "
           billItems: newBill.items.map(item => ({ type: item.unitLabel, amount: item.amount }))
         }, {
           headers: {
-            Authorization: `Bearer ${process.env.API_SECRET_TOKEN}` // O kaya ay galing sa public env kung client-side
+            Authorization: `Bearer ${process.env.NEXT_PUBLIC_API_SECRET_TOKEN}` // O kaya ay galing sa public env kung client-side
           }
         });
 
@@ -308,7 +308,7 @@ export async function createInvoiceAction(newInvoiceData: Omit<Invoice, "id" | "
           utilityType: "Kuryente at Tubig",
         }, {
           headers: {
-            Authorization: `Bearer ${process.env.API_SECRET_TOKEN}` // O kaya ay galing sa public env kung client-side
+            Authorization: `Bearer ${process.env.NEXT_PUBLIC_API_SECRET_TOKEN}` // O kaya ay galing sa public env kung client-side
           }
         });
       } catch (emailErr) {
@@ -327,7 +327,7 @@ export async function createInvoiceAction(newInvoiceData: Omit<Invoice, "id" | "
           message: smsMessage,
         }, {
           headers: {
-            Authorization: `Bearer ${process.env.API_SECRET_TOKEN}` // O kaya ay galing sa public env kung client-side
+            Authorization: `Bearer ${process.env.NEXT_PUBLIC_API_SECRET_TOKEN}` // O kaya ay galing sa public env kung client-side
           }
         });
       } catch (smsErr) {
@@ -416,7 +416,7 @@ export async function markInvoiceAsPaidAction(id: string) {
           notes: "Na-verify at tinanggap na ang iyong pagbabayad. Maraming salamat!",
         }, {
           headers: {
-            Authorization: `Bearer ${process.env.API_SECRET_TOKEN}` // O kaya ay galing sa public env kung client-side
+            Authorization: `Bearer ${process.env.NEXT_PUBLIC_API_SECRET_TOKEN}` // O kaya ay galing sa public env kung client-side
           }
         });
       } catch (emailErr) {
@@ -435,7 +435,7 @@ export async function markInvoiceAsPaidAction(id: string) {
           message: smsMessage,
         }, {
           headers: {
-            Authorization: `Bearer ${process.env.API_SECRET_TOKEN}` // O kaya ay galing sa public env kung client-side
+            Authorization: `Bearer ${process.env.NEXT_PUBLIC_API_SECRET_TOKEN}` // O kaya ay galing sa public env kung client-side
           }
         });
       } catch (smsErr) {
@@ -687,7 +687,7 @@ export async function runAutoBillingForLandlord(adminId: string) {
             billItems: newBill.items.map(item => ({ type: item.unitLabel, amount: item.amount }))
           }, {
             headers: {
-              Authorization: `Bearer ${process.env.API_SECRET_TOKEN}` // O kaya ay galing sa public env kung client-side
+              Authorization: `Bearer ${process.env.NEXT_PUBLIC_API_SECRET_TOKEN}` // O kaya ay galing sa public env kung client-side
             }
           });
           console.log(`--> Naipadala ang Bill Notification Email kay ${tenantEmail}`);
@@ -702,7 +702,7 @@ export async function runAutoBillingForLandlord(adminId: string) {
             utilityType: "Kuryente at Tubig",
           }, {
             headers: {
-              Authorization: `Bearer ${process.env.API_SECRET_TOKEN}` // O kaya ay galing sa public env kung client-side
+              Authorization: `Bearer ${process.env.NEXT_PUBLIC_API_SECRET_TOKEN}` // O kaya ay galing sa public env kung client-side
             }
           });
           console.log(`--> Naipadala ang Reading Request Email kay ${tenantEmail}`);
@@ -724,7 +724,7 @@ export async function runAutoBillingForLandlord(adminId: string) {
             message: smsMessage,
           }, {
             headers: {
-              Authorization: `Bearer ${process.env.API_SECRET_TOKEN}` // O kaya ay galing sa public env kung client-side
+              Authorization: `Bearer ${process.env.NEXT_PUBLIC_API_SECRET_TOKEN}` // O kaya ay galing sa public env kung client-side
             }
           });
           console.log(`--> Naipadala ang SMS notification kay ${tenantPhone}`);
