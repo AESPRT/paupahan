@@ -86,8 +86,7 @@ export function UtilitiesClientWrapper({ initialRates, initialAmenities }: Utili
       />
 
       <UtilityBillsList 
-        rates={rates} 
-        onEditRate={() => setIsAssignModalOpen(true)} 
+        rates={rates}
       />
 
       <div className="pt-4 border-t border-line">

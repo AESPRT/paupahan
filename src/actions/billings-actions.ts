@@ -293,6 +293,10 @@ export async function createInvoiceAction(newInvoiceData: Omit<Invoice, "id" | "
           totalAmount: newInvoiceData.totalAmount,
           invoiceNumber: newBill.id,
           billItems: newBill.items.map(item => ({ type: item.unitLabel, amount: item.amount }))
+        }, {
+          headers: {
+            Authorization: `Bearer ${process.env.API_SECRET_TOKEN}` // O kaya ay galing sa public env kung client-side
+          }
         });
 
         await axios.post(`${API_BASE_URL}/notify/reading-request`, {
@@ -302,6 +306,10 @@ export async function createInvoiceAction(newInvoiceData: Omit<Invoice, "id" | "
           invoiceNumber: newBill.id,
           dueDate: formattedDueDate,
           utilityType: "Kuryente at Tubig",
+        }, {
+          headers: {
+            Authorization: `Bearer ${process.env.API_SECRET_TOKEN}` // O kaya ay galing sa public env kung client-side
+          }
         });
       } catch (emailErr) {
         console.error(`Error sa pagpapadala ng email kay ${tenantEmail}:`, emailErr);
@@ -317,6 +325,10 @@ export async function createInvoiceAction(newInvoiceData: Omit<Invoice, "id" | "
           phoneNumber: tenantPhone,
           carrier: detectedCarrier,
           message: smsMessage,
+        }, {
+          headers: {
+            Authorization: `Bearer ${process.env.API_SECRET_TOKEN}` // O kaya ay galing sa public env kung client-side
+          }
         });
       } catch (smsErr) {
         console.error(`Error sa pagpapadala ng SMS kay ${tenantPhone}:`, smsErr);
@@ -402,6 +414,10 @@ export async function markInvoiceAsPaidAction(id: string) {
           paymentDate: formattedDate,
           invoiceNumber: updatedBill.id,
           notes: "Na-verify at tinanggap na ang iyong pagbabayad. Maraming salamat!",
+        }, {
+          headers: {
+            Authorization: `Bearer ${process.env.API_SECRET_TOKEN}` // O kaya ay galing sa public env kung client-side
+          }
         });
       } catch (emailErr) {
         console.error(`Error sa pagpapadala ng payment confirmation email kay ${tenantEmail}:`, emailErr);
@@ -417,6 +433,10 @@ export async function markInvoiceAsPaidAction(id: string) {
           phoneNumber: tenantPhone,
           carrier: detectedCarrier,
           message: smsMessage,
+        }, {
+          headers: {
+            Authorization: `Bearer ${process.env.API_SECRET_TOKEN}` // O kaya ay galing sa public env kung client-side
+          }
         });
       } catch (smsErr) {
         console.error(`Error sa pagpapadala ng SMS kay ${tenantPhone}:`, smsErr);
@@ -665,6 +685,10 @@ export async function runAutoBillingForLandlord(adminId: string) {
             totalAmount: totalAmount,
             invoiceNumber: newBill.id,
             billItems: newBill.items.map(item => ({ type: item.unitLabel, amount: item.amount }))
+          }, {
+            headers: {
+              Authorization: `Bearer ${process.env.API_SECRET_TOKEN}` // O kaya ay galing sa public env kung client-side
+            }
           });
           console.log(`--> Naipadala ang Bill Notification Email kay ${tenantEmail}`);
 
@@ -676,6 +700,10 @@ export async function runAutoBillingForLandlord(adminId: string) {
             invoiceNumber: newBill.id,
             dueDate: formattedDueDate,
             utilityType: "Kuryente at Tubig",
+          }, {
+            headers: {
+              Authorization: `Bearer ${process.env.API_SECRET_TOKEN}` // O kaya ay galing sa public env kung client-side
+            }
           });
           console.log(`--> Naipadala ang Reading Request Email kay ${tenantEmail}`);
 
@@ -694,6 +722,10 @@ export async function runAutoBillingForLandlord(adminId: string) {
             phoneNumber: tenantPhone,
             carrier: detectedCarrier, 
             message: smsMessage,
+          }, {
+            headers: {
+              Authorization: `Bearer ${process.env.API_SECRET_TOKEN}` // O kaya ay galing sa public env kung client-side
+            }
           });
           console.log(`--> Naipadala ang SMS notification kay ${tenantPhone}`);
         } catch (smsErr) {

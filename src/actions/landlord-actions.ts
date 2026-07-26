@@ -49,9 +49,12 @@ export async function registerLandlord(formData: FormData): Promise<ActionRespon
         
         // Pagtawag gamit ang axios
         const response = await axios.get(`${apiUrl}/v1/paupahan-payments/user-subscription`, {
-          params: { referenceNumber },
-          timeout: 5000, // 5 seconds timeout
-        });
+            params: { referenceNumber },
+            headers: {
+              Authorization: `Bearer ${process.env.API_SECRET_TOKEN}`, // O kaya ay process.env.NEXT_PUBLIC_API_SECRET_TOKEN depende kung saan mo ginamit
+            },
+            timeout: 5000, // 5 seconds timeout
+          });
 
         if (response.data && response.data.hasActiveSub && response.data.subscription) {
           const sub = response.data.subscription;

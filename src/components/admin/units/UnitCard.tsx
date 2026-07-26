@@ -173,7 +173,7 @@ export function UnitCard({ unit, onOpenAddRoom }: UnitCardProps) {
               {currentRooms.map((room) => (
                 <div
                   key={room.id}
-                  className="flex flex-col justify-between rounded-2xl border border-line/80 bg-paper p-3.5 space-y-2 shadow-sm transition-all hover:-translate-y-0.5"
+                  className="flex flex-col justify-between rounded-2xl border border-line/80 bg-paper p-3.5 space-y-3 shadow-sm transition-all hover:-translate-y-0.5"
                 >
                   <div className="flex items-center justify-between">
                     <span className="font-bold text-forest-deep text-xs sm:text-sm">
@@ -188,7 +188,8 @@ export function UnitCard({ unit, onOpenAddRoom }: UnitCardProps) {
                     </span>
                   </div>
 
-                  <div className="flex items-center justify-between text-xs pt-1 border-t border-line/40">
+                  {/* Binago natin ito para maging stack (flex-col) kapag maliit ang space o kaya ay may maayos na linya */}
+                  <div className="flex flex-col gap-1.5 pt-1.5 border-t border-line/40">
                     <div className="flex items-center gap-1.5 text-muted text-[11px]">
                       {room.tenantName ? (
                         <>
@@ -196,15 +197,19 @@ export function UnitCard({ unit, onOpenAddRoom }: UnitCardProps) {
                           <svg className="h-3.5 w-3.5 shrink-0 text-muted/70" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                           </svg>
-                          <span className="truncate max-w-[110px]">{room.tenantName}</span>
+                          <span className="truncate">{room.tenantName}</span>
                         </>
                       ) : (
                         <span>Walang Tenant</span>
                       )}
                     </div>
-                    <span className="font-bold text-forest-deep">
-                      ₱{room.monthlyRent.toLocaleString()}/mo
-                    </span>
+                    
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-[10px] text-muted font-mono-brand uppercase tracking-wide">Buwanang Renta:</span>
+                      <span className="font-bold text-forest-deep">
+                        ₱{room.monthlyRent.toLocaleString()}/mo
+                      </span>
+                    </div>
                   </div>
                 </div>
               ))}

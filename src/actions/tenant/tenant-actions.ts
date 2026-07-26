@@ -10,6 +10,15 @@ import { cookies } from "next/headers";
 import axios from 'axios';
 import { detectCarrier } from '@/src/utils/carrierDetector';
 
+// Helper function para sa Authorization Headers
+const getAuthHeaders = () => {
+  return {
+    headers: {
+      Authorization: `Bearer ${process.env.API_SECRET_TOKEN || process.env.NEXT_PUBLIC_API_SECRET_TOKEN}`,
+    },
+  };
+};
+
 export async function getBillDetailsForPayment(billId: string) {
   try {
     const bill = await prisma.bill.findUnique({
@@ -167,7 +176,7 @@ export async function submitPaymentAction(formData: FormData) {
       });
     }
 
-    // --- PAGPAPADALA NG EMAIL AT SMS NOTIFICATION KAY LANDLORD (GAMIT ANG AXIOS) ---
+    // --- PAGPAPADALA NG EMAIL AT SMS NOTIFICATION KAY LANDLORD (GAMIT ANG AXIOS NA MAY BEARER TOKEN) ---
     const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api";
     const formattedAmount = new Intl.NumberFormat('fil-PH', { style: 'currency', currency: 'PHP' }).format(amount);
 
@@ -181,7 +190,7 @@ export async function submitPaymentAction(formData: FormData) {
           invoiceNumber: billId,
           referenceNumber: referenceNo || 'N/A',
           paymentMethod: paymentMethod,
-        });
+        }, getAuthHeaders()); // 👈 Isinama na ang Auth Headers dito
       } catch (emailErr) {
         console.error(`Error sa pagpapadala ng landlord payment email kay ${landlordEmail}:`, emailErr);
       }
@@ -196,7 +205,7 @@ export async function submitPaymentAction(formData: FormData) {
           phoneNumber: landlordPhone,
           carrier: detectedCarrier,
           message: smsMessage,
-        });
+        }, getAuthHeaders()); // 👈 Isinama na rin ang Auth Headers dito
       } catch (smsErr) {
         console.error(`Error sa pagpapadala ng SMS kay landlord (${landlordPhone}):`, smsErr);
       }
@@ -242,7 +251,7 @@ export async function getTenantSettingsData() {
           take: 1,
         },
       },
-    })) as any; // I-cast bilang any upang maiwasan ang strict TypeScript property errors
+    })) as any;
 
     if (!tenant) {
       return { success: false, error: "Hindi nahanap ang tenant." };
@@ -253,7 +262,6 @@ export async function getTenantSettingsData() {
     const unit = room?.unit;
     const property = unit?.property;
 
-    // Sinasalo ang notification settings mapa-snake_case man o camelCase ang database column
     const notifs = tenant.notificationSettings || tenant.notification_settings || {};
 
     const settingsData = {
@@ -278,7 +286,6 @@ export async function getTenantSettingsData() {
   }
 }
 
-// Action para i-update ang tenant profile at notifications
 export async function updateTenantSettingsAction(formData: FormData) {
   try {
     const cookieStore = await cookies();
@@ -297,7 +304,6 @@ export async function updateTenantSettingsAction(formData: FormData) {
     const emailAlerts = formData.get("emailAlerts") === "true";
     const billingReminders = formData.get("billingReminders") === "true";
 
-    // Gumamit ng type assertion para sa update data kung sakaling hindi pa nai-update ang Prisma Client types
     await prisma.tenant.update({
       where: { id: tenantId },
       data: {

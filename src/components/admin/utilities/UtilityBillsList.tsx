@@ -4,10 +4,9 @@ import { UtilityRate } from "@/src/types/admin/utility";
 
 interface UtilityRatesListProps {
   rates: UtilityRate[];
-  onEditRate: (rate: UtilityRate) => void;
 }
 
-export function UtilityBillsList({ rates, onEditRate }: UtilityRatesListProps) {
+export function UtilityBillsList({ rates }: UtilityRatesListProps) {
   const getIcon = (type: UtilityRate["type"]) => {
     switch (type) {
       case "electricity":
@@ -45,8 +44,8 @@ export function UtilityBillsList({ rates, onEditRate }: UtilityRatesListProps) {
         <>
           <div className="grid grid-cols-1 gap-3 md:hidden">
             {filteredRates.map((rate) => (
-              <div key={rate.id} className="flex flex-col gap-3 rounded-2xl border border-line bg-paper-card p-4 shadow-sm">
-                <div className="flex items-center justify-between border-b border-line/60 pb-2.5">
+              <div key={rate.id} className="flex flex-col gap-2 rounded-2xl border border-line bg-paper-card p-4 shadow-sm">
+                <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2.5">
                     <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-forest/5 border border-forest/10">
                       {getIcon(rate.type)}
@@ -60,12 +59,6 @@ export function UtilityBillsList({ rates, onEditRate }: UtilityRatesListProps) {
                     ₱{rate.ratePerUnit.toLocaleString()} <span className="text-[10px] text-muted font-normal">/ {rate.unitLabel}</span>
                   </span>
                 </div>
-                <button
-                  onClick={() => onEditRate(rate)}
-                  className="w-full rounded-xl bg-forest/10 border border-forest/20 py-2 font-mono-brand text-xs font-bold text-forest hover:bg-forest hover:text-white transition-all"
-                >
-                  I-update ang Rate
-                </button>
               </div>
             ))}
           </div>
@@ -77,7 +70,6 @@ export function UtilityBillsList({ rates, onEditRate }: UtilityRatesListProps) {
                   <th className="px-5 py-4 font-bold">Uri ng Utility</th>
                   <th className="px-5 py-4 font-bold">Base Unit</th>
                   <th className="px-5 py-4 font-bold">Rate / Halaga</th>
-                  <th className="px-5 py-4 text-right font-bold">Aksyon</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-line/60">
@@ -94,14 +86,6 @@ export function UtilityBillsList({ rates, onEditRate }: UtilityRatesListProps) {
                     <td className="px-5 py-4 text-muted font-medium">{rate.unitLabel}</td>
                     <td className="px-5 py-4 font-bold text-forest-deep">
                       ₱{rate.ratePerUnit.toLocaleString()} <span className="text-[11px] text-muted font-normal">per {rate.unitLabel}</span>
-                    </td>
-                    <td className="px-5 py-4 text-right">
-                      <button
-                        onClick={() => onEditRate(rate)}
-                        className="rounded-lg border border-forest/30 bg-forest/5 px-3 py-1.5 font-mono-brand text-[11px] font-bold text-forest hover:bg-forest hover:text-white transition-colors"
-                      >
-                        I-edit ang Rate
-                      </button>
                     </td>
                   </tr>
                 ))}

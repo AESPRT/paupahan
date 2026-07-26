@@ -32,9 +32,18 @@ interface ChangePlanPayload {
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api";
 
+// Helper function para sa mga headers na may kasamang Bearer Token
+const getAuthHeaders = () => {
+  return {
+    headers: {
+      Authorization: `Bearer ${process.env.API_SECRET_TOKEN || process.env.NEXT_PUBLIC_API_SECRET_TOKEN}`,
+    },
+  };
+};
+
 export async function createCheckoutSession(payload: CheckoutPayload): Promise<string> {
   try {
-    const response = await axios.post(`${API_BASE_URL}/checkout`, payload);
+    const response = await axios.post(`${API_BASE_URL}/checkout`, payload, getAuthHeaders());
     const data = response.data;
 
     if (data && data.checkoutUrl) {
@@ -49,7 +58,7 @@ export async function createCheckoutSession(payload: CheckoutPayload): Promise<s
 
 export async function submitCustomInquiry(payload: CustomInquiryPayload): Promise<void> {
   try {
-    await axios.post(`${API_BASE_URL}/custom-inquiry`, payload);
+    await axios.post(`${API_BASE_URL}/custom-inquiry`, payload, getAuthHeaders());
   } catch (err: any) {
     const errorMessage = err.response?.data?.error || err.message || "Nabigong maipadala ang mensahe. Subukan muli.";
     throw new Error(errorMessage);
@@ -58,7 +67,7 @@ export async function submitCustomInquiry(payload: CustomInquiryPayload): Promis
 
 export async function changeLandlordSubscription(payload: ChangePlanPayload): Promise<string> {
   try {
-    const response = await axios.post(`${API_BASE_URL}/change-plan`, payload);
+    const response = await axios.post(`${API_BASE_URL}/change-plan`, payload, getAuthHeaders());
     const data = response.data;
 
     // Kung paid plan, magbabalik ito ng checkout URL para sa PayMongo
