@@ -18,51 +18,56 @@ export function NavRail() {
 
   useEffect(() => {
     async function fetchDashboardData() {
-      const data = await getDashboardBadgeCounts();
-      
-      // I-update ang nav items gamit ang badge at locked/disabled state batay sa plan
-      const updatedItems = DASHBOARD_NAV_ITEMS.map((item) => {
-        let badgeVal: string | undefined = undefined;
-        if (item.id === "notifications") badgeVal = data.notifications;
-        if (item.id === "billings") badgeVal = data.billings;
-        if (item.id === "maintenance") badgeVal = data.maintenance;
-
-        // 🛑 Tukuyin kung naka-lock ang menu item base sa feature permissions ng plan
-        let isLocked = false;
+      try {
+        const data = await getDashboardBadgeCounts();
         
-        // Halimbawa: I-lock ang maintenance kung walang access
-        if (item.id === "maintenance" && data.canAccessMaintenance === false) {
-          isLocked = true;
-        }
-        // Halimbawa: I-lock ang analytics o reports kung walang access
-        if ((item.id === "analytics" || item.id === "reports") && data.canAccessAnalytics === false) {
-          isLocked = true;
-        }
+        const updatedItems = DASHBOARD_NAV_ITEMS.map((item) => {
+          let badgeVal: string | undefined = undefined;
+          if (item.id === "notifications") badgeVal = data.notifications;
+          if (item.id === "billings") badgeVal = data.billings;
+          if (item.id === "maintenance") badgeVal = data.maintenance;
 
-        if (item.id === "notifications" && data.canAccessNotifications === false) {
-          isLocked = true;
-        }
+          let isLocked = false;
+          if (item.id === "maintenance" && data.canAccessMaintenance === false) isLocked = true;
+          if ((item.id === "analytics" || item.id === "reports") && data.canAccessAnalytics === false) isLocked = true;
+          if (item.id === "notifications" && data.canAccessNotifications === false) isLocked = true;
+          if (item.id === "audit_logs" && data.canAccessAuditLogs === false) isLocked = true;
 
-        if (item.id === "audit_logs" && data.canAccessAuditLogs === false) {
-          isLocked = true;
-        }
+          return {
+            ...item,
+            badge: badgeVal,
+            disabled: isLocked,
+          };
+        });
 
-        return {
-          ...item,
-          badge: badgeVal,
-          disabled: isLocked, // 👈 Idagdag o gamitin ito para ma-handle ng NavRailItem
-        };
-      });
-
-      setNavItems(updatedItems);
-      setUserInfo({
-        name: data.userName,
-        role: data.userRole || "Property Admin",
-        initials: data.userInitials,
-      });
+        setNavItems(updatedItems);
+        setUserInfo({
+          name: data.userName,
+          role: data.userRole || "Property Admin",
+          initials: data.userInitials,
+        });
+      } catch (error) {
+        console.error("Error fetching navigation badge counts:", error);
+      }
     }
 
+    // 1. Kunin agad ang data sa unang load
     fetchDashboardData();
+
+    // 2. Real-time polling: I-refresh ang data tuwing 15 segundo para laging updated
+    const intervalId = setInterval(fetchDashboardData, 15000);
+
+    // 3. Custom Event listener para sa Instant Real-time Trigger (Hal. kapag nag-save o nagbasa ng bill/notification)
+    const handleRefreshNav = () => {
+      fetchDashboardData();
+    };
+    window.addEventListener("refresh-nav-badges", handleRefreshNav);
+
+    // Cleanup kapag na-unmount ang component
+    return () => {
+      clearInterval(intervalId);
+      window.removeEventListener("refresh-nav-badges", handleRefreshNav);
+    };
   }, []);
 
   return (
