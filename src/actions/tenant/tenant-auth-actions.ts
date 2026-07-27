@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use server";
 
 import prisma from "@/src/lib/prisma";
@@ -49,6 +50,13 @@ export async function loginTenantAction(loginCode: string) {
             status: "active",
           },
           include: {
+            // Isama ang unit para sa Whole Unit assignment
+            unit: {
+              select: {
+                name: true,
+              },
+            },
+            // Isama ang room at ang unit nito para sa Bedspace/Room assignment
             room: {
               include: {
                 unit: {
@@ -116,13 +124,17 @@ export async function loginTenantAction(loginCode: string) {
       maxAge: 60 * 60 * 24 * 7,
     });
 
+    // Ligtas na pagkuha ng unit name at room number depende kung Room o Buong Unit
+    const assignedUnitName = activeLease.room?.unit?.name || activeLease.unit?.name || "Main Unit";
+    const assignedRoomNumber = activeLease.room?.roomNumber;
+
     return {
       success: true,
       tenant: {
         id: tenantRecord.id,
         fullName: tenantRecord.fullName,
-        roomNumber: activeLease.room.roomNumber,
-        unitName: activeLease.room.unit?.name ?? "Main Unit",
+        roomNumber: assignedRoomNumber,
+        unitName: assignedUnitName,
       },
     };
   } catch (error) {

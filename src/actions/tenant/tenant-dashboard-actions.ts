@@ -13,13 +13,18 @@ export async function getTenantDashboardData() {
       return { success: false, error: "Walang active session." };
     }
 
-    // Kunin ang tenant, ang kasalukuyang active lease nito, room, unit, property, at mga bills
+    // Kunin ang tenant, active lease, room, unit, property, at mga bills
     const tenant = await prisma.tenant.findUnique({
       where: { id: tenantId },
       include: {
         leases: {
           where: { status: "active" },
           include: {
+            unit: {
+              include: {
+                property: true,
+              },
+            },
             room: {
               include: {
                 unit: {
@@ -36,7 +41,7 @@ export async function getTenantDashboardData() {
           orderBy: { generatedAt: "desc" },
           take: 1,
           include: {
-            items: true, // Para sa kuryente, tubig, atbp.
+            items: true,
           },
         },
         maintenanceRequests: {
@@ -45,7 +50,7 @@ export async function getTenantDashboardData() {
         },
         user: {
           select: {
-            paymentSettings: true, // Dito nakalagay ang GCash/Bank details ng landlord kung sinet nila
+            paymentSettings: true,
           },
         },
       },
@@ -56,13 +61,19 @@ export async function getTenantDashboardData() {
     }
 
     const activeLease = tenant.leases[0];
+    
+    // Alamin kung ang lease ay nakatali sa Room (Bedspace) o sa Buong Unit
     const room = activeLease.room;
-    const unit = room.unit;
-    const property = unit.property;
+    const unit = room?.unit || activeLease.unit;
+    const property = unit?.property;
     const latestBill = tenant.bills[0] || null;
     const latestTicket = tenant.maintenanceRequests[0] || null;
 
-    // Kunin ang Landlord payment settings mula sa property o landlord user
+    if (!property || !unit) {
+      return { success: false, error: "May kulang na impormasyon sa ari-arian o unit." };
+    }
+
+    // Kunin ang Landlord payment settings mula sa property landlord
     const landlordUser = await prisma.user.findUnique({
       where: { id: property.landlordId },
       select: { paymentSettings: true },
@@ -70,14 +81,19 @@ export async function getTenantDashboardData() {
 
     const paymentSettings = (landlordUser?.paymentSettings as any) || {};
 
-    // I-parse ang utility items mula sa bill items kung mayroon man
+    // I-parse ang utility items mula sa bill items
     const electricityItem = latestBill?.items.find((i) => i.type === "electricity");
     const waterItem = latestBill?.items.find((i) => i.type === "water");
+
+    // Ligtas na pagbuo ng pangalan ng lokasyon (Room + Unit o Buong Unit lang)
+    const roomName = room 
+      ? `Room ${room.roomNumber} - ${unit.name}` 
+      : `Buong Unit - ${unit.name}`;
 
     // Formatted Data para sa Dashboard Frontend
     const dashboardData = {
       tenantName: tenant.fullName,
-      roomName: `Room ${room.roomNumber} - ${unit.name}`,
+      roomName: roomName,
       propertyName: property.name,
       billingMonth: latestBill ? latestBill.billingMonthYear : "Kasalukuyang Buwan",
       totalBillThisMonth: latestBill ? Number(latestBill.totalAmount) : 0,

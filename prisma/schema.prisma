@@ -179,18 +179,19 @@ model Property {
 }
 
 model Unit {
-  id          String   @id @default(uuid())
-  propertyId  String   @map("property_id")
-  monthlyRent Decimal? @map("monthly_rent") @db.Decimal(12, 2)
-  name        String // Halimbawa: "Building A" o "2nd Floor"
+  id          String     @id @default(uuid())
+  propertyId  String     @map("property_id")
+  monthlyRent Decimal?   @map("monthly_rent") @db.Decimal(12, 2)
+  name        String     // Halimbawa: "Building A" o "2nd Floor"
   description String?
   status      UnitStatus @default(vacant)
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  createdAt   DateTime   @default(now()) @map("created_at")
+  updatedAt   DateTime   @updatedAt @map("updated_at")
 
-  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  rooms    Room[] // Mga kuwarto/pintuan sa loob ng unit na ito
-  leases   Lease[]
+  property            Property             @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  rooms               Room[]               // Mga kuwarto/pintuan sa loob ng unit na ito
+  leases              Lease[]
+  maintenanceRequests MaintenanceRequest[]
 
   @@map("units")
 }
@@ -348,7 +349,8 @@ model Payment {
 model MaintenanceRequest {
   id           String              @id @default(uuid())
   ticketNumber String?             @map("ticket_number")
-  roomId       String              @map("room_id")
+  roomId       String?             @map("room_id") // Ginawang opsyonal (?)
+  unitId       String?             @map("unit_id") // Ginawang opsyonal (?)
   tenantId     String?             @map("tenant_id")
   title        String
   category     MaintenanceCategory
@@ -361,7 +363,8 @@ model MaintenanceRequest {
   createdAt    DateTime            @default(now()) @map("created_at")
   updatedAt    DateTime            @updatedAt @map("updated_at")
 
-  room   Room    @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  room   Room?   @relation(fields: [roomId], references: [id], onDelete: Cascade) // Opsyonal na relasyon
+  unit   Unit?   @relation(fields: [unitId], references: [id], onDelete: Cascade) // Opsyonal na relasyon
   tenant Tenant? @relation(fields: [tenantId], references: [id])
 
   @@map("maintenance_requests")

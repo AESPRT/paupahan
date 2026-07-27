@@ -19,15 +19,27 @@ export async function getAdminMaintenanceRequests() {
       return { success: false, requests: [], error: "Walang active session." };
     }
 
+    // Sinusuportahan na nito ang parehong Room/Bedspace at Buong Unit maintenance requests
     const maintenanceRequests = await prisma.maintenanceRequest.findMany({
       where: {
-        room: {
-          unit: {
-            property: {
-              landlordId: userId,
+        OR: [
+          {
+            room: {
+              unit: {
+                property: {
+                  landlordId: userId,
+                },
+              },
             },
           },
-        },
+          {
+            unit: {
+              property: {
+                landlordId: userId,
+              },
+            },
+          },
+        ],
       },
       include: {
         room: {
@@ -37,6 +49,11 @@ export async function getAdminMaintenanceRequests() {
                 property: true,
               },
             },
+          },
+        },
+        unit: {
+          include: {
+            property: true,
           },
         },
         tenant: true,
@@ -64,11 +81,15 @@ export async function getAdminMaintenanceRequests() {
       else if (catLower === "appliance") category = "Appliance";
       else if (catLower === "structural") category = "Structural";
 
+      // Ligtas na pagkuha ng pangalan ng unit at room number kung mayroon man
+      const resolvedUnitName = req.room?.unit?.name || req.unit?.name || "Walang Unit";
+      const resolvedRoomNumber = req.room?.roomNumber ? `Room ${req.room.roomNumber}` : "Buong Unit";
+
       return {
         id: req.id,
         ticketNumber: req.ticketNumber || `TICK-${req.id.slice(0, 5).toUpperCase()}`,
-        unitName: req.room.unit.name,
-        roomNumber: req.room.roomNumber,
+        unitName: resolvedUnitName,
+        roomNumber: resolvedRoomNumber,
         tenantName: req.tenant?.fullName || "Hindi nakatala",
         category,
         issueTitle: req.title,
@@ -113,7 +134,7 @@ export async function updateMaintenanceStatusAction(
       updateData.expenses = expenses !== undefined ? expenses : 0;
     }
 
-    // 1. I-update ang maintenance request at isama ang relasyon patungo sa landlord para makuha ang pangalan nito
+    // I-update ang maintenance request kasama ang relasyon sa room o unit patungong landlord
     const updatedRequest = await prisma.maintenanceRequest.update({
       where: { id: requestId },
       data: updateData,
@@ -128,6 +149,15 @@ export async function updateMaintenanceStatusAction(
                     landlord: { select: { fullName: true } },
                   },
                 },
+              },
+            },
+          },
+        },
+        unit: {
+          include: {
+            property: {
+              include: {
+                landlord: { select: { fullName: true } },
               },
             },
           },
@@ -154,8 +184,10 @@ export async function updateMaintenanceStatusAction(
     const tenantPhone = updatedRequest.tenant?.phone;
     const tenantName = updatedRequest.tenant?.fullName || "Tenant";
     
-    // Kunin ang pangalan ng landlord gamit ang tamang property relation path
-    const landlordName = updatedRequest.room?.unit?.property?.landlord?.fullName || "Landlord";
+    // Ligtas na pagkuha ng pangalan ng landlord mula sa Room o Unit relation
+    const landlordName = updatedRequest.room?.unit?.property?.landlord?.fullName || 
+                         updatedRequest.unit?.property?.landlord?.fullName || 
+                         "Landlord";
     
     const issueTitle = updatedRequest.title || "Maintenance Request";
     const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api";
@@ -171,7 +203,7 @@ export async function updateMaintenanceStatusAction(
           maintenanceNotes: adminRemark || (expenses ? `Gastos sa pag-aayos: ₱${expenses.toLocaleString()}` : undefined),
         }, {
           headers: {
-            Authorization: `Bearer ${process.env.NEXT_PUBLIC_API_SECRET_TOKEN}` // O kaya ay galing sa public env kung client-side
+            Authorization: `Bearer ${process.env.NEXT_PUBLIC_API_SECRET_TOKEN}`
           }
         });
       } catch (emailErr) {

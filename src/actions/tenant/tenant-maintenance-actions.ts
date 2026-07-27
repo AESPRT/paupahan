@@ -15,14 +15,21 @@ export async function getTenantMaintenanceTickets() {
       return { success: false, tickets: [], error: "Walang active session." };
     }
 
-    // Hanapin ang tenant profile gamit ang userId
+    // Hanapin ang tenant profile gamit ang userId kasama ang room at unit sa active lease
     const tenant = await prisma.tenant.findUnique({
       where: { id: userId },
       include: {
         leases: {
           where: { status: "active" },
           take: 1,
-          include: { room: true }
+          include: { 
+            room: {
+              select: { roomNumber: true }
+            },
+            unit: {
+              select: { name: true }
+            }
+          }
         }
       }
     });
@@ -37,19 +44,20 @@ export async function getTenantMaintenanceTickets() {
       include: {
         room: {
           select: { roomNumber: true }
+        },
+        unit: {
+          select: { name: true }
         }
       }
     });
 
     // I-map patungong frontend format
     const tickets = dbTickets.map((t) => {
-      // I-format ang status para sa badge ng UI
       let status: "Pending" | "In Progress" | "Resolved" | "Rejected" = "Pending";
       if (t.status === "in_progress") status = "In Progress";
       else if (t.status === "resolved") status = "Resolved";
       else if (t.status === "rejected") status = "Rejected";
 
-      // I-format ang oras/petsa kung kailan ginawa
       const timeAgo = new Intl.DateTimeFormat('fil-PH', {
         month: 'short',
         day: 'numeric',
@@ -69,7 +77,14 @@ export async function getTenantMaintenanceTickets() {
       };
     });
 
-    return { success: true, tickets, roomId: tenant.leases[0]?.roomId };
+    const activeLease = tenant.leases[0];
+
+    return { 
+      success: true, 
+      tickets, 
+      roomId: activeLease?.roomId,
+      unitId: activeLease?.unitId 
+    };
   } catch (error) {
     console.error("Error fetching maintenance tickets:", error);
     return { success: false, tickets: [], error: "Nabigong kunin ang mga maintenance tickets." };
@@ -103,17 +118,19 @@ export async function createMaintenanceTicketAction(data: {
     });
 
     if (!tenant || tenant.leases.length === 0) {
-      return { success: false, error: "Walang aktibong lease o kwarto para sa tenant na ito." };
+      return { success: false, error: "Walang aktibong lease o lokasyon para sa tenant na ito." };
     }
 
-    const activeRoomId = tenant.leases[0].roomId;
+    const activeLease = tenant.leases[0];
+    const activeRoomId = activeLease.roomId || null;
+    const activeUnitId = activeLease.unitId || null;
+
     const ticketCount = await prisma.maintenanceRequest.count();
     const ticketNumber = `MNT-2026-${String(ticketCount + 1).padStart(3, '0')}`;
 
     await prisma.maintenanceRequest.create({
       data: {
         ticketNumber,
-        roomId: activeRoomId,
         tenantId: tenant.id,
         title: data.title,
         category: data.category,
@@ -121,6 +138,8 @@ export async function createMaintenanceTicketAction(data: {
         priority: data.priority,
         status: "pending",
         photoUrl: data.photoUrl,
+        ...(activeRoomId ? { roomId: activeRoomId } : {}),
+        ...(activeUnitId ? { unitId: activeUnitId } : {}),
       },
     });
 
