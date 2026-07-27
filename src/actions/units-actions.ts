@@ -26,11 +26,21 @@ export async function getUnitsData() {
       return [];
     }
 
-    // 2. Kunin lamang ang mga unit sa ilalim ng mga property ng landlord na ito
+    // 2. Kunin ang mga unit kasama ang rooms nito at unit-level leases
     const unitsList = await prisma.unit.findMany({
       where: { propertyId: { in: propertyIds } },
       include: {
         property: { select: { name: true, city: true, addressLine: true } },
+        // 👈 Isinama natin ang unit-level leases para malaman kung occupied/reserved ang buong unit
+        leases: {
+          where: { 
+            status: { in: ['active', 'pending'] } 
+          },
+          include: {
+            tenant: { select: { fullName: true } },
+          },
+          take: 1,
+        },
         rooms: {
           include: {
             leases: {
@@ -49,6 +59,8 @@ export async function getUnitsData() {
     });
 
     const formattedUnits = unitsList.map((unit) => {
+      const activeOrPendingUnitLease = unit.leases[0];
+
       const formattedRooms = unit.rooms.map((room) => {
         const activeOrPendingLease = room.leases[0];
         
@@ -73,10 +85,15 @@ export async function getUnitsData() {
 
       return {
         id: unit.id,
-        name: `${unit.property.name} - ${unit.name}`,
+        name: unit.name,
         address: `${unit.property.addressLine}, ${unit.property.city}`,
         totalRooms: formattedRooms.length,
         rooms: formattedRooms,
+        monthlyRent: Number(unit.monthlyRent || 0), // 👈 Sinamahan na rin ng monthlyRent ng unit
+        // Maaari mo ring idagdag ang mga ito kung kailangan sa frontend interface mo:
+        unitStatus: unit.status,
+        unitLeaseStatus: activeOrPendingUnitLease ? (activeOrPendingUnitLease.status === 'pending' ? "Reserved" : "Occupied") : "Vacant",
+        unitTenantName: activeOrPendingUnitLease?.tenant?.fullName,
       };
     });
 
@@ -87,7 +104,7 @@ export async function getUnitsData() {
   }
 }
 
-export async function addUnitAction(name: string) {
+export async function addUnitAction(data: { unitName: string; monthlyRent: number }) {
   try {
     const cookieStore = await cookies();
     const adminId = cookieStore.get("session_user_id")?.value;
@@ -99,7 +116,6 @@ export async function addUnitAction(name: string) {
     // 1. Suriin ang subscription limits ng user
     const limits = await checkUserSubscriptionLimits();
     
-    // 🛑 DITO ANG PAGBABAGO: Kapag hindi na kaya magdagdag (umabot na sa max units), harangin agad anuman ang plan!
     if (!limits.canAddMoreUnits) {
       return { 
         success: false, 
@@ -107,12 +123,12 @@ export async function addUnitAction(name: string) {
       };
     }
 
-    // 1. Hanapin muna kung mayroon nang property ang landlord na ito
+    // 2. Hanapin muna kung mayroon nang property ang landlord na ito
     let property = await prisma.property.findFirst({
       where: { landlordId: adminId },
     });
 
-    // 2. Kung wala pang property ang landlord na ito, gawan siya ng sariling property
+    // 3. Kung wala pang property ang landlord na ito, gawan siya ng sariling property
     if (!property) {
       property = await prisma.property.create({
         data: {
@@ -124,11 +140,12 @@ export async function addUnitAction(name: string) {
       });
     }
 
-    // 3. I-create ang Unit sa ilalim ng property ng landlord at i-save sa variable
+    // 4. I-create ang Unit sa ilalim ng property ng landlord kasama ang monthlyRent
     const newUnit = await prisma.unit.create({
       data: {
         propertyId: property.id,
-        name: `${property.name} - ${name}`,
+        name: `${property.name} - ${data.unitName}`,
+        monthlyRent: data.monthlyRent, // 👈 Isinama na ang buwanang renta para sa unit-level lease
       },
       include: {
         rooms: true, // Para masigurong kasama ang rooms array sa return value
@@ -137,15 +154,14 @@ export async function addUnitAction(name: string) {
 
     await createAuditLog({
       actorId: adminId,
-      action: `Gumawa ng bagong Unit/Building: ${name}`,
+      action: `Gumawa ng bagong Unit/Building: ${data.unitName}`,
       entityType: 'Unit',
-      entityId: newUnit.id, // Ginamit ang tunay na ID ng bagong unit
+      entityId: newUnit.id,
       metadata: { actionType: 'ADD' },
     });
     
     revalidatePath('/admin/dashboard/units');
     
-    // Ibinabalik na ngayon ang success kasama ang mismong unit data mula sa DB
     return { success: true, unit: newUnit };
   } catch (error) {
     console.error('Error adding unit:', error);

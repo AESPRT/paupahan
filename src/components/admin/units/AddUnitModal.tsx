@@ -6,7 +6,8 @@ interface AddUnitModalProps {
   isOpen: boolean;
   propertyName: string;
   onClose: () => void;
-  onAddUnit: (unitName: string) => void;
+  // Binago para tanggapin ang object na may unitName at monthlyRent
+  onAddUnit: (unitData: { unitName: string; monthlyRent: number }) => void;
 }
 
 export function AddUnitModal({
@@ -16,15 +17,21 @@ export function AddUnitModal({
   onAddUnit,
 }: AddUnitModalProps) {
   const [unitName, setUnitName] = useState("");
+  const [monthlyRent, setMonthlyRent] = useState(""); // 👈 Bagong state para sa rent
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!unitName.trim()) return;
 
-    onAddUnit(unitName);
+    onAddUnit({
+      unitName,
+      monthlyRent: Number(monthlyRent) || 0,
+    });
+
     setUnitName("");
+    setMonthlyRent("");
     onClose();
   };
 
@@ -40,7 +47,7 @@ export function AddUnitModal({
           </div>
           <button
             onClick={onClose}
-            className="rounded-full p-1 text-muted hover:bg-paper hover:text-ink"
+            className="rounded-full p-1 text-muted hover:bg-paper hover:text-ink cursor-pointer"
           >
             ✕
           </button>
@@ -61,17 +68,33 @@ export function AddUnitModal({
             />
           </div>
 
+          {/* 👈 Bagong Input Field para sa Buwanang Renta ng Unit */}
+          <div>
+            <label className="block text-xs font-bold text-forest-deep mb-1">
+              Buwanang Renta (Monthly Rent) - Opsyonal kung may Rooms
+            </label>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              placeholder="e.g. 5000"
+              value={monthlyRent}
+              onChange={(e) => setMonthlyRent(e.target.value)}
+              className="w-full rounded-xl border border-line bg-paper px-3.5 py-2.5 text-xs font-medium text-ink outline-none focus:border-forest"
+            />
+          </div>
+
           <div className="flex items-center justify-end gap-2 pt-2">
             <button
               type="button"
               onClick={onClose}
-              className="rounded-xl border border-line px-4 py-2 text-xs font-bold text-muted hover:bg-paper"
+              className="rounded-xl border border-line px-4 py-2 text-xs font-bold text-muted hover:bg-paper cursor-pointer"
             >
               Kanselahin
             </button>
             <button
               type="submit"
-              className="rounded-xl bg-forest px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-forest-deep"
+              className="rounded-xl bg-forest px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-forest-deep cursor-pointer"
             >
               Idagdag ang Unit
             </button>

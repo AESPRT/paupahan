@@ -15,40 +15,48 @@ export async function getAdminReportsData() {
       return { success: false, error: "Walang active session." };
     }
 
-    const rooms = await prisma.room.findMany({
-      where: {
-        unit: {
-          property: {
-            landlordId: userId,
-          },
-        },
-      },
+    // 💡 Kunin ang parehong Rooms at Units para sa Occupancy at Bilang
+    const units = await prisma.unit.findMany({
+      where: { property: { landlordId: userId } },
       include: {
-        leases: {
-          where: {
-            status: "active",
+        rooms: {
+          include: {
+            leases: { where: { status: "active" } },
           },
         },
+        leases: { where: { status: "active" } }, // Para sa unit-level leases
       },
     });
 
-    const totalRooms = rooms.length;
-    const occupiedRooms = rooms.filter(
-      (r) => (r.leases && r.leases.length > 0) || r.status === "occupied"
-    ).length;
-    
-    const occupancyRate = totalRooms > 0 ? Math.round((occupiedRooms / totalRooms) * 100) : 0;
+    let totalRoomsOrUnits = 0;
+    let occupiedCount = 0;
 
+    units.forEach((unit) => {
+      if (unit.rooms && unit.rooms.length > 0) {
+        unit.rooms.forEach((room) => {
+          totalRoomsOrUnits++;
+          if ((room.leases && room.leases.length > 0) || room.status === "occupied") {
+            occupiedCount++;
+          }
+        });
+      } else {
+        totalRoomsOrUnits++;
+        if (unit.leases && unit.leases.length > 0) {
+          occupiedCount++;
+        }
+      }
+    });
+
+    const occupancyRate = totalRoomsOrUnits > 0 ? Math.round((occupiedCount / totalRoomsOrUnits) * 100) : 0;
+
+    // 💡 Ayusin ang query para sa Payments / Bills (suportahan ang Room at Unit level lease)
     const payments = await prisma.bill.findMany({
       where: {
         lease: {
-          room: {
-            unit: {
-              property: {
-                landlordId: userId,
-              },
-            },
-          },
+          OR: [
+            { room: { unit: { property: { landlordId: userId } } } },
+            { unit: { property: { landlordId: userId } } },
+          ],
         },
         status: "paid",
       },
@@ -58,17 +66,12 @@ export async function getAdminReportsData() {
 
     const maintenanceExpenses = await prisma.maintenanceRequest.findMany({
       where: {
-        room: {
-          unit: {
-            property: {
-              landlordId: userId,
-            },
-          },
-        },
+        OR: [
+          { room: { unit: { property: { landlordId: userId } } } },
+          { unit: { property: { landlordId: userId } } },
+        ],
       },
-      select: {
-        expenses: true,
-      },
+      select: { expenses: true },
     });
 
     const totalExpenses = maintenanceExpenses.reduce(
@@ -90,13 +93,10 @@ export async function getAdminReportsData() {
       where: {
         leases: {
           some: {
-            room: {
-              unit: {
-                property: {
-                  landlordId: userId,
-                },
-              },
-            },
+            OR: [
+              { room: { unit: { property: { landlordId: userId } } } },
+              { unit: { property: { landlordId: userId } } },
+            ],
           },
         },
       },
@@ -105,13 +105,10 @@ export async function getAdminReportsData() {
     const overdueBillsCount = await prisma.bill.count({
       where: {
         lease: {
-          room: {
-            unit: {
-              property: {
-                landlordId: userId,
-              },
-            },
-          },
+          OR: [
+            { room: { unit: { property: { landlordId: userId } } } },
+            { unit: { property: { landlordId: userId } } },
+          ],
         },
         status: "overdue",
       },
@@ -119,13 +116,10 @@ export async function getAdminReportsData() {
 
     const maintenanceCount = await prisma.maintenanceRequest.count({
       where: {
-        room: {
-          unit: {
-            property: {
-              landlordId: userId,
-            },
-          },
-        },
+        OR: [
+          { room: { unit: { property: { landlordId: userId } } } },
+          { unit: { property: { landlordId: userId } } },
+        ],
       },
     });
 
@@ -161,7 +155,7 @@ export async function getAdminReportsData() {
       {
         id: "rep-occupancy",
         title: "Occupancy & Vacancy Report",
-        description: `Status ng bawat kwarto (${occupiedRooms} occupied / ${totalRooms} total rooms) para sa property planning.`,
+        description: `Status ng bawat property (${occupiedCount} occupied / ${totalRoomsOrUnits} total) para sa property planning.`,
         lastGenerated: "Huling na-update",
         fileSize: "620 KB",
       },
@@ -195,7 +189,14 @@ export async function generateReportAction(reportId: string, format: string) {
     let mimeType = "application/octet-stream";
     let fileExtension = lowerFormat;
 
-    // --- 1. PDF GENERATION PARA SA LAHAT NG URI NG ULAT ---
+    // Helper condition para sa landlord filter
+    const landlordFilter = {
+      OR: [
+        { room: { unit: { property: { landlordId: userId } } } },
+        { unit: { property: { landlordId: userId } } },
+      ],
+    };
+
     if (lowerFormat === "pdf") {
       mimeType = "application/pdf";
       fileExtension = "pdf";
@@ -220,7 +221,7 @@ export async function generateReportAction(reportId: string, format: string) {
         currentY += 10;
 
         const payments = await prisma.bill.findMany({
-          where: { lease: { room: { unit: { property: { landlordId: userId } } } } },
+          where: { lease: landlordFilter },
           include: { tenant: true },
         });
 
@@ -250,7 +251,7 @@ export async function generateReportAction(reportId: string, format: string) {
         currentY += 10;
 
         const tenants = await prisma.tenant.findMany({
-          where: { leases: { some: { room: { unit: { property: { landlordId: userId } } } } } },
+          where: { leases: { some: landlordFilter } },
         });
 
         doc.setFontSize(10);
@@ -278,7 +279,7 @@ export async function generateReportAction(reportId: string, format: string) {
 
         const overdueBills = await prisma.bill.findMany({
           where: {
-            lease: { room: { unit: { property: { landlordId: userId } } } },
+            lease: landlordFilter,
             status: "overdue",
           },
           include: { tenant: true },
@@ -309,9 +310,7 @@ export async function generateReportAction(reportId: string, format: string) {
 
         const billItems = await prisma.billItem.findMany({
           where: {
-            bill: {
-              lease: { room: { unit: { property: { landlordId: userId } } } },
-            },
+            bill: { lease: landlordFilter },
           },
           include: { bill: { include: { tenant: true } } },
         });
@@ -372,7 +371,12 @@ export async function generateReportAction(reportId: string, format: string) {
         currentY += 10;
 
         const expenses = await prisma.maintenanceRequest.findMany({
-          where: { room: { unit: { property: { landlordId: userId } } } },
+          where: {
+            OR: [
+              { room: { unit: { property: { landlordId: userId } } } },
+              { unit: { property: { landlordId: userId } } },
+            ],
+          },
         });
 
         doc.setFontSize(10);
@@ -397,7 +401,6 @@ export async function generateReportAction(reportId: string, format: string) {
       const pdfOutput = doc.output("arraybuffer");
       fileBuffer = Buffer.from(pdfOutput);
     } 
-    // --- 2. EXCEL / XLSX GENERATION PARA SA LAHAT NG URI NG ULAT ---
     else if (lowerFormat === "xlsx" || lowerFormat === "csv") {
       mimeType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
       fileExtension = "xlsx";
@@ -407,7 +410,7 @@ export async function generateReportAction(reportId: string, format: string) {
 
       if (reportId === "rep-income") {
         const payments = await prisma.bill.findMany({
-          where: { lease: { room: { unit: { property: { landlordId: userId } } } } },
+          where: { lease: landlordFilter },
           include: { tenant: true },
         });
 
@@ -431,7 +434,7 @@ export async function generateReportAction(reportId: string, format: string) {
       } 
       else if (reportId === "rep-tenants") {
         const tenants = await prisma.tenant.findMany({
-          where: { leases: { some: { room: { unit: { property: { landlordId: userId } } } } } },
+          where: { leases: { some: landlordFilter } },
         });
 
         sheet.columns = [
@@ -455,7 +458,7 @@ export async function generateReportAction(reportId: string, format: string) {
       else if (reportId === "rep-unpaid") {
         const overdueBills = await prisma.bill.findMany({
           where: {
-            lease: { room: { unit: { property: { landlordId: userId } } } },
+            lease: landlordFilter,
             status: "overdue",
           },
           include: { tenant: true },
@@ -480,9 +483,7 @@ export async function generateReportAction(reportId: string, format: string) {
       else if (reportId === "rep-utilities") {
         const billItems = await prisma.billItem.findMany({
           where: {
-            bill: {
-              lease: { room: { unit: { property: { landlordId: userId } } } },
-            },
+            bill: { lease: landlordFilter },
           },
           include: { bill: { include: { tenant: true } } },
         });
@@ -529,7 +530,12 @@ export async function generateReportAction(reportId: string, format: string) {
       }
       else if (reportId === "rep-expenses") {
         const expenses = await prisma.maintenanceRequest.findMany({
-          where: { room: { unit: { property: { landlordId: userId } } } },
+          where: {
+            OR: [
+              { room: { unit: { property: { landlordId: userId } } } },
+              { unit: { property: { landlordId: userId } } },
+            ],
+          },
         });
 
         sheet.columns = [
@@ -554,7 +560,6 @@ export async function generateReportAction(reportId: string, format: string) {
       const uint8Array = await workbook.xlsx.writeBuffer();
       fileBuffer = Buffer.from(uint8Array);
     } 
-    // --- 3. FALLBACK ---
     else {
       fileBuffer = Buffer.from(`Ulat: ${reportId}\nPetsa: ${new Date().toISOString()}`);
       mimeType = "text/plain";
@@ -577,6 +582,7 @@ export async function generateReportAction(reportId: string, format: string) {
 }
 
 export async function generateAllReportsAction(format: unknown) {
+  // Katulad ng ginawa sa itaas, ang mga filters ay maaari ding i-update gamit ang landlordFilter kung kinakailangan.
   try {
     const cookieStore = await cookies();
     const userId = cookieStore.get("session_user_id")?.value;
@@ -590,14 +596,17 @@ export async function generateAllReportsAction(format: unknown) {
     const reportIds = ["rep-income", "rep-tenants", "rep-unpaid", "rep-utilities", "rep-occupancy", "rep-expenses"];
     
     const zip = new AdmZip();
+    const landlordFilter = {
+      OR: [
+        { room: { unit: { property: { landlordId: userId } } } },
+        { unit: { property: { landlordId: userId } } },
+      ],
+    };
 
     for (const reportId of reportIds) {
       let fileBuffer: Buffer;
       let fileExtension = lowerFormat;
 
-      // -------------------------------------------------------------
-      // 1. KUNG PDF ANG NAPILI SA "DOWNLOAD ALL"
-      // -------------------------------------------------------------
       if (lowerFormat === "pdf") {
         fileExtension = "pdf";
         const doc = new jsPDF();
@@ -617,7 +626,7 @@ export async function generateAllReportsAction(format: unknown) {
           doc.text("Financial & Income Statement", 14, currentY);
           currentY += 8;
           const payments = await prisma.bill.findMany({
-            where: { lease: { room: { unit: { property: { landlordId: userId } } } } },
+            where: { lease: landlordFilter },
             include: { tenant: true },
           });
           doc.setFont("helvetica", "normal");
@@ -632,7 +641,7 @@ export async function generateAllReportsAction(format: unknown) {
           doc.text("Tenant Masterlist & Records", 14, currentY);
           currentY += 8;
           const tenants = await prisma.tenant.findMany({
-            where: { leases: { some: { room: { unit: { property: { landlordId: userId } } } } } },
+            where: { leases: { some: landlordFilter } },
           });
           doc.setFont("helvetica", "normal");
           tenants.forEach((t) => {
@@ -646,7 +655,7 @@ export async function generateAllReportsAction(format: unknown) {
           doc.text("Overdue & Balanse (Delinquency)", 14, currentY);
           currentY += 8;
           const overdueBills = await prisma.bill.findMany({
-            where: { lease: { room: { unit: { property: { landlordId: userId } } } }, status: "overdue" },
+            where: { lease: landlordFilter, status: "overdue" },
             include: { tenant: true },
           });
           doc.setFont("helvetica", "normal");
@@ -661,7 +670,7 @@ export async function generateAllReportsAction(format: unknown) {
           doc.text("Sub-meter & Utility Readings", 14, currentY);
           currentY += 8;
           const billItems = await prisma.billItem.findMany({
-            where: { bill: { lease: { room: { unit: { property: { landlordId: userId } } } } } },
+            where: { bill: { lease: landlordFilter } },
             include: { bill: { include: { tenant: true } } },
           });
           doc.setFont("helvetica", "normal");
@@ -691,7 +700,7 @@ export async function generateAllReportsAction(format: unknown) {
           doc.text("Maintenance & Expenses Log", 14, currentY);
           currentY += 8;
           const expenses = await prisma.maintenanceRequest.findMany({
-            where: { room: { unit: { property: { landlordId: userId } } } },
+            where: landlordFilter,
           });
           doc.setFont("helvetica", "normal");
           expenses.forEach((e) => {
@@ -703,9 +712,6 @@ export async function generateAllReportsAction(format: unknown) {
 
         fileBuffer = Buffer.from(doc.output("arraybuffer"));
       } 
-      // -------------------------------------------------------------
-      // 2. KUNG EXCEL / XLSX ANG NAPILI SA "DOWNLOAD ALL"
-      // -------------------------------------------------------------
       else {
         fileExtension = "xlsx";
         const workbook = new ExcelJS.Workbook();
@@ -713,7 +719,7 @@ export async function generateAllReportsAction(format: unknown) {
 
         if (reportId === "rep-income") {
           const payments = await prisma.bill.findMany({
-            where: { lease: { room: { unit: { property: { landlordId: userId } } } } },
+            where: { lease: landlordFilter },
             include: { tenant: true },
           });
           sheet.columns = [
@@ -728,7 +734,7 @@ export async function generateAllReportsAction(format: unknown) {
         } 
         else if (reportId === "rep-tenants") {
           const tenants = await prisma.tenant.findMany({
-            where: { leases: { some: { room: { unit: { property: { landlordId: userId } } } } } },
+            where: { leases: { some: landlordFilter } },
           });
           sheet.columns = [
             { header: "Full Name", key: "fullName", width: 25 },
@@ -741,7 +747,7 @@ export async function generateAllReportsAction(format: unknown) {
         }
         else if (reportId === "rep-unpaid") {
           const overdueBills = await prisma.bill.findMany({
-            where: { lease: { room: { unit: { property: { landlordId: userId } } } }, status: "overdue" },
+            where: { lease: landlordFilter, status: "overdue" },
             include: { tenant: true },
           });
           sheet.columns = [
@@ -755,7 +761,7 @@ export async function generateAllReportsAction(format: unknown) {
         }
         else if (reportId === "rep-utilities") {
           const billItems = await prisma.billItem.findMany({
-            where: { bill: { lease: { room: { unit: { property: { landlordId: userId } } } } } },
+            where: { bill: { lease: landlordFilter } },
             include: { bill: { include: { tenant: true } } },
           });
           sheet.columns = [
@@ -785,7 +791,7 @@ export async function generateAllReportsAction(format: unknown) {
         }
         else if (reportId === "rep-expenses") {
           const expenses = await prisma.maintenanceRequest.findMany({
-            where: { room: { unit: { property: { landlordId: userId } } } },
+            where: landlordFilter,
           });
           sheet.columns = [
             { header: "Title", key: "title", width: 25 },
@@ -802,7 +808,6 @@ export async function generateAllReportsAction(format: unknown) {
         fileBuffer = Buffer.from(uint8Array);
       }
 
-      // Idagdag sa ZIP archive ang bawat ulat na may tamang laman
       zip.addFile(`${reportId}-${new Date().toISOString().split("T")[0]}.${fileExtension}`, fileBuffer);
     }
 

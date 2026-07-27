@@ -99,6 +99,21 @@ enum BillItemStatus {
   rejected
 }
 
+enum UnitStatus {
+  vacant
+  occupied
+  reserved
+}
+
+enum PaymentStatus {
+  paid
+  overdue
+  pending
+  draft
+
+  @@map("payment_status")
+}
+
 model User {
   id            String   @id @default(uuid())
   email         String   @unique
@@ -166,13 +181,16 @@ model Property {
 model Unit {
   id          String   @id @default(uuid())
   propertyId  String   @map("property_id")
+  monthlyRent Decimal? @map("monthly_rent") @db.Decimal(12, 2)
   name        String // Halimbawa: "Building A" o "2nd Floor"
   description String?
+  status      UnitStatus @default(vacant)
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
   property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
   rooms    Room[] // Mga kuwarto/pintuan sa loob ng unit na ito
+  leases   Lease[]
 
   @@map("units")
 }
@@ -222,7 +240,8 @@ model Tenant {
 model Lease {
   id          String    @id @default(uuid())
   tenantId    String    @map("tenant_id")
-  roomId      String    @map("room_id")
+  unitId      String?   @map("unit_id") // 👈 Unit-level lease (optional)
+  roomId      String?   @map("room_id") // 👈 Room-level lease (optional)
   startDate   DateTime  @map("start_date") @db.Date
   endDate     DateTime? @map("end_date") @db.Date
   monthlyRent Decimal   @map("monthly_rent") @db.Decimal(12, 2)
@@ -233,16 +252,19 @@ model Lease {
   depositAmount Decimal @default(0) @map("deposit_amount") @db.Decimal(12, 2)
 
   status        LeaseStatus @default(active)
+  paymentStatus PaymentStatus @default(pending) @map("payment_status")
   utilityConfig Json        @default("{}") @map("utility_config")
   createdAt     DateTime    @default(now()) @map("created_at")
   updatedAt     DateTime    @updatedAt @map("updated_at")
 
   tenant    Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  room      Room           @relation(fields: [roomId], references: [id])
+  unit      Unit?          @relation(fields: [unitId], references: [id]) // 👈 Idagdag ito para sa Opposite Relation
+  room      Room?          @relation(fields: [roomId], references: [id]) // 👈 Ginawa ring optional
   bills     Bill[]
   amenities LeaseAmenity[]
 
   @@index([tenantId])
+  @@index([unitId, status])
   @@index([roomId, status])
   @@map("leases")
 }

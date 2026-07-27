@@ -1,9 +1,10 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useState } from "react";
 import { Invoice } from "@/src/types/admin/billing";
 
-// Uri para sa mga Amenities na naka-assign o nakakabit sa kuwarto/tenant
+// Uri para sa mga Amenities na naka-assign o nakakabit sa kuwarto/unit/tenant
 interface RoomAmenity {
   id: string;
   name: string;
@@ -12,12 +13,14 @@ interface RoomAmenity {
 }
 
 interface ActiveTenantRoom {
-  roomId: string;
+  leaseId: string;
+  roomId?: string | null;
+  unitId?: string | null;
   roomNumber: string;
   unitName: string;
   tenantName: string;
   monthlyRent: number;
-  amenities?: RoomAmenity[]; // 👈 Mga amenities para sa kuwartong ito
+  amenities?: RoomAmenity[]; // 👈 Mga amenities para sa kuwarto/unit na ito
 }
 
 interface CreateInvoiceModalProps {
@@ -33,7 +36,8 @@ export function CreateInvoiceModal({
   onCreate,
   roomsWithTenants = [],
 }: CreateInvoiceModalProps) {
-  const [selectedRoomId, setSelectedRoomId] = useState("");
+  // 💡 Ginamit ang leaseId bilang pangunahing identifier sa dropdown para saklaw ang parehong Room at Unit
+  const [selectedLeaseId, setSelectedLeaseId] = useState("");
   const [tenantName, setTenantName] = useState("");
   const [unitRoom, setUnitRoom] = useState("");
   const [dueDate, setDueDate] = useState("");
@@ -42,13 +46,20 @@ export function CreateInvoiceModal({
   // State para sa mga napiling amenities at kani-kanilang halaga
   const [roomAmenities, setRoomAmenities] = useState<RoomAmenity[]>([]);
 
-  // Kapag nagbago ang piniling room, auto-fill ang tenant name, rent, at amenities
-  const handleRoomChange = (roomId: string) => {
-    setSelectedRoomId(roomId);
-    const found = roomsWithTenants.find((r) => r.roomId === roomId);
+  // Kapag nagbago ang piniling lease, auto-fill ang tenant name, rent, at amenities
+  const handleLeaseChange = (leaseId: string) => {
+    setSelectedLeaseId(leaseId);
+    const found = roomsWithTenants.find((r) => r.leaseId === leaseId);
     if (found) {
       setTenantName(found.tenantName);
-      setUnitRoom(`${found.unitName} - Room ${found.roomNumber}`);
+      
+      // 💡 Suriin kung ito ba ay buong unit o may kasamang room number
+      if (found.roomNumber === "Buong Unit" || !found.roomId) {
+        setUnitRoom(`${found.unitName} (Buong Unit)`);
+      } else {
+        setUnitRoom(`${found.unitName} - Room ${found.roomNumber}`);
+      }
+
       setRentAmount(found.monthlyRent ? found.monthlyRent.toString() : "");
       setRoomAmenities(found.amenities || []); // 👈 Kunin ang amenities kung meron man
     } else {
@@ -81,7 +92,7 @@ export function CreateInvoiceModal({
       total += Number(rentAmount);
     }
 
-    // 3. ✨ Isama ang lahat ng nakasulat/na-set na Amenities sa Line Items at Total
+    // 2. ✨ Isama ang lahat ng nakasulat/na-set na Amenities sa Line Items at Total
     roomAmenities.forEach((amenity) => {
       if (amenity.amount > 0) {
         lineItems.push({
@@ -105,7 +116,7 @@ export function CreateInvoiceModal({
     });
 
     // Reset form
-    setSelectedRoomId("");
+    setSelectedLeaseId("");
     setTenantName("");
     setUnitRoom("");
     setDueDate("");
@@ -130,23 +141,29 @@ export function CreateInvoiceModal({
         </div>
 
         <form onSubmit={handleSubmit} className="mt-4 space-y-3.5">
-          {/* Dropdown para sa mga Occupied Rooms */}
+          {/* Dropdown para sa mga Occupied Units/Rooms (Gamit ang leaseId) */}
           <div>
             <label className="block text-xs font-bold text-forest-deep mb-1">
-              Pumili ng Kuwarto / Tenant (Occupied)
+              Pumili ng Property / Tenant (Occupied)
             </label>
             <select
               required
-              value={selectedRoomId}
-              onChange={(e) => handleRoomChange(e.target.value)}
+              value={selectedLeaseId}
+              onChange={(e) => handleLeaseChange(e.target.value)}
               className="w-full rounded-xl border border-line bg-paper px-3.5 py-2 text-xs font-medium text-ink outline-none focus:border-forest"
             >
-              <option value="">-- Piliin ang Kuwarto at Tenant --</option>
-              {roomsWithTenants.map((item) => (
-                <option key={item.roomId} value={item.roomId}>
-                  {item.unitName} - Room {item.roomNumber} ({item.tenantName})
-                </option>
-              ))}
+              <option value="">-- Piliin ang Unit/Room at Tenant --</option>
+              {roomsWithTenants.map((item) => {
+                const displayText = item.roomNumber === "Buong Unit" || !item.roomId
+                  ? `${item.unitName} (Buong Unit) - ${item.tenantName}`
+                  : `${item.unitName} - Room ${item.roomNumber} (${item.tenantName})`;
+
+                return (
+                  <option key={item.leaseId} value={item.leaseId}>
+                    {displayText}
+                  </option>
+                );
+              })}
             </select>
           </div>
 
@@ -202,11 +219,11 @@ export function CreateInvoiceModal({
             </div>
           </div>
 
-          {/* ✨ DITO LUMALABAS ANG MGA AMENITIES KUNG MERON MANANG NAKATAKDA SA KUWARTO */}
+          {/* ✨ DITO LUMALABAS ANG MGA AMENITIES KUNG MERON MANANG NAKATAKDA SA UNIT/ROOM */}
           {roomAmenities.length > 0 && (
             <div className="space-y-2 border-t border-line/60 pt-3">
               <span className="block font-mono-brand text-[11px] font-bold uppercase text-forest">
-                Mga Nakatalagang Amenities para sa Kuwartong Ito
+                Mga Nakatalagang Amenities para sa Paupahang Ito
               </span>
 
               <div className="space-y-2 max-h-40 overflow-y-auto pr-1">

@@ -5,6 +5,7 @@
 import { useState, useEffect } from "react";
 import Image from "next/image";
 import QRCode from "qrcode";
+import { Sparkles, UserPlus, PhoneCall, Package, QrCode } from "lucide-react";
 import { getUnitsAndRoomsForTenantByTenantId, addTenantAction, updateTenantAction } from "@/src/actions/tenants-actions";
 import { Tenant } from "@/src/types/tenant/tenant";
 
@@ -19,7 +20,15 @@ export function AddTenantModal({ isOpen, onClose, onTenantSaved, tenantToEdit }:
   const [fullName, setFullName] = useState(tenantToEdit?.fullName || "");
   const [email, setEmail] = useState(tenantToEdit?.email || "");
   const [phoneNumber, setPhoneNumber] = useState(tenantToEdit?.phone || "");
-  const [selectedRoomId, setSelectedRoomId] = useState("");
+  
+  // Emergency Contact States
+  const [emergencyName, setEmergencyName] = useState(tenantToEdit?.emergencyContactName || "");
+  const [emergencyPhone, setEmergencyPhone] = useState(tenantToEdit?.emergencyContactPhone || "");
+  
+  // Suporta para sa Unit ID o Room ID selection
+  const [selectedAssignmentId, setSelectedAssignmentId] = useState("");
+  const [assignmentType, setAssignmentType] = useState<"unit" | "room">("unit");
+
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   
@@ -35,10 +44,35 @@ export function AddTenantModal({ isOpen, onClose, onTenantSaved, tenantToEdit }:
 
   const isEditMode = Boolean(tenantToEdit);
 
-  // Ang useEffect na ito ay para lamang sa pagkuha ng external data mula sa server actions.
-  // Ang pag-generate ng QR code ay ginawa nating asynchronous promise chaining para maiwasan ang synchronous setState sa linter.
+  const [isPaid, setIsPaid] = useState<boolean>(true);
+
   useEffect(() => {
     if (!isOpen) return;
+
+    // Kung binubuksan sa edit mode, i-populate ang states
+    if (tenantToEdit) {
+      setFullName(tenantToEdit.fullName || "");
+      setEmail(tenantToEdit.email || "");
+      setPhoneNumber(tenantToEdit.phone || "");
+      setEmergencyName(tenantToEdit.emergencyContactName || "");
+      setEmergencyPhone(tenantToEdit.emergencyContactPhone || "");
+      setAdvanceMonths(tenantToEdit.advanceMonths ?? 1);
+      setDepositMonths(tenantToEdit.depositMonths ?? 1);
+      setIsPaid(tenantToEdit.paymentStatus === 'paid');
+    } else {
+      setFullName("");
+      setEmail("");
+      setPhoneNumber("");
+      setEmergencyName("");
+      setEmergencyPhone("");
+      setAdvanceMonths(1);
+      setDepositMonths(1);
+      setSelectedAssignmentId("");
+      setAssignmentType("unit");
+      setStartDate("");
+      setEndDate("");
+      setIsPaid(true);
+    }
 
     getUnitsAndRoomsForTenantByTenantId(tenantToEdit?.id).then((data: any) => {
       setUnitsData(data.unitsData || []);
@@ -66,26 +100,32 @@ export function AddTenantModal({ isOpen, onClose, onTenantSaved, tenantToEdit }:
           setQrCodeUrl("");
         });
     } else {
-      // Inalis ang direktang synchronous else block sa pamamagitan ng paggamit ng queueMicrotask
       queueMicrotask(() => setQrCodeUrl(""));
     }
   }, [isOpen, tenantToEdit]);
 
   if (!isOpen) return null;
 
-  let selectedRoomMonthlyRent = 0;
-  if (selectedRoomId) {
+  // Pag-compute ng buwanang renta base sa napiling Unit o Room
+  let selectedMonthlyRent = 0;
+  if (selectedAssignmentId) {
     for (const unit of unitsData) {
-      const foundRoom = unit.rooms.find((r: any) => r.id === selectedRoomId);
-      if (foundRoom) {
-        selectedRoomMonthlyRent = Number(foundRoom.monthlyRent) || 0;
+      if (assignmentType === "unit" && unit.id === selectedAssignmentId) {
+        selectedMonthlyRent = Number(unit.monthlyRent) || 0;
         break;
+      }
+      if (assignmentType === "room") {
+        const foundRoom = unit.rooms?.find((r: any) => r.id === selectedAssignmentId);
+        if (foundRoom) {
+          selectedMonthlyRent = Number(foundRoom.monthlyRent) || 0;
+          break;
+        }
       }
     }
   }
 
-  const computedAdvanceAmount = selectedRoomMonthlyRent * advanceMonths;
-  const computedDepositAmount = selectedRoomMonthlyRent * depositMonths;
+  const computedAdvanceAmount = selectedMonthlyRent * advanceMonths;
+  const computedDepositAmount = selectedMonthlyRent * depositMonths;
 
   const handleAmenityToggle = (amenityId: string) => {
     setSelectedAmenities(prev => ({
@@ -107,10 +147,10 @@ export function AddTenantModal({ isOpen, onClose, onTenantSaved, tenantToEdit }:
     }));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!fullName || (!isEditMode && !selectedRoomId) || (!isEditMode && !startDate)) {
-      alert("Pakiusap na punan ang mga pangunahing impormasyon (Pangalan, Kwarto, at Simula ng Upa).");
+    if (!fullName || (!isEditMode && !selectedAssignmentId) || (!isEditMode && !startDate)) {
+      alert("Pakiusap na punan ang mga pangunahing impormasyon (Pangalan, Unit/Kwarto, at Simula ng Upa).");
       return;
     }
 
@@ -131,6 +171,9 @@ export function AddTenantModal({ isOpen, onClose, onTenantSaved, tenantToEdit }:
         fullName,
         email,
         phoneNumber,
+        emergencyContactName: emergencyName,
+        emergencyContactPhone: emergencyPhone,
+        paymentStatus: isPaid ? 'paid' : 'pending',
         amenities: amenitiesPayload,
       });
     } else {
@@ -138,11 +181,15 @@ export function AddTenantModal({ isOpen, onClose, onTenantSaved, tenantToEdit }:
         fullName,
         email,
         phoneNumber,
-        roomId: selectedRoomId,
+        emergencyContactName: emergencyName,
+        emergencyContactPhone: emergencyPhone,
+        unitId: assignmentType === "unit" ? selectedAssignmentId : undefined,
+        roomId: assignmentType === "room" ? selectedAssignmentId : undefined,
         startDate,
         endDate: endDate || undefined,
         advanceMonths,
         depositMonths,
+        paymentStatus: isPaid ? 'paid' : 'pending',
         amenities: amenitiesPayload,
       });
     }
@@ -162,7 +209,10 @@ export function AddTenantModal({ isOpen, onClose, onTenantSaved, tenantToEdit }:
     setFullName("");
     setEmail("");
     setPhoneNumber("");
-    setSelectedRoomId("");
+    setEmergencyName("");
+    setEmergencyPhone("");
+    setSelectedAssignmentId("");
+    setAssignmentType("unit");
     setStartDate("");
     setEndDate("");
     setAdvanceMonths(1);
@@ -173,13 +223,25 @@ export function AddTenantModal({ isOpen, onClose, onTenantSaved, tenantToEdit }:
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 backdrop-blur-xs p-4 animate-fadeIn">
-      <div className="w-full max-w-lg rounded-3xl bg-paper-card p-6 shadow-2xl border border-line space-y-5 max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 backdrop-blur-xs p-2 sm:p-4 animate-fadeIn">
+      {/* Full View Modal Container */}
+      <div className="w-full max-w-2xl h-[92vh] sm:h-[88vh] rounded-3xl bg-paper-card shadow-2xl border border-line flex flex-col overflow-hidden">
         
-        <div className="flex justify-between items-center border-b border-line pb-3">
+        {/* Fixed Header */}
+        <div className="flex justify-between items-center border-b border-line p-5 bg-paper-card shrink-0">
           <div>
-            <span className="inline-block px-3 py-1 mb-1 text-[10px] font-bold tracking-wider uppercase rounded-full bg-forest/10 text-forest">
-              {isEditMode ? "✨ Pamamahala ng Tenant" : "🎉 Bagong Pakikipag-ugnayan"}
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 mb-1 text-[10px] font-bold tracking-wider uppercase rounded-full bg-forest/10 text-forest">
+              {isEditMode ? (
+                <>
+                  <Sparkles className="w-3.5 h-3.5" />
+                  Pamamahala ng Tenant
+                </>
+              ) : (
+                <>
+                  <UserPlus className="w-3.5 h-3.5" />
+                  Bagong Pakikipag-ugnayan
+                </>
+              )}
             </span>
             <h3 className="text-xl font-extrabold text-foreground">
               {isEditMode ? `I-edit si ${tenantToEdit?.fullName}` : "Magdagdag ng Bagong Tenant"}
@@ -198,7 +260,8 @@ export function AddTenantModal({ isOpen, onClose, onTenantSaved, tenantToEdit }:
           </button>
         </div>
         
-        <form onSubmit={handleSubmit} className="space-y-4">
+        {/* Scrollable Body Content */}
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-5 space-y-4">
           <div>
             <label className="block text-xs font-bold text-foreground mb-1.5">Buong Pangalan</label>
             <input
@@ -234,25 +297,88 @@ export function AddTenantModal({ isOpen, onClose, onTenantSaved, tenantToEdit }:
             </div>
           </div>
 
+          {/* Emergency Contact Section */}
+          <div className="rounded-2xl border border-line p-4 bg-background/60 space-y-3 shadow-inner">
+            <h4 className="flex items-center gap-1.5 text-xs font-extrabold text-foreground uppercase tracking-wider font-mono">
+              <PhoneCall className="w-3.5 h-3.5 text-forest" />
+              Emergency Contact Details
+            </h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-bold text-foreground mb-1.5">Pangalan ng Kokontakin</label>
+                <input
+                  type="text"
+                  value={emergencyName}
+                  onChange={(e) => setEmergencyName(e.target.value)}
+                  placeholder="Maria Dela Cruz"
+                  className="w-full rounded-xl border border-line bg-background p-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-forest/50 transition-all shadow-xs"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-foreground mb-1.5">Numero ng Emergency Contact</label>
+                <input
+                  type="text"
+                  value={emergencyPhone}
+                  onChange={(e) => setEmergencyPhone(e.target.value)}
+                  placeholder="+63 918 987 6543"
+                  className="w-full rounded-xl border border-line bg-background p-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-forest/50 transition-all shadow-xs"
+                />
+              </div>
+            </div>
+          </div>
+
           {!isEditMode && (
             <div>
-              <label className="block text-xs font-bold text-foreground mb-1.5">Pumili ng Unit at Kwarto</label>
+              <label className="block text-xs font-bold text-foreground mb-1.5">Mag-assign sa Unit o Kwarto</label>
               <select
                 required
-                value={selectedRoomId}
-                onChange={(e) => setSelectedRoomId(e.target.value)}
+                value={selectedAssignmentId}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setSelectedAssignmentId(val);
+                  let foundType: "unit" | "room" = "unit";
+                  for (const unit of unitsData) {
+                    if (unit.id === val) {
+                      foundType = "unit";
+                      break;
+                    }
+                    const matchRoom = unit.rooms?.find((r: any) => r.id === val);
+                    if (matchRoom) {
+                      foundType = "room";
+                      break;
+                    }
+                  }
+                  setAssignmentType(foundType);
+                }}
                 className="w-full rounded-xl border border-line bg-background p-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-forest/50 transition-all cursor-pointer shadow-xs"
               >
-                <option value="">-- Pumili ng Kwarto --</option>
-                {unitsData.map((unit) => (
-                  <optgroup key={unit.id} label={unit.name}>
-                    {unit.rooms.map((room: any) => (
-                      <option key={room.id} value={room.id}>
-                        Room {room.roomNumber} (₱{Number(room.monthlyRent).toLocaleString()})
+                <option value="">-- Pumili ng Unit o Kwarto --</option>
+                {unitsData.map((unit) => {
+                  return (
+                    <optgroup key={unit.id} label={`Unit: ${unit.name}`}>
+                      {/* Buong Unit Option */}
+                      <option 
+                        value={unit.id} 
+                        disabled={unit.isWholeUnitDisabled}
+                      >
+                        {unit.isWholeUnitDisabled ? "[Occupied / May Naka-occupy na Bed]" : "[Vacant]"} [Buong Unit] {unit.name} (₱{Number(unit.monthlyRent || 0).toLocaleString()})
                       </option>
-                    ))}
-                  </optgroup>
-                ))}
+
+                      {/* Mga Beds / Rooms sa loob ng Unit */}
+                      {unit.rooms && unit.rooms.map((room: any) => {
+                        return (
+                          <option 
+                            key={room.id} 
+                            value={room.id} 
+                            disabled={room.isRoomDisabled}
+                          >
+                            &nbsp;&nbsp;&nbsp;&nbsp;↳ {room.isRoomDisabled ? "[Occupied]" : "[Vacant]"} Room {room.roomNumber} (₱{Number(room.monthlyRent).toLocaleString()})
+                          </option>
+                        );
+                      })}
+                    </optgroup>
+                  );
+                })}
               </select>
             </div>
           )}
@@ -293,10 +419,39 @@ export function AddTenantModal({ isOpen, onClose, onTenantSaved, tenantToEdit }:
             </div>
           )}
 
+          <div className="rounded-2xl border border-line p-4 bg-background/60 space-y-2 shadow-inner">
+            <label className="block text-xs font-bold text-foreground">
+              Bayad na ba ang Advance at Deposit?
+            </label>
+            <div className="flex items-center gap-4">
+              <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-foreground">
+                <input
+                  type="radio"
+                  name="paymentStatusOption"
+                  checked={isPaid}
+                  onChange={() => setIsPaid(true)}
+                  className="h-4 w-4 text-forest focus:ring-forest cursor-pointer"
+                />
+                Oo, Bayad na (Paid)
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-foreground">
+                <input
+                  type="radio"
+                  name="paymentStatusOption"
+                  checked={!isPaid}
+                  onChange={() => setIsPaid(false)}
+                  className="h-4 w-4 text-forest focus:ring-forest cursor-pointer"
+                />
+                Hindi pa, Pending
+              </label>
+            </div>
+          </div>
+
           {availableAmenities.length > 0 && (
             <div className="rounded-2xl border border-line p-4 bg-background/60 space-y-2.5 shadow-inner">
-              <label className="block text-xs font-extrabold text-foreground">
-                📦 Pamahalaan ang mga Amenities / Karagdagang Bayarin
+              <label className="flex items-center gap-1.5 text-xs font-extrabold text-foreground">
+                <Package className="w-3.5 h-3.5 text-forest" />
+                Pamahalaan ang mga Amenities / Karagdagang Bayarin
               </label>
               <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
                 {availableAmenities.map((amenity) => {
@@ -362,30 +517,42 @@ export function AddTenantModal({ isOpen, onClose, onTenantSaved, tenantToEdit }:
 
           {isEditMode && qrCodeUrl && (
             <div className="flex flex-col items-center justify-center p-3 rounded-2xl bg-background/50 border border-line">
-              <p className="text-xs font-bold text-muted mb-2">Tenant Portal QR Code</p>
+              <p className="flex items-center gap-1.5 text-xs font-bold text-muted mb-2">
+                <QrCode className="w-3.5 h-3.5" />
+                Tenant Portal QR Code
+              </p>
               <div className="rounded-xl bg-white p-2 border border-line shadow-sm">
                 <Image src={qrCodeUrl} alt="Tenant QR Code" width={120} height={120} className="object-contain" />
               </div>
             </div>
           )}
 
-          <div className="flex justify-end gap-3 pt-3 border-t border-line">
-            <button
-              type="button"
-              onClick={handleCloseModal}
-              className="rounded-xl border border-line px-5 py-2.5 text-xs font-bold text-muted hover:bg-paper transition-all cursor-pointer"
-            >
-              Kanselahin
-            </button>
-            <button
-              type="submit"
-              disabled={loading}
-              className="rounded-xl bg-forest text-paper px-6 py-2.5 text-xs font-extrabold shadow-md hover:bg-forest-deep disabled:opacity-50 transition-all cursor-pointer"
-            >
-              {loading ? "Binabago..." : isEditMode ? "I-save ang Pagbabago" : "I-save ang Tenant"}
-            </button>
-          </div>
+          {/* Spacer para sa ilalim bago ang buttons */}
+          <div className="h-2" />
         </form>
+
+        {/* Fixed Footer Buttons */}
+        <div className="flex justify-end gap-3 p-4 border-t border-line bg-paper-card shrink-0">
+          <button
+            type="button"
+            onClick={handleCloseModal}
+            className="rounded-xl border border-line px-5 py-2.5 text-xs font-bold text-muted hover:bg-paper transition-all cursor-pointer"
+          >
+            Kanselahin
+          </button>
+          <button
+            type="button"
+            onClick={(e) => {
+              const form = document.querySelector('form');
+              if (form) form.requestSubmit();
+            }}
+            disabled={loading}
+            className="rounded-xl bg-forest text-paper px-6 py-2.5 text-xs font-extrabold shadow-md hover:bg-forest-deep disabled:opacity-50 transition-all cursor-pointer"
+          >
+            {loading ? "Binabago..." : isEditMode ? "I-save ang Pagbabago" : "I-save ang Tenant"}
+          </button>
+        </div>
+
       </div>
     </div>
   );

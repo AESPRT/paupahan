@@ -16,24 +16,20 @@ interface UnitsClientWrapperProps {
 export default function UnitsClientWrapper({
   initialUnits
 }: UnitsClientWrapperProps) {
-  // 1. Gawing state ang units para madali nating ma-update nang realtime
   const [units, setUnits] = useState<Unit[]>(initialUnits);
   const [selectedUnitForRoom, setSelectedUnitForRoom] = useState<Unit | null>(null);
   const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
 
-  // States para sa Search, Status/Occupancy Filter, at Pagination ng Units
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedFilter, setSelectedFilter] = useState<string>("All");
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 4; // Limit na 3 units bawat pahina
+  const itemsPerPage = 4;
 
-  // Dynamic calculations para sa stats na magbabago agad kasabay ng state (buong units data)
   const totalUnits = units.length;
-  const allRooms = units.flatMap((u) => u.rooms);
+  const allRooms = units.flatMap((u) => u.rooms || []);
   const totalRooms = allRooms.length;
   const vacantRooms = allRooms.filter((r) => r.status === "Vacant").length;
 
-  // I-filter ang mga units batay sa search query (pangalan o address) at status filter
   const filteredUnits = useMemo(() => {
     return units.filter((unit) => {
       const matchesSearch =
@@ -55,7 +51,6 @@ export default function UnitsClientWrapper({
     });
   }, [units, searchQuery, selectedFilter]);
 
-  // Kalkulahin ang pagination para sa units
   const totalPages = Math.ceil(filteredUnits.length / itemsPerPage);
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -89,20 +84,19 @@ export default function UnitsClientWrapper({
     );
 
     if (result.success) {
-      // 2. Realtime update para sa Rooms nang walang server page refresh
       setUnits((prevUnits) =>
         prevUnits.map((unit) => {
           if (unit.id === selectedUnitForRoom.id) {
             const newRoom: Room = {
-              id: Date.now().toString(), // Pansamantalang ID habang nag-aantay sa sync
+              id: Date.now().toString(),
               roomNumber: newRoomData.roomNumber,
               status: "Vacant" as const,
               monthlyRent: Number(newRoomData.monthlyRent),
             };
             return {
               ...unit,
-              totalRooms: unit.rooms.length + 1,
-              rooms: [...unit.rooms, newRoom],
+              totalRooms: (unit.rooms || []).length + 1,
+              rooms: [...(unit.rooms || []), newRoom],
             };
           }
           return unit;
@@ -115,17 +109,17 @@ export default function UnitsClientWrapper({
     }
   };
 
-  const handleAddUnit = async (unitName: string) => {
-    const result = await addUnitAction(unitName);
+  const handleAddUnit = async (unitData: { unitName: string; monthlyRent: number }) => {
+    const result = await addUnitAction(unitData);
 
     if (result.success && result.unit) {
-      // ✅ Kunin ang totoong unit mula sa server na may tunay na database ID
       const newUnit: Unit = {
-        id: result.unit.id, // Totoong ID galing sa database!
+        id: result.unit.id,
         name: result.unit.name,
-        address: "",
+        address: "Pangunahing Lokasyon",
         totalRooms: 0,
         rooms: [],
+        monthlyRent: Number(result.unit.monthlyRent || 0),
       };
 
       setUnits((prev) => [newUnit, ...prev]);
@@ -138,7 +132,7 @@ export default function UnitsClientWrapper({
 
   return (
     <div className="space-y-6 p-4 sm:p-6 lg:p-8">
-      {/* Header Section (Magbabago nang realtime ang mga bilang) */}
+      {/* Header Section */}
       <UnitsHeader
         totalUnits={totalUnits}
         totalRooms={totalRooms}
@@ -146,16 +140,15 @@ export default function UnitsClientWrapper({
         onAddUnit={() => setIsAddUnitOpen(true)}
       />
 
-      {/* Units Search & Filter Controls Section */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <h2 className="font-mono-brand text-xs font-bold uppercase tracking-wider text-muted">
+      {/* Units Search & Filter Controls Section (Na-ayos ang wrap para iwas overlap) */}
+      <div className="flex flex-col gap-4 rounded-2xl border border-line/60 bg-paper-card p-4 shadow-sm xl:flex-row xl:items-center xl:justify-between">
+        <h2 className="font-mono-brand text-xs font-bold uppercase tracking-wider text-muted shrink-0">
           Mga Nakarehistrong Unit ({filteredUnits.length})
         </h2>
 
-        {/* Playful Search & Filter Controls */}
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center w-full xl:w-auto">
           {/* Search Input */}
-          <div className="relative">
+          <div className="relative w-full sm:w-72">
             <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-muted pointer-events-none">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -166,12 +159,12 @@ export default function UnitsClientWrapper({
               placeholder="Hanapin ang unit o address..."
               value={searchQuery}
               onChange={handleSearchChange}
-              className="w-full sm:w-60 rounded-xl border border-line bg-paper-card py-2 pl-9 pr-4 font-mono-brand text-xs text-ink placeholder:text-muted/60 focus:border-forest focus:outline-none focus:ring-1 focus:ring-forest shadow-sm"
+              className="w-full rounded-xl border border-line bg-paper py-2 pl-9 pr-4 font-mono-brand text-xs text-ink placeholder:text-muted/60 focus:border-forest focus:outline-none focus:ring-1 focus:ring-forest shadow-sm"
             />
           </div>
 
           {/* Filter Buttons */}
-          <div className="flex items-center gap-1 overflow-x-auto pb-1 sm:pb-0">
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 shrink-0">
             {[
               { label: "Lahat", value: "All" },
               { label: "May Vacant", value: "Has Vacant" },
@@ -180,10 +173,10 @@ export default function UnitsClientWrapper({
               <button
                 key={filter.value}
                 onClick={() => handleFilterChange(filter.value)}
-                className={`rounded-xl px-3 py-2 font-mono-brand text-[11px] font-bold transition-all whitespace-nowrap ${
+                className={`rounded-xl px-3.5 py-2 font-mono-brand text-[11px] font-bold transition-all whitespace-nowrap shadow-sm ${
                   selectedFilter === filter.value
-                    ? "bg-forest text-white shadow-sm"
-                    : "border border-line bg-paper-card text-muted hover:bg-line/30 hover:text-ink"
+                    ? "bg-forest text-white"
+                    : "border border-line bg-paper text-muted hover:bg-line/30 hover:text-ink"
                 }`}
               >
                 {filter.label}
@@ -207,7 +200,7 @@ export default function UnitsClientWrapper({
               ))}
             </div>
 
-            {/* Playful Pagination Controls para sa Units */}
+            {/* Pagination Controls */}
             {totalPages > 1 && (
               <div className="mt-8 flex items-center justify-between rounded-2xl border border-line bg-paper-card px-6 py-4 shadow-sm">
                 <button

@@ -72,7 +72,7 @@ export async function getDashboardBadgeCounts() {
       userRole: currentUser?.role ? currentUser.role.replace("_", " ").toUpperCase() : "PROPERTY ADMIN",
       userInitials: initials,
       
-      // 👉 Idinagdag ang feature flags mula sa subscription
+      // Feature flags mula sa subscription
       canAccessAutoBilling: limits.canAccessAutoBilling,
       canAccessSmsReminders: limits.canAccessSmsReminders,
       canAccessMaintenance: limits.canAccessMaintenance,
@@ -92,12 +92,14 @@ export async function getDashboardBadgeCounts() {
       userRole: "Property Admin",
       userInitials: "JD",
       
-      // Default false kung may error
       canAccessAutoBilling: false,
       canAccessSmsReminders: false,
       canAccessMaintenance: false,
       canAccessAnalytics: false,
       canAccessStaffAccounts: false,
+      canAccessNotifications: false,
+      canAccessAuditLogs: false,
+      canAccessTenantModule: false,
     };
   }
 }

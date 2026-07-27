@@ -42,6 +42,7 @@ export async function getBillingsData() {
               where: { status: "active" },
               include: {
                 room: { include: { unit: true } },
+                unit: true, // 👈 Isinama ang unit sakaling unit-level lease ito
                 amenities: {
                   include: {
                     amenity: {
@@ -64,8 +65,16 @@ export async function getBillingsData() {
 
     const invoices: Invoice[] = dbBills.map((bill) => {
       const activeLease = bill.tenant?.leases?.[0];
-      const roomNumber = activeLease?.room?.roomNumber ?? "N/A";
-      const unitName = activeLease?.room?.unit?.name ?? "";
+      
+      // 💡 Suriin kung room-level o unit-level ang lease para sa tamang pag-display ng lokasyon
+      let unitRoomText = "N/A";
+      if (activeLease?.room) {
+        const roomNumber = activeLease.room.roomNumber ?? "N/A";
+        const unitName = activeLease.room.unit?.name ?? "";
+        unitRoomText = unitName ? `${unitName} - Room ${roomNumber}` : `Room ${roomNumber}`;
+      } else if (activeLease?.unit) {
+        unitRoomText = `${activeLease.unit.name} (Buong Unit)`;
+      }
       
       const lineItems: { description: string; amount: number }[] = [];
       
@@ -95,7 +104,7 @@ export async function getBillingsData() {
         bill.items.forEach((item) => {
           const itemAmount = Number(item.amount);
           const isUtility = item.type === "electricity" || item.type === "water";
-          const isApproved = item.status === "approved";
+          const isApproved = item.status === "approved" && item.type !== "other";
 
           if (itemAmount > 0 && item.type) {
             if (!isUtility) {
@@ -132,7 +141,7 @@ export async function getBillingsData() {
         id: bill.id,
         invoiceNumber: `INV-${bill.id.slice(0, 8).toUpperCase()}`,
         tenantName: bill.tenant?.fullName ?? "Unknown Tenant",
-        unitRoom: unitName ? `${unitName} - Room ${roomNumber}` : `Room ${roomNumber}`,
+        unitRoom: unitRoomText,
         issueDate: bill.generatedAt.toISOString().split("T")[0],
         dueDate: bill.dueDate.toISOString().split("T")[0],
         lineItems,
@@ -180,6 +189,7 @@ export async function createInvoiceAction(newInvoiceData: Omit<Invoice, "id" | "
       include: {
         leases: {
           where: { status: 'active' },
+          include: { room: true, unit: true },
           take: 1,
         },
       },
@@ -195,7 +205,7 @@ export async function createInvoiceAction(newInvoiceData: Omit<Invoice, "id" | "
     const activeLease = tenant.leases[0];
     const billingMonthYear = newInvoiceData.issueDate.slice(0, 7);
 
-    // 💡 2. I-check muna kung may existing bill na ang lease na ito ngayong buwan
+    // 💡 2. I-check muna kung mayroon nang bill ang lease na ito ngayong buwan
     const existingBill = await prisma.bill.findFirst({
       where: {
         leaseId: activeLease.id,
@@ -206,7 +216,7 @@ export async function createInvoiceAction(newInvoiceData: Omit<Invoice, "id" | "
     if (existingBill) {
       return { 
         success: false, 
-        error: `Mayroon na palang bill ang tenant na ito para sa buwan ng ${billingMonthYear}. Hindi maaaring magkaroon ng dobleng bill sa ihong buwan.` 
+        error: `Mayroon na palang bill ang tenant na ito para sa buwan ng ${billingMonthYear}. Hindi maaaring magkaroon ng dobleng bill sa iisang buwan.` 
       };
     }
 
@@ -229,9 +239,11 @@ export async function createInvoiceAction(newInvoiceData: Omit<Invoice, "id" | "
       rentAmount = newInvoiceData.totalAmount;
     }
     
+    const locationDescription = activeLease.roomId ? `Room ID: ${activeLease.roomId}` : `Unit ID: ${activeLease.unitId}`;
+
     await createAuditLog({
       actorId: adminId,
-      action: `Gumawa ng bagong invoice para sa tenant: ${tenant.fullName}, Room: ${activeLease.roomId}, Halaga: ${newInvoiceData.totalAmount}`,
+      action: `Gumawa ng bagong invoice para sa tenant: ${tenant.fullName}, ${locationDescription}, Halaga: ${newInvoiceData.totalAmount}`,
       entityType: 'Billing',
       entityId: adminId,
       metadata: { actionType: 'ADD' },
@@ -276,7 +288,13 @@ export async function createInvoiceAction(newInvoiceData: Omit<Invoice, "id" | "
       },
     });
 
-    // --- PAGPAPADALA NG NOTIFICATIONS (EMAILS & SMS GAMIT ANG AXIOS) ---
+    // --- 💡 3. Kusa nitong i-a-update ang paymentStatus ng Lease sa 'pending' (o 'draft') kapag gumawa ng bill ---
+    await prisma.lease.update({
+      where: { id: activeLease.id },
+      data: { paymentStatus: 'pending' },
+    });
+
+    // --- PAGPAPADALA NG NOTIFICATIONS ---
     const tenantEmail = tenant.email;
     const tenantPhone = tenant.phone;
     const tenantName = tenant.fullName;
@@ -295,7 +313,7 @@ export async function createInvoiceAction(newInvoiceData: Omit<Invoice, "id" | "
           billItems: newBill.items.map(item => ({ type: item.unitLabel, amount: item.amount }))
         }, {
           headers: {
-            Authorization: `Bearer ${process.env.NEXT_PUBLIC_API_SECRET_TOKEN}` // O kaya ay galing sa public env kung client-side
+            Authorization: `Bearer ${process.env.NEXT_PUBLIC_API_SECRET_TOKEN}`
           }
         });
 
@@ -308,7 +326,7 @@ export async function createInvoiceAction(newInvoiceData: Omit<Invoice, "id" | "
           utilityType: "Kuryente at Tubig",
         }, {
           headers: {
-            Authorization: `Bearer ${process.env.NEXT_PUBLIC_API_SECRET_TOKEN}` // O kaya ay galing sa public env kung client-side
+            Authorization: `Bearer ${process.env.NEXT_PUBLIC_API_SECRET_TOKEN}`
           }
         });
       } catch (emailErr) {
@@ -327,7 +345,7 @@ export async function createInvoiceAction(newInvoiceData: Omit<Invoice, "id" | "
           message: smsMessage,
         }, {
           headers: {
-            Authorization: `Bearer ${process.env.NEXT_PUBLIC_API_SECRET_TOKEN}` // O kaya ay galing sa public env kung client-side
+            Authorization: `Bearer ${process.env.NEXT_PUBLIC_API_SECRET_TOKEN}`
           }
         });
       } catch (smsErr) {
@@ -352,14 +370,12 @@ export async function markInvoiceAsPaidAction(id: string) {
       return { success: false, error: "Walang active session." };
     }
 
-    // Kunin ang pangalan ng Landlord para sa email context (ginamit ang fullName)
     const landlordUser = await prisma.user.findUnique({
       where: { id: adminId },
       select: { fullName: true },
     });
     const landlordName = landlordUser?.fullName || "Landlord";
 
-    // 1. Seguridad: Siguraduhing ang bill ay pagmamay-ari ng tenant na nasa ilalim ng landlord na ito
     const landlordTenants = await prisma.tenant.findMany({
       where: { userId: adminId },
       select: { id: true },
@@ -388,6 +404,14 @@ export async function markInvoiceAsPaidAction(id: string) {
       },
     });
     
+    // --- 💡 I-update ang paymentStatus ng Lease sa 'paid' kapag nabayaran na ang bill ---
+    if (updatedBill.leaseId) {
+      await prisma.lease.update({
+        where: { id: updatedBill.leaseId },
+        data: { paymentStatus: 'paid' },
+      });
+    }
+
     await createAuditLog({
       actorId: adminId,
       action: `Minarkahan bilang bayad ang invoice ID: ${id}`,
@@ -396,7 +420,6 @@ export async function markInvoiceAsPaidAction(id: string) {
       metadata: { actionType: 'ADD' },
     });
 
-    // --- PAGPAPADALA NG PAYMENT CONFIRMATION (EMAIL & SMS GAMIT ANG AXIOS) ---
     const tenantEmail = billCheck.tenant.email;
     const tenantPhone = billCheck.tenant.phone;
     const tenantName = billCheck.tenant.fullName;
@@ -416,7 +439,7 @@ export async function markInvoiceAsPaidAction(id: string) {
           notes: "Na-verify at tinanggap na ang iyong pagbabayad. Maraming salamat!",
         }, {
           headers: {
-            Authorization: `Bearer ${process.env.NEXT_PUBLIC_API_SECRET_TOKEN}` // O kaya ay galing sa public env kung client-side
+            Authorization: `Bearer ${process.env.NEXT_PUBLIC_API_SECRET_TOKEN}`
           }
         });
       } catch (emailErr) {
@@ -435,7 +458,7 @@ export async function markInvoiceAsPaidAction(id: string) {
           message: smsMessage,
         }, {
           headers: {
-            Authorization: `Bearer ${process.env.NEXT_PUBLIC_API_SECRET_TOKEN}` // O kaya ay galing sa public env kung client-side
+            Authorization: `Bearer ${process.env.NEXT_PUBLIC_API_SECRET_TOKEN}`
           }
         });
       } catch (smsErr) {
@@ -460,7 +483,6 @@ export async function getOccupiedRoomsForBilling() {
       return { success: false, roomsWithTenants: [], error: "Walang active session." };
     }
 
-    // 1. Kunin ang mga tenant ID ng landlord na ito
     const landlordTenants = await prisma.tenant.findMany({
       where: { userId: adminId },
       select: { id: true },
@@ -471,7 +493,7 @@ export async function getOccupiedRoomsForBilling() {
       return { success: true, roomsWithTenants: [] };
     }
 
-    // 2. Kunin lamang ang mga active lease na naka-attach sa mga tenant ng landlord na ito
+    // 💡 1. Kunin ang lahat ng active leases (sumusuporta sa room-level at unit-level)
     const activeLeases = await prisma.lease.findMany({
       where: {
         status: "active",
@@ -490,6 +512,12 @@ export async function getOccupiedRoomsForBilling() {
                 name: true,
               },
             },
+          },
+        },
+        unit: {
+          select: {
+            name: true,
+            monthlyRent: true,
           },
         },
         amenities: {
@@ -513,21 +541,30 @@ export async function getOccupiedRoomsForBilling() {
         frequency: item.amenity.frequency ?? "Buwanan",
       }));
 
+      // 💡 Kalkulahin ang monthly rent kung ito ba ay galing sa Room o Unit
+      const monthlyRent = Number(
+        lease.monthlyRent ?? 
+        lease.room?.monthlyRent ?? 
+        lease.unit?.monthlyRent ?? 
+        0
+      );
+
       return {
         leaseId: lease.id,
-        roomId: lease.room.id,
-        roomNumber: lease.room.roomNumber,
-        unitName: lease.room.unit?.name ?? "Main Unit",
+        roomId: lease.roomId ?? null,
+        unitId: lease.unitId ?? null,
+        roomNumber: lease.room?.roomNumber ?? "Buong Unit",
+        unitName: lease.room?.unit?.name ?? lease.unit?.name ?? "Main Unit",
         tenantName: lease.tenant?.fullName ?? "Unknown Tenant",
-        monthlyRent: Number(lease.monthlyRent ?? lease.room.monthlyRent ?? 0),
+        monthlyRent: monthlyRent,
         amenities: formattedAmenities,
       };
     });
 
     return { success: true, roomsWithTenants };
   } catch (error) {
-    console.error("Error fetching occupied rooms with lease amenities:", error);
-    return { success: false, roomsWithTenants: [], error: "Nabigong kunin ang mga occupied rooms." };
+    console.error("Error fetching occupied rooms/units with lease amenities:", error);
+    return { success: false, roomsWithTenants: [], error: "Nabigong kunin ang mga occupied units/rooms." };
   }
 }
 
@@ -536,12 +573,10 @@ export async function runAutoBillingForLandlord(adminId: string) {
     console.log("-----------------------------------------");
     console.log("1. Tumatakbo ang auto-billing para sa adminId:", adminId);
 
-    // 1. Kunin ang mga tenant ID sa ilalim ng landlord na ito
     const landlordTenants = await prisma.tenant.findMany({
       where: { userId: adminId },
       select: { id: true, fullName: true, email: true, phone: true },
     });
-    console.log("2. Bilang ng nahanap na tenants:", landlordTenants.length);
     
     if (landlordTenants.length === 0) {
       console.log("--> HUMINTO: Walang tenants sa ilalim ng landlord na ito.");
@@ -550,21 +585,17 @@ export async function runAutoBillingForLandlord(adminId: string) {
 
     const tenantIds = landlordTenants.map((t) => t.id);
 
-    // Kunin ang pangalan ng Landlord para sa email/SMS context (ginamit ang fullName)
     const landlordUser = await prisma.user.findUnique({
       where: { id: adminId },
       select: { fullName: true, email: true },
     });
     const landlordName = landlordUser?.fullName || "Landlord";
 
-    // 2. Kunin ang kasalukuyang buwan at taon (Format: "YYYY-MM")
     const now = new Date();
     const currentYear = now.getFullYear();
     const currentMonth = String(now.getMonth() + 1).padStart(2, '0');
     const billingMonthYear = `${currentYear}-${currentMonth}`;
-    console.log("3. Kasalukuyang billingMonthYear:", billingMonthYear);
 
-    // 3. Kunin lahat ng active leases ng mga tenant na ito
     const activeLeases = await prisma.lease.findMany({
       where: {
         status: "active",
@@ -573,6 +604,7 @@ export async function runAutoBillingForLandlord(adminId: string) {
       include: {
         tenant: { select: { fullName: true, email: true, phone: true } },
         room: { include: { unit: { select: { name: true } } } },
+        unit: { select: { name: true, monthlyRent: true } },
         amenities: {
           include: {
             amenity: { select: { name: true, frequency: true } },
@@ -580,7 +612,6 @@ export async function runAutoBillingForLandlord(adminId: string) {
         },
       },
     });
-    console.log("4. Bilang ng nahanap na active leases:", activeLeases.length);
 
     if (activeLeases.length === 0) {
       console.log("--> HUMINTO: Walang active lease na nahanap para sa mga tenants na ito.");
@@ -590,9 +621,6 @@ export async function runAutoBillingForLandlord(adminId: string) {
     const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api";
 
     for (const lease of activeLeases) {
-      console.log(`5. Sinusuri ang lease ID: ${lease.id} para sa tenant: ${lease.tenant.fullName}`);
-
-      // 4. Suriin kung mayroon nang bill ang lease na ito para sa kasalukuyang buwan
       const existingBill = await prisma.bill.findFirst({
         where: {
           leaseId: lease.id,
@@ -601,13 +629,16 @@ export async function runAutoBillingForLandlord(adminId: string) {
       });
 
       if (existingBill) {
-        console.log(`--> LALAMPASAN: Mayroon na palang bill ang lease ID: ${lease.id} ngayong ${billingMonthYear}`);
         continue;
       }
 
-      console.log(`6. Gagawa na ng bill para sa lease ID: ${lease.id}...`);
-
-      const monthlyRent = Number(lease.monthlyRent ?? lease.room.monthlyRent ?? 0);
+      // 💡 Kunin ang buwanang renta base sa lease, room, o unit
+      const monthlyRent = Number(
+        lease.monthlyRent ?? 
+        lease.room?.monthlyRent ?? 
+        lease.unit?.monthlyRent ?? 
+        0
+      );
       let totalAmount = monthlyRent;
 
       const lineItemsData: { type: "electricity" | "water" | "other" | "amenities"; unitLabel: string; amount: number; ratePerUnit: number }[] = [];
@@ -640,7 +671,6 @@ export async function runAutoBillingForLandlord(adminId: string) {
 
       totalAmount = monthlyRent + amenitiesFeeTotal;
 
-      // 5. Kunin ang araw mula sa lease.startDate para maging due date bawat buwan
       const leaseStartDate = new Date(lease.startDate);
       const startDay = leaseStartDate.getDate();
       const dueDate = new Date(currentYear, Number(currentMonth) - 1, startDay, 23, 59, 59);
@@ -666,9 +696,12 @@ export async function runAutoBillingForLandlord(adminId: string) {
         },
       });
 
-      console.log(`7. TAGUMPAY! Nalikha na ang bill ID: ${newBill.id} na may Due Date na: ${dueDate.toISOString()}`);
+      // --- 💡 I-update ang paymentStatus ng Lease sa 'pending' kapag nabuo na ang awtomatikong bill ---
+      await prisma.lease.update({
+        where: { id: lease.id },
+        data: { paymentStatus: 'pending' },
+      });
 
-      // --- PAGPAPADALA NG NOTIFICATIONS (EMAILS & SMS GAMIT ANG AXIOS) ---
       const tenantEmail = lease.tenant.email;
       const tenantPhone = lease.tenant.phone;
       const tenantName = lease.tenant.fullName;
@@ -676,7 +709,6 @@ export async function runAutoBillingForLandlord(adminId: string) {
 
       if (tenantEmail) {
         try {
-          // 1. Ipadala ang unang email: Bill / Invoice Notification (`/notify/bill`)
           await axios.post(`${API_BASE_URL}/notify/bill`, {
             tenantName: tenantName,
             tenantEmail: tenantEmail,
@@ -687,12 +719,10 @@ export async function runAutoBillingForLandlord(adminId: string) {
             billItems: newBill.items.map(item => ({ type: item.unitLabel, amount: item.amount }))
           }, {
             headers: {
-              Authorization: `Bearer ${process.env.NEXT_PUBLIC_API_SECRET_TOKEN}` // O kaya ay galing sa public env kung client-side
+              Authorization: `Bearer ${process.env.NEXT_PUBLIC_API_SECRET_TOKEN}`
             }
           });
-          console.log(`--> Naipadala ang Bill Notification Email kay ${tenantEmail}`);
 
-          // 2. Ipadala ang pangalawang email: Reading Request Notification (`/notify/reading-request`)
           await axios.post(`${API_BASE_URL}/notify/reading-request`, {
             tenantName: tenantName,
             tenantEmail: tenantEmail,
@@ -702,11 +732,9 @@ export async function runAutoBillingForLandlord(adminId: string) {
             utilityType: "Kuryente at Tubig",
           }, {
             headers: {
-              Authorization: `Bearer ${process.env.NEXT_PUBLIC_API_SECRET_TOKEN}` // O kaya ay galing sa public env kung client-side
+              Authorization: `Bearer ${process.env.NEXT_PUBLIC_API_SECRET_TOKEN}`
             }
           });
-          console.log(`--> Naipadala ang Reading Request Email kay ${tenantEmail}`);
-
         } catch (emailErr) {
           console.error(`Error sa pagpapadala ng emails kay ${tenantEmail}:`, emailErr);
         }
@@ -714,7 +742,6 @@ export async function runAutoBillingForLandlord(adminId: string) {
 
       if (tenantPhone) {
         try {
-          // 3. Ipadala ang SMS notification via Email-to-SMS gateway
           const smsMessage = `Paupahan: Nabuo na ang draft bill (${newBill.id}) na nagkakahalaga ng ₱${totalAmount.toLocaleString()}. Mangyaring mag-log in at i-submit ang iyong meter reading. Due: ${formattedDueDate}`;
           const detectedCarrier = detectCarrier(tenantPhone);
 
@@ -724,10 +751,9 @@ export async function runAutoBillingForLandlord(adminId: string) {
             message: smsMessage,
           }, {
             headers: {
-              Authorization: `Bearer ${process.env.NEXT_PUBLIC_API_SECRET_TOKEN}` // O kaya ay galing sa public env kung client-side
+              Authorization: `Bearer ${process.env.NEXT_PUBLIC_API_SECRET_TOKEN}`
             }
           });
-          console.log(`--> Naipadala ang SMS notification kay ${tenantPhone}`);
         } catch (smsErr) {
           console.error(`Error sa pagpapadala ng SMS kay ${tenantPhone}:`, smsErr);
         }

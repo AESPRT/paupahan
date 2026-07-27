@@ -170,13 +170,15 @@ export function TenantsTable({ tenants, onSelectTenant, onEditTenant }: TenantsT
               </div>
             </div>
 
-            {/* Details Grid */}
-            <div className="grid grid-cols-2 gap-2 text-xs">
+            {/* Details Grid (Mobile) */}
+            <div className="flex flex-col gap-1 text-xs">
               <div>
                 <span className="text-[10px] uppercase font-mono-brand text-muted block">Unit / Room</span>
-                <span className="font-semibold text-ink">{tenant.unitName} - Room {tenant.roomNumber}</span>
+                <span className="font-semibold text-ink">
+                  {tenant.roomNumber ? `${tenant.unitName} - Room ${tenant.roomNumber}` : tenant.unitName}
+                </span>
               </div>
-              <div>
+              <div className="mt-1">
                 <span className="text-[10px] uppercase font-mono-brand text-muted block">Upa (Rent)</span>
                 <span className="font-bold text-forest-deep">₱{tenant.monthlyRent.toLocaleString()}/mo</span>
               </div>
@@ -208,7 +210,7 @@ export function TenantsTable({ tenants, onSelectTenant, onEditTenant }: TenantsT
       </div>
 
       {/* ----------------------------------------------------------------- */}
-      {/* 2. DESKTOP/TABLET VIEW: Table Layout (Lalabas sa ≥ md screens)    */}
+      {/* 2. DESKTOP/TABLET VIEW: Table Layout na may Pababang Detalye       */}
       {/* ----------------------------------------------------------------- */}
       <div className="hidden overflow-hidden rounded-2xl border border-line bg-paper-card shadow-sm md:block">
         <div className="overflow-x-auto">
@@ -216,8 +218,7 @@ export function TenantsTable({ tenants, onSelectTenant, onEditTenant }: TenantsT
             <thead className="border-b border-line bg-paper font-mono-brand uppercase text-muted">
               <tr>
                 <th className="px-5 py-4 font-bold">Tenant</th>
-                <th className="px-5 py-4 font-bold">Unit / Kwarto</th>
-                <th className="px-5 py-4 font-bold">Upa (Rent)</th>
+                <th className="px-5 py-4 font-bold">Detalye (Unit / Upa)</th>
                 <th className="px-5 py-4 font-bold">Status</th>
                 <th className="px-5 py-4 font-bold">Bayad</th>
                 <th className="px-5 py-4 text-right font-bold">Aksyon</th>
@@ -230,6 +231,7 @@ export function TenantsTable({ tenants, onSelectTenant, onEditTenant }: TenantsT
                   className="transition-colors hover:bg-paper/60 cursor-pointer"
                   onClick={() => onSelectTenant(tenant)}
                 >
+                  {/* Column 1: Tenant Info */}
                   <td className="px-5 py-4">
                     <div className="flex items-center gap-3">
                       <div className="flex h-9 w-9 items-center justify-center rounded-full border border-forest/20 bg-coral/10 font-mono-brand text-xs font-bold text-coral-deep">
@@ -241,12 +243,23 @@ export function TenantsTable({ tenants, onSelectTenant, onEditTenant }: TenantsT
                       </div>
                     </div>
                   </td>
-                  <td className="px-5 py-4 font-semibold text-ink">
-                    {tenant.unitName} - <span className="text-muted">Room {tenant.roomNumber}</span>
+
+                  {/* Column 2: Unit / Room at Upa (Pababa / Stacked nang walang room kung unit-level) */}
+                  <td className="px-5 py-4">
+                    <div className="flex flex-col gap-0.5">
+                      <span className="font-semibold text-ink">
+                        {tenant.unitName}
+                      </span>
+                      {tenant.roomNumber && (
+                        <span className="text-[11px] text-muted">Room {tenant.roomNumber}</span>
+                      )}
+                      <span className="font-bold text-forest-deep text-xs mt-0.5">
+                        ₱{tenant.monthlyRent.toLocaleString()}/mo
+                      </span>
+                    </div>
                   </td>
-                  <td className="px-5 py-4 font-bold text-forest-deep">
-                    ₱{tenant.monthlyRent.toLocaleString()}/mo
-                  </td>
+
+                  {/* Column 3: Lease Status */}
                   <td className="px-5 py-4" onClick={(e) => e.stopPropagation()}>
                     <select
                       value={tenant.leaseStatus}
@@ -260,11 +273,15 @@ export function TenantsTable({ tenants, onSelectTenant, onEditTenant }: TenantsT
                       <option value="inactive">Inactive</option>
                     </select>
                   </td>
+
+                  {/* Column 4: Payment Status */}
                   <td className="px-5 py-4">
                     <span className={`rounded-full px-2.5 py-1 font-mono-brand text-[10px] font-bold uppercase ${getPaymentBadge(tenant.paymentStatus)}`}>
                       {tenant.paymentStatus}
                     </span>
                   </td>
+
+                  {/* Column 5: Actions */}
                   <td className="px-5 py-4 text-right" onClick={(e) => e.stopPropagation()}>
                     <div className="flex items-center justify-end gap-2">
                       <button

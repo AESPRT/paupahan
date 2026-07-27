@@ -18,12 +18,21 @@ import { getDashboardData, handleApprovalAction } from "@/src/actions/dashboard-
 import FullPageLoader from "@/src/components/ui/FullPageLoader";
 
 export default function BillingsPage() {
+  // 💡 I-update ang interface para tanggapin ang unitId at gawing optional ang room fields
   interface ActiveTenantRoom {
-    roomId: string;
+    leaseId: string;
+    roomId?: string | null;
+    unitId?: string | null;
     roomNumber: string;
     unitName: string;
     tenantName: string;
     monthlyRent: number;
+    amenities: {
+      id: string;
+      name: string;
+      amount: number;
+      frequency: string;
+    }[];
   }
 
   const [occupiedRooms, setOccupiedRooms] = useState<ActiveTenantRoom[]>([]);
@@ -52,11 +61,11 @@ export default function BillingsPage() {
     loadData();
   }, []);
 
-  // Function para buksan ang modal at i-fetch ang mga occupied rooms
+  // Function para buksan ang modal at i-fetch ang mga occupied rooms/units
   const handleOpenModal = async () => {
     const result = await getOccupiedRoomsForBilling();
     if (result.success) {
-      setOccupiedRooms(result.roomsWithTenants);
+      setOccupiedRooms(result.roomsWithTenants as ActiveTenantRoom[]);
     }
     setIsModalOpen(true);
   };

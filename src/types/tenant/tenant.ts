@@ -17,12 +17,12 @@ export interface Tenant {
   createdAt: Date;
   updatedAt: Date;
   
-  // Lease & Room details
+  // Lease & Room/Unit details
   unitName: string;
-  roomNumber: string;
+  roomNumber?: string; // 👈 Ginawang opsyonal (?) para hindi mag-error kapag Unit-level ang upa
   monthlyRent: number;
   
-  // 👈 Mga bagong fields para ma-display din sa frontend kung kinakailangan
+  // Mga karagdagang fields para sa advance at deposit
   advanceMonths?: number;
   advanceAmount?: number;
   depositMonths?: number;
