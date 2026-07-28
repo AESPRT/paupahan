@@ -4,6 +4,16 @@
 import { useState, useMemo } from "react";
 import { Invoice } from "@/src/types/admin/billing";
 import Image from "next/image";
+import { 
+  Search, 
+  FileText, 
+  CreditCard, 
+  CheckCircle2, 
+  Clock, 
+  ArrowLeft, 
+  ArrowRight, 
+  ExternalLink 
+} from "lucide-react"; // ✨ Na-import ang mga Lucide icons
 
 interface InvoicesListProps {
   invoices: Invoice[];
@@ -35,18 +45,18 @@ export function InvoicesList({
       if (selectedStatus === "All") return matchesSearch;
       if (selectedStatus === "Paid") return matchesSearch && inv.status === "Paid";
       if (selectedStatus === "Overdue") return matchesSearch && inv.status === "Overdue";
+      
       if (selectedStatus === "Pending") {
-        const hasPaymentSubmitted = inv.paymentDetails != null || inv.status === "Pending";
+        const hasPaymentSubmitted = inv.paymentDetails != null;
         return matchesSearch && hasPaymentSubmitted && inv.status !== "Paid" && inv.status !== "Overdue";
       }
+      
       return matchesSearch;
     });
   }, [invoices, searchQuery, selectedStatus]);
 
-  // Kalkulahin ang pagination mula sa na-filter na listahan
   const totalPages = Math.ceil(filteredInvoices.length / itemsPerPage);
   
-  // I-reset sa page 1 kapag nagbago ang search o filter
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(e.target.value);
     setCurrentPage(1);
@@ -75,24 +85,11 @@ export function InvoicesList({
           Mga Inilabas na Resibo at Invoice ({filteredInvoices.length})
         </h2>
 
-        {/* Playful Search & Filter Controls */}
+        {/* Search & Filter Controls */}
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-          {/* Search Input na may SVG Icon */}
           <div className="relative">
             <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-muted pointer-events-none">
-              <svg 
-                className="w-4 h-4" 
-                fill="none" 
-                stroke="currentColor" 
-                viewBox="0 0 24 24"
-              >
-                <path 
-                  strokeLinecap="round" 
-                  strokeLinejoin="round" 
-                  strokeWidth="2" 
-                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" 
-                />
-              </svg>
+              <Search className="w-4 h-4" />
             </span>
             <input
               type="text"
@@ -103,7 +100,6 @@ export function InvoicesList({
             />
           </div>
 
-          {/* Status Filter Buttons */}
           <div className="flex items-center gap-1 overflow-x-auto pb-1 sm:pb-0">
             {["All", "Paid", "Pending", "Overdue"].map((status) => (
               <button
@@ -124,21 +120,8 @@ export function InvoicesList({
 
       {filteredInvoices.length === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-3xl border border-dashed border-line bg-paper-card p-12 text-center shadow-sm">
-          {/* Empty State SVG Icon */}
           <div className="mb-3 rounded-2xl bg-forest/5 p-4 text-forest">
-            <svg 
-              className="w-8 h-8" 
-              fill="none" 
-              stroke="currentColor" 
-              viewBox="0 0 24 24"
-            >
-              <path 
-                strokeLinecap="round" 
-                strokeLinejoin="round" 
-                strokeWidth="1.5" 
-                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" 
-              />
-            </svg>
+            <FileText className="w-8 h-8" />
           </div>
           <h3 className="font-display text-base font-bold text-forest-deep">
             Walang Nakitang Invoice
@@ -153,7 +136,7 @@ export function InvoicesList({
             {currentInvoices.map((inv: any) => {
               const isPaid = inv.status === "Paid";
               const isOverdue = inv.status === "Overdue";
-              const hasPaymentSubmitted = inv.paymentDetails != null || inv.status === "Pending";
+              const hasPaymentSubmitted = inv.paymentDetails != null;
 
               return (
                 <div
@@ -202,11 +185,14 @@ export function InvoicesList({
                       </span>
                     </div>
 
-                    {/* GCash Payment Details gamit ang next/image */}
+                    {/* Payment Details with Lucide Icons */}
                     {inv.paymentDetails && (
                       <div className="mt-3 rounded-xl bg-forest/5 p-3 border border-forest/15 space-y-2 font-mono-brand text-[11px]">
                         <div className="font-bold text-forest-deep flex items-center justify-between">
-                          <span>💳 Isinumiteng Bayad:</span>
+                          <span className="flex items-center gap-1.5">
+                            <CreditCard className="w-3.5 h-3.5 text-forest" />
+                            Isinumiteng Bayad:
+                          </span>
                           <span className="uppercase bg-forest/10 px-2 py-0.5 rounded text-forest font-extrabold">
                             {inv.paymentDetails.method}
                           </span>
@@ -224,7 +210,7 @@ export function InvoicesList({
                             <div className="relative group rounded-lg overflow-hidden border border-line bg-paper h-32 w-full flex items-center justify-center">
                               <Image 
                                 src={inv.paymentDetails.receiptUrl} 
-                                alt="GCash Payment Proof" 
+                                alt="Payment Proof" 
                                 fill
                                 sizes="(max-width: 768px) 100vw, 33vw"
                                 className="object-cover rounded-md transition-transform group-hover:scale-105"
@@ -233,9 +219,9 @@ export function InvoicesList({
                                 href={inv.paymentDetails.receiptUrl} 
                                 target="_blank" 
                                 rel="noopener noreferrer"
-                                className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white font-bold text-xs z-10"
+                                className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1 text-white font-bold text-xs z-10"
                               >
-                                Tignan nang Buo ↗
+                                Tignan nang Buo <ExternalLink className="w-3.5 h-3.5" />
                               </a>
                             </div>
                           </div>
@@ -268,20 +254,22 @@ export function InvoicesList({
                           I-remind
                         </button>
                         
-                        <button
-                          disabled={!hasPaymentSubmitted}
-                          onClick={() => onMarkAsPaid(inv.id)}
-                          className={`rounded-xl py-2 font-mono-brand text-[11px] font-bold shadow-sm transition-all ${
-                            !hasPaymentSubmitted
-                              ? "bg-line/60 text-muted cursor-not-allowed shadow-none" 
-                              : "bg-forest text-white hover:bg-forest-deep active:scale-95"
-                          }`}
-                        >
-                          {!hasPaymentSubmitted ? "Naghihintay ng Bayad" : "Mark Paid"}
-                        </button>
+                        {hasPaymentSubmitted ? (
+                          <button
+                            onClick={() => onMarkAsPaid(inv.id)}
+                            className="rounded-xl bg-forest py-2 font-mono-brand text-[11px] font-bold text-white shadow-sm hover:bg-forest-deep active:scale-95 transition-all"
+                          >
+                            Mark Paid
+                          </button>
+                        ) : (
+                          <div className="flex items-center justify-center rounded-xl bg-line/30 py-2 px-1 font-mono-brand text-[10px] font-bold text-muted text-center leading-tight">
+                            Naghihintay ng Bayad
+                          </div>
+                        )}
                       </div>
                     ) : (
                       <div className="flex items-center justify-center gap-1.5 text-center font-mono-brand text-[11px] font-bold text-forest">
+                        <CheckCircle2 className="w-4 h-4" />
                         <span>Kumpleto na ang bayad</span>
                       </div>
                     )}
@@ -291,7 +279,7 @@ export function InvoicesList({
             })}
           </div>
 
-          {/* Playful Pagination Controls */}
+          {/* Pagination Controls */}
           {totalPages > 1 && (
             <div className="mt-8 flex items-center justify-between rounded-2xl border border-line bg-paper-card px-6 py-4 shadow-sm">
               <button
@@ -303,7 +291,7 @@ export function InvoicesList({
                     : "bg-forest/10 text-forest hover:bg-forest hover:text-white active:scale-95"
                 }`}
               >
-                <span className="transition-transform group-hover:-translate-x-0.5">←</span> Nakaraan
+                <ArrowLeft className="w-4 h-4 transition-transform group-hover:-translate-x-0.5" /> Nakaraan
               </button>
 
               <div className="flex items-center gap-2 font-mono-brand text-xs font-bold text-forest-deep">
@@ -323,7 +311,7 @@ export function InvoicesList({
                     : "bg-forest/10 text-forest hover:bg-forest hover:text-white active:scale-95"
                 }`}
               >
-                Susunod <span className="transition-transform group-hover:translate-x-0.5">→</span>
+                Susunod <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
               </button>
             </div>
           )}

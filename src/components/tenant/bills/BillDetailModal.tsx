@@ -277,7 +277,7 @@ export function BillDetailModal({
               </div>
             </div>
 
-            {/* ✨ PAY BUTTON: Magre-redirect sa payment page gamit ang bill.id */}
+            {/* ✨ KUNG PENDING PAYMENT PA LANG: Magpapakita ang Pay Button */}
             {bill.status === "Pending Payment" && (
               <button
                 onClick={() => {
@@ -291,6 +291,32 @@ export function BillDetailModal({
                 </svg>
                 <span>Magbayad Na (Pay Now)</span>
               </button>
+            )}
+
+            {/* ✨ KUNG NAKASUMITE NA NG BAYAD (Waiting for Landlord Confirmation) */}
+            {bill.status === "Pending Verification" && (
+              <div className="flex items-center gap-2 rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900">
+                <svg className="h-5 w-5 shrink-0 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <div>
+                  <p className="font-bold">Nai-submit na ang Bayad</p>
+                  <p className="text-[11px] text-amber-800">Naghihintay na lamang ng kumpirmasyon at pag-apruba mula sa landlord.</p>
+                </div>
+              </div>
+            )}
+
+            {/* ✨ KUNG KUMPIRMADO NA AT PAID NA */}
+            {bill.status === "Paid" && (
+              <div className="flex items-center gap-2 rounded-xl border border-forest/30 bg-forest/10 p-3 text-xs text-forest-deep">
+                <svg className="h-5 w-5 shrink-0 text-forest" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                <div>
+                  <p className="font-bold">Bayad na ang Bill na Ito</p>
+                  <p className="text-[11px] text-forest/80">Maraming salamat! Na-verify na ni landlord ang iyong kabayaran.</p>
+                </div>
+              </div>
             )}
           </div>
 

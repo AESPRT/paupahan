@@ -1,32 +1,45 @@
-// Thin fetch wrapper for talking to the Node.js/Express backend.
-// Keeps the API base URL and auth-token handling in one place.
+import axios, { AxiosRequestConfig, Method } from 'axios';
+
+// Thin fetch wrapper para sa Node.js/Express backend gamit ang Axios.
+// Pinapanatili nito ang API base URL at auth-token handling sa iisang lugar.
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000/api";
 
-type RequestOptions = Omit<RequestInit, "body"> & {
+export type RequestOptions = Omit<AxiosRequestConfig, "url" | "method" | "data" | "headers"> & {
+  method?: Method | string;
   body?: unknown;
   token?: string;
+  query?: Record<string, any>;
+  headers?: Record<string, string>;
 };
 
 export async function apiFetch<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const { body, token, headers, ...rest } = options;
+  const { body, token, query, headers, method = "GET", ...rest } = options;
 
-  const res = await fetch(`${API_URL}${path}`, {
-    ...rest,
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...headers,
-    },
-    body: body !== undefined ? JSON.stringify(body) : undefined,
-  });
+  try {
+    const response = await axios({
+      url: `${API_URL}${path}`,
+      method: method,
+      params: query,
+      data: body,
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...headers,
+      },
+      ...rest,
+    });
 
-  if (!res.ok) {
-    const message = await res.text().catch(() => res.statusText);
-    throw new Error(`API ${options.method ?? "GET"} ${path} failed (${res.status}): ${message}`);
+    return response.data as T;
+  } catch (error: any) {
+    if (axios.isAxiosError(error)) {
+      const status = error.response?.status ?? 500;
+      const statusText = error.response?.statusText ?? "Internal Server Error";
+      const errorData = error.response?.data;
+      const message = typeof errorData === "string" ? errorData : JSON.stringify(errorData) || error.message;
+      
+      throw new Error(`API ${method.toUpperCase()} ${path} failed (${status} ${statusText}): ${message}`);
+    }
+    throw error;
   }
-
-  // Handle empty responses (e.g. 204 No Content)
-  const text = await res.text();
-  return text ? (JSON.parse(text) as T) : (undefined as T);
 }

@@ -7,7 +7,7 @@ import { revalidatePath } from 'next/cache'
 import bcrypt from 'bcryptjs'
 import { cookies } from 'next/headers'
 import { createAuditLog } from '@/src/actions/audit-actions'
-import axios from 'axios' // 👈 Gamit na ang axios
+import { apiFetch } from "@/src/lib/api";
 
 export type ActionResponse = {
   success: boolean
@@ -39,30 +39,29 @@ export async function registerLandlord(formData: FormData): Promise<ActionRespon
     // I-hash ang password
     const passwordHash = await bcrypt.hash(password, 10)
 
-    // 1. Alamin ang plan tier at billing cycle gamit ang axios kung may referenceNumber
+    // 1. Alamin ang plan tier at billing cycle gamit ang apiFetch kung may referenceNumber
     let planTierStr = selectedPlanParam || 'panimula'
     let billingCycle = 'MONTHLY'
 
     if (referenceNumber) {
       try {
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
-        
-        // Pagtawag gamit ang axios
-        const response = await axios.get(`${apiUrl}/v1/paupahan-payments/user-subscription`, {
-            params: { referenceNumber },
-            headers: {
-              Authorization: `Bearer ${process.env.NEXT_PUBLIC_API_SECRET_TOKEN}`, // O kaya ay process.env.NEXT_PUBLIC_API_SECRET_TOKEN depende kung saan mo ginamit
-            },
-            timeout: 5000, // 5 seconds timeout
-          });
+        // Token para sa API authentication
+        const apiToken = process.env.NEXT_PUBLIC_API_SECRET_TOKEN;
 
-        if (response.data && response.data.hasActiveSub && response.data.subscription) {
-          const sub = response.data.subscription;
+        // Pagtawag gamit ang apiFetch (ginagamit ang 'query' param para sa query parameters)
+        const response: any = await apiFetch("/v1/paupahan-payments/user-subscription", {
+          method: "GET",
+          query: { referenceNumber },
+          token: apiToken,
+        });
+
+        if (response && response.hasActiveSub && response.subscription) {
+          const sub = response.subscription;
           planTierStr = sub.package_id || sub.planTier || 'panimula';
           billingCycle = sub.billing_cycle || 'MONTHLY';
         }
       } catch (apiError: any) {
-        console.error('Error fetching subscription from API server via Axios:', apiError.message || apiError);
+        console.error('Error fetching subscription from API server via apiFetch:', apiError.message || apiError);
       }
     }
 

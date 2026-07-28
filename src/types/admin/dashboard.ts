@@ -1,11 +1,3 @@
-export interface StatMetric {
-  title: string;
-  value: string | number;
-  change?: string;
-  isPositive?: boolean;
-  icon: "rooms" | "units" | "vacant" | "occupied" | "revenue" | "pending" | "reserved";
-}
-
 export interface PendingReading {
   id: string;
   tenantName: string;

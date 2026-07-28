@@ -5,8 +5,8 @@ import prisma from "@/src/lib/prisma";
 import { MaintenanceStatus } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
-import axios from 'axios';
 import { detectCarrier } from "@/src/utils/carrierDetector";
+import { apiFetch } from "@/src/lib/api";
 
 type MaintenanceCategoryType = "Plumbing" | "Electrical" | "Appliance" | "Structural" | "Others";
 
@@ -190,21 +190,23 @@ export async function updateMaintenanceStatusAction(
                          "Landlord";
     
     const issueTitle = updatedRequest.title || "Maintenance Request";
-    const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api";
+    
+    // Token para sa API authentication
+    const apiToken = process.env.NEXT_PUBLIC_API_SECRET_TOKEN;
 
     if (tenantEmail) {
       try {
-        await axios.post(`${API_BASE_URL}/notify/maintenance`, {
-          tenantName: tenantName,
-          tenantEmail: tenantEmail,
-          landlordName: landlordName,
-          issueTitle: issueTitle,
-          status: newStatus,
-          maintenanceNotes: adminRemark || (expenses ? `Gastos sa pag-aayos: ₱${expenses.toLocaleString()}` : undefined),
-        }, {
-          headers: {
-            Authorization: `Bearer ${process.env.NEXT_PUBLIC_API_SECRET_TOKEN}`
-          }
+        await apiFetch("/notify/maintenance", {
+          method: "POST",
+          body: {
+            tenantName: tenantName,
+            tenantEmail: tenantEmail,
+            landlordName: landlordName,
+            issueTitle: issueTitle,
+            status: newStatus,
+            maintenanceNotes: adminRemark || (expenses ? `Gastos sa pag-aayos: ₱${expenses.toLocaleString()}` : undefined),
+          },
+          token: apiToken,
         });
       } catch (emailErr) {
         console.error(`Error sa pagpapadala ng maintenance email kay ${tenantEmail}:`, emailErr);
@@ -216,10 +218,14 @@ export async function updateMaintenanceStatusAction(
         const smsMessage = `Paupahan Maintenance: Ang iyong request na "${issueTitle}" ay nasa status na ngayon: ${newStatus}.${adminRemark ? ` Tala: ${adminRemark}` : ''}`;
         const detectedCarrier = detectCarrier(tenantPhone);
         
-        await axios.post(`${API_BASE_URL}/notify/sms`, {
-          phoneNumber: tenantPhone,
-          carrier: detectedCarrier,
-          message: smsMessage,
+        await apiFetch("/notify/sms", {
+          method: "POST",
+          body: {
+            phoneNumber: tenantPhone,
+            carrier: detectedCarrier,
+            message: smsMessage,
+          },
+          token: apiToken,
         });
       } catch (smsErr) {
         console.error(`Error sa pagpapadala ng SMS kay ${tenantPhone}:`, smsErr);

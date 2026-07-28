@@ -59,6 +59,8 @@ export async function getTenantBillsData() {
         uiStatus = "Overdue";
       } else if (bill.status === "pending") {
         uiStatus = "Pending Payment"; 
+      } else if (bill.status === "payment_submitted") {
+        uiStatus = "Pending Verification"; 
       } else if (bill.status === "draft") {
         if (electricityItem?.currentReading || waterItem?.currentReading) {
           uiStatus = "Pending Landlord Approval";

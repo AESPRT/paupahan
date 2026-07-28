@@ -6,8 +6,8 @@ import { Invoice } from "@/src/types/admin/billing"
 import { revalidatePath } from "next/cache"
 import { cookies } from 'next/headers'
 import { createAuditLog } from '@/src/actions/audit-actions'
-import axios from 'axios';
 import { detectCarrier } from '@/src/utils/carrierDetector';
+import { apiFetch } from "@/src/lib/api";
 
 export async function getBillingsData() {
   try {
@@ -129,10 +129,12 @@ export async function getBillingsData() {
       }
 
       let status: Invoice["status"] = "Draft";
-      if (bill.status === "paid") status = "Paid";
-      else if (bill.status === "overdue") status = "Overdue";
-      else if (bill.status === "pending" || (bill.payments && bill.payments.length > 0)) {
-        status = "Pending";
+      if (bill.status === "paid") {
+        status = "Paid";
+      } else if (bill.status === "overdue") {
+        status = "Overdue";
+      } else if (bill.status === "payment_submitted" || bill.status === "pending" || (bill.payments && bill.payments.length > 0)) {
+        status = "Pending"; 
       }
 
       const latestPayment = bill.payments[0];
@@ -270,14 +272,16 @@ export async function createInvoiceAction(newInvoiceData: Omit<Invoice, "id" | "
               itemType = 'water';
             } else if (desc.includes('kuryente') || desc.includes('electric')) {
               itemType = 'electricity';
-            } else if (desc.includes('utilities') || desc.includes('wifi')) {
+            } else if (desc.includes('rent') || desc.includes('renta')) {
+              itemType = 'other';
+            } else {
               itemType = 'amenities';
             }
 
             return {
               type: itemType,
               unitLabel: item.description,
-              amount: desc.includes('rent') || desc.includes('renta') ? 0 : item.amount,
+              amount: item.amount,
               ratePerUnit: item.amount,
             };
           }),
@@ -299,35 +303,37 @@ export async function createInvoiceAction(newInvoiceData: Omit<Invoice, "id" | "
     const tenantPhone = tenant.phone;
     const tenantName = tenant.fullName;
     const formattedDueDate = new Date(newInvoiceData.dueDate).toLocaleDateString('fil-PH', { year: 'numeric', month: 'long', day: 'numeric' });
-    const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api";
+    
+    // Token para sa API authentication
+    const apiToken = process.env.NEXT_PUBLIC_API_SECRET_TOKEN;
 
     if (tenantEmail) {
       try {
-        await axios.post(`${API_BASE_URL}/notify/bill`, {
-          tenantName: tenantName,
-          tenantEmail: tenantEmail,
-          landlordName: landlordName,
-          dueDate: formattedDueDate,
-          totalAmount: newInvoiceData.totalAmount,
-          invoiceNumber: newBill.id,
-          billItems: newBill.items.map(item => ({ type: item.unitLabel, amount: item.amount }))
-        }, {
-          headers: {
-            Authorization: `Bearer ${process.env.NEXT_PUBLIC_API_SECRET_TOKEN}`
-          }
+        await apiFetch("/notify/bill", {
+          method: "POST",
+          body: {
+            tenantName: tenantName,
+            tenantEmail: tenantEmail,
+            landlordName: landlordName,
+            dueDate: formattedDueDate,
+            totalAmount: newInvoiceData.totalAmount,
+            invoiceNumber: newBill.id,
+            billItems: newBill.items.map(item => ({ type: item.unitLabel, amount: item.amount }))
+          },
+          token: apiToken,
         });
 
-        await axios.post(`${API_BASE_URL}/notify/reading-request`, {
-          tenantName: tenantName,
-          tenantEmail: tenantEmail,
-          landlordName: landlordName,
-          invoiceNumber: newBill.id,
-          dueDate: formattedDueDate,
-          utilityType: "Kuryente at Tubig",
-        }, {
-          headers: {
-            Authorization: `Bearer ${process.env.NEXT_PUBLIC_API_SECRET_TOKEN}`
-          }
+        await apiFetch("/notify/reading-request", {
+          method: "POST",
+          body: {
+            tenantName: tenantName,
+            tenantEmail: tenantEmail,
+            landlordName: landlordName,
+            invoiceNumber: newBill.id,
+            dueDate: formattedDueDate,
+            utilityType: "Kuryente at Tubig",
+          },
+          token: apiToken,
         });
       } catch (emailErr) {
         console.error(`Error sa pagpapadala ng email kay ${tenantEmail}:`, emailErr);
@@ -339,14 +345,14 @@ export async function createInvoiceAction(newInvoiceData: Omit<Invoice, "id" | "
         const smsMessage = `Paupahan: Bagong bill (${newBill.id}) na nagkakahalaga ng ₱${newInvoiceData.totalAmount.toLocaleString()} ang nilikha. Mag-log in at i-submit ang reading. Due: ${formattedDueDate}`;
         const detectedCarrier = detectCarrier(tenantPhone);
 
-        await axios.post(`${API_BASE_URL}/notify/sms`, {
-          phoneNumber: tenantPhone,
-          carrier: detectedCarrier,
-          message: smsMessage,
-        }, {
-          headers: {
-            Authorization: `Bearer ${process.env.NEXT_PUBLIC_API_SECRET_TOKEN}`
-          }
+        await apiFetch("/notify/sms", {
+          method: "POST",
+          body: {
+            phoneNumber: tenantPhone,
+            carrier: detectedCarrier,
+            message: smsMessage,
+          },
+          token: apiToken,
         });
       } catch (smsErr) {
         console.error(`Error sa pagpapadala ng SMS kay ${tenantPhone}:`, smsErr);
@@ -425,22 +431,24 @@ export async function markInvoiceAsPaidAction(id: string) {
     const tenantName = billCheck.tenant.fullName;
     const totalAmount = Number(updatedBill.totalAmount);
     const formattedDate = new Date().toLocaleDateString('fil-PH', { year: 'numeric', month: 'long', day: 'numeric' });
-    const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api";
+    
+    // Token para sa API authentication
+    const apiToken = process.env.NEXT_PUBLIC_API_SECRET_TOKEN;
 
     if (tenantEmail) {
       try {
-        await axios.post(`${API_BASE_URL}/notify/confirmation`, {
-          tenantName: tenantName,
-          tenantEmail: tenantEmail,
-          landlordName: landlordName,
-          amountPaid: totalAmount,
-          paymentDate: formattedDate,
-          invoiceNumber: updatedBill.id,
-          notes: "Na-verify at tinanggap na ang iyong pagbabayad. Maraming salamat!",
-        }, {
-          headers: {
-            Authorization: `Bearer ${process.env.NEXT_PUBLIC_API_SECRET_TOKEN}`
-          }
+        await apiFetch("/notify/confirmation", {
+          method: "POST",
+          body: {
+            tenantName: tenantName,
+            tenantEmail: tenantEmail,
+            landlordName: landlordName,
+            amountPaid: totalAmount,
+            paymentDate: formattedDate,
+            invoiceNumber: updatedBill.id,
+            notes: "Na-verify at tinanggap na ang iyong pagbabayad. Maraming salamat!",
+          },
+          token: apiToken,
         });
       } catch (emailErr) {
         console.error(`Error sa pagpapadala ng payment confirmation email kay ${tenantEmail}:`, emailErr);
@@ -452,14 +460,14 @@ export async function markInvoiceAsPaidAction(id: string) {
         const smsMessage = `Paupahan: Tanggap na ang iyong bayad para sa invoice (${updatedBill.id}) na nagkakahalaga ng ₱${totalAmount.toLocaleString()}. Maraming salamat!`;
         const detectedCarrier = detectCarrier(tenantPhone);
 
-        await axios.post(`${API_BASE_URL}/notify/sms`, {
-          phoneNumber: tenantPhone,
-          carrier: detectedCarrier,
-          message: smsMessage,
-        }, {
-          headers: {
-            Authorization: `Bearer ${process.env.NEXT_PUBLIC_API_SECRET_TOKEN}`
-          }
+        await apiFetch("/notify/sms", {
+          method: "POST",
+          body: {
+            phoneNumber: tenantPhone,
+            carrier: detectedCarrier,
+            message: smsMessage,
+          },
+          token: apiToken,
         });
       } catch (smsErr) {
         console.error(`Error sa pagpapadala ng SMS kay ${tenantPhone}:`, smsErr);
@@ -618,8 +626,6 @@ export async function runAutoBillingForLandlord(adminId: string) {
       return;
     }
 
-    const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api";
-
     for (const lease of activeLeases) {
       const existingBill = await prisma.bill.findFirst({
         where: {
@@ -707,33 +713,38 @@ export async function runAutoBillingForLandlord(adminId: string) {
       const tenantName = lease.tenant.fullName;
       const formattedDueDate = dueDate.toLocaleDateString('fil-PH', { year: 'numeric', month: 'long', day: 'numeric' });
 
+      // Token para sa API authentication
+      const apiToken = process.env.NEXT_PUBLIC_API_SECRET_TOKEN;
+
       if (tenantEmail) {
         try {
-          await axios.post(`${API_BASE_URL}/notify/bill`, {
-            tenantName: tenantName,
-            tenantEmail: tenantEmail,
-            landlordName: landlordName,
-            dueDate: formattedDueDate,
-            totalAmount: totalAmount,
-            invoiceNumber: newBill.id,
-            billItems: newBill.items.map(item => ({ type: item.unitLabel, amount: item.amount }))
-          }, {
-            headers: {
-              Authorization: `Bearer ${process.env.NEXT_PUBLIC_API_SECRET_TOKEN}`
-            }
+          // Gamit ang apiFetch para sa notify/bill
+          await apiFetch("/notify/bill", {
+            method: "POST",
+            body: {
+              tenantName: tenantName,
+              tenantEmail: tenantEmail,
+              landlordName: landlordName,
+              dueDate: formattedDueDate,
+              totalAmount: totalAmount,
+              invoiceNumber: newBill.id,
+              billItems: newBill.items.map(item => ({ type: item.unitLabel, amount: item.amount }))
+            },
+            token: apiToken,
           });
 
-          await axios.post(`${API_BASE_URL}/notify/reading-request`, {
-            tenantName: tenantName,
-            tenantEmail: tenantEmail,
-            landlordName: landlordName,
-            invoiceNumber: newBill.id,
-            dueDate: formattedDueDate,
-            utilityType: "Kuryente at Tubig",
-          }, {
-            headers: {
-              Authorization: `Bearer ${process.env.NEXT_PUBLIC_API_SECRET_TOKEN}`
-            }
+          // Gamit ang apiFetch para sa notify/reading-request
+          await apiFetch("/notify/reading-request", {
+            method: "POST",
+            body: {
+              tenantName: tenantName,
+              tenantEmail: tenantEmail,
+              landlordName: landlordName,
+              invoiceNumber: newBill.id,
+              dueDate: formattedDueDate,
+              utilityType: "Kuryente at Tubig",
+            },
+            token: apiToken,
           });
         } catch (emailErr) {
           console.error(`Error sa pagpapadala ng emails kay ${tenantEmail}:`, emailErr);
@@ -745,14 +756,15 @@ export async function runAutoBillingForLandlord(adminId: string) {
           const smsMessage = `Paupahan: Nabuo na ang draft bill (${newBill.id}) na nagkakahalaga ng ₱${totalAmount.toLocaleString()}. Mangyaring mag-log in at i-submit ang iyong meter reading. Due: ${formattedDueDate}`;
           const detectedCarrier = detectCarrier(tenantPhone);
 
-          await axios.post(`${API_BASE_URL}/notify/sms`, {
-            phoneNumber: tenantPhone,
-            carrier: detectedCarrier, 
-            message: smsMessage,
-          }, {
-            headers: {
-              Authorization: `Bearer ${process.env.NEXT_PUBLIC_API_SECRET_TOKEN}`
-            }
+          // Gamit ang apiFetch para sa notify/sms
+          await apiFetch("/notify/sms", {
+            method: "POST",
+            body: {
+              phoneNumber: tenantPhone,
+              carrier: detectedCarrier, 
+              message: smsMessage,
+            },
+            token: apiToken,
           });
         } catch (smsErr) {
           console.error(`Error sa pagpapadala ng SMS kay ${tenantPhone}:`, smsErr);
@@ -762,5 +774,102 @@ export async function runAutoBillingForLandlord(adminId: string) {
     console.log("-----------------------------------------");
   } catch (error) {
     console.error("Error sa auto-billing process:", error);
+  }
+}
+
+export async function sendBillingReminderAction(invoiceId: string, tenantName: string, reminderNote: string = "") {
+  try {
+    // 1. Kunin ang mga detalye ng bill, tenant, at landlord mula sa database
+    const bill = await prisma.bill.findUnique({
+      where: { id: invoiceId },
+      include: {
+        tenant: {
+          select: {
+            fullName: true,
+            email: true,
+          },
+        },
+        lease: {
+          include: {
+            room: {
+              include: {
+                unit: {
+                  include: {
+                    property: {
+                      include: {
+                        landlord: {
+                          select: {
+                            fullName: true,
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            unit: {
+              include: {
+                property: {
+                  include: {
+                    landlord: {
+                      select: {
+                        fullName: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        items: true,
+      },
+    });
+
+    if (!bill || !bill.tenant) {
+      return { success: false, error: "Hindi natagpuan ang detalye ng bill o tenant." };
+    }
+
+    // 2. Kunin ang Landlord Name mula sa room lease o unit lease
+    const landlordName = 
+      bill.lease?.room?.unit?.property?.landlord?.fullName || 
+      bill.lease?.unit?.property?.landlord?.fullName || 
+      "Landlord";
+
+    // 3. Kalkulahin o kunin ang total amount
+    let totalAmount = Number(bill.rentAmount) || 0;
+    totalAmount += Number(bill.amenitiesFee) || 0;
+    totalAmount += Number(bill.utilityAmount) || 0;
+    if (bill.items && bill.items.length > 0) {
+      bill.items.forEach(item => {
+        totalAmount += Number(item.amount) || 0;
+      });
+    }
+
+    const tenantEmail = bill.tenant.email || "";
+    const formattedInvoiceNumber = `INV-${bill.id.slice(0, 8).toUpperCase()}`;
+    const dueDateFormatted = bill.dueDate.toISOString().split("T")[0];
+
+    // 4. Tawagin ang backend endpoint gamit ang apiFetch wrapper
+    await apiFetch("/notify/reminder", {
+      method: "POST",
+      body: {
+        tenantName: bill.tenant.fullName,
+        tenantEmail: tenantEmail,
+        landlordName: landlordName,
+        dueDate: dueDateFormatted,
+        totalAmount: totalAmount,
+        invoiceNumber: formattedInvoiceNumber,
+        reminderNote: reminderNote,
+      },
+      // Opsyonal: Kung gumagamit ka ng token mula sa environment variable o cookies
+      token: process.env.NEXT_PUBLIC_API_SECRET_TOKEN,
+    });
+
+    return { success: true, message: `Matagumpay na naipadala ang paalala kay ${tenantName}.` };
+  } catch (error) {
+    console.error("Error sending billing reminder:", error);
+    return { success: false, error: "Nabigong magpadala ng paalala sa tenant." };
   }
 }

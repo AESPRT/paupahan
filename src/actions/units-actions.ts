@@ -145,10 +145,10 @@ export async function addUnitAction(data: { unitName: string; monthlyRent: numbe
       data: {
         propertyId: property.id,
         name: `${property.name} - ${data.unitName}`,
-        monthlyRent: data.monthlyRent, // 👈 Isinama na ang buwanang renta para sa unit-level lease
+        monthlyRent: data.monthlyRent,
       },
       include: {
-        rooms: true, // Para masigurong kasama ang rooms array sa return value
+        rooms: true,
       },
     });
 
@@ -162,7 +162,17 @@ export async function addUnitAction(data: { unitName: string; monthlyRent: numbe
     
     revalidatePath('/admin/dashboard/units');
     
-    return { success: true, unit: newUnit };
+    // ✨ I-convert ang Prisma Decimals patungong plain number para sa Client Component
+    const serializedUnit = {
+      ...newUnit,
+      monthlyRent: newUnit.monthlyRent ? Number(newUnit.monthlyRent) : 0,
+      rooms: newUnit.rooms.map(room => ({
+        ...room,
+        monthlyRent: room.monthlyRent ? Number(room.monthlyRent) : 0,
+      })),
+    };
+
+    return { success: true, unit: serializedUnit };
   } catch (error) {
     console.error('Error adding unit:', error);
     return { success: false, error: 'May naganap na error sa pagdagdag ng unit/building.' };

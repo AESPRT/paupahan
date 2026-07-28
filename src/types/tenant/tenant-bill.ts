@@ -1,4 +1,10 @@
-export type BillStatus = "Draft Pending Readings" | "Pending Payment" | "Paid" | "Overdue" | "Pending Landlord Approval";
+export type BillStatus = 
+"Draft Pending Readings" 
+| "Pending Payment" 
+| "Paid" 
+| "Overdue" 
+| "Pending Landlord Approval"
+| "Pending Verification";
 
 export interface UtilityItem {
   type: "electricity" | "water";

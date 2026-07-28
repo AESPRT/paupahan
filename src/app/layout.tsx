@@ -25,8 +25,11 @@ export const metadata: Metadata = {
   description:
     "Paupahan tracks your tenants' bills, sends payment reminders, and shows you exactly who's paid — kahit isang unit lang o limampu.",
   icons: {
-    icon: "/icon.svg",
-    apple: "/icon.svg",
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/icon.svg", type: "image/svg+xml" },
+    ],
+    apple: { url: "/icon.svg", type: "image/svg+xml" },
   },
 };
 

@@ -7,17 +7,8 @@ import prisma from "@/src/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { NotificationChannel, NotificationStatus } from "@prisma/client";
 import { cookies } from "next/headers";
-import axios from 'axios';
+import { apiFetch } from "@/src/lib/api"; // 👈 Gamitin ang apiFetch wrapper
 import { detectCarrier } from '@/src/utils/carrierDetector';
-
-// Helper function para sa Authorization Headers
-const getAuthHeaders = () => {
-  return {
-    headers: {
-      Authorization: `Bearer ${process.env.API_SECRET_TOKEN || process.env.NEXT_PUBLIC_API_SECRET_TOKEN}`,
-    },
-  };
-};
 
 export async function getBillDetailsForPayment(billId: string) {
   try {
@@ -121,7 +112,7 @@ export async function submitPaymentAction(formData: FormData) {
     await prisma.bill.update({
       where: { id: billId },
       data: {
-        status: "pending", 
+        status: "payment_submitted", 
         paymentReceiptUrl: receiptUrl || null,
       },
     });
@@ -176,21 +167,25 @@ export async function submitPaymentAction(formData: FormData) {
       });
     }
 
-    // --- PAGPAPADALA NG EMAIL AT SMS NOTIFICATION KAY LANDLORD (GAMIT ANG AXIOS NA MAY BEARER TOKEN) ---
-    const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api";
+    // --- PAGPAPADALA NG EMAIL AT SMS NOTIFICATION KAY LANDLORD (GAMIT ANG apiFetch) ---
+    const apiToken = process.env.API_SECRET_TOKEN || process.env.NEXT_PUBLIC_API_SECRET_TOKEN;
     const formattedAmount = new Intl.NumberFormat('fil-PH', { style: 'currency', currency: 'PHP' }).format(amount);
 
     if (landlordEmail) {
       try {
-        await axios.post(`${API_BASE_URL}/notify/landlord-payment`, {
-          landlordEmail: landlordEmail,
-          landlordName: landlordName,
-          tenantName: tenantName,
-          amountPaid: amount,
-          invoiceNumber: billId,
-          referenceNumber: referenceNo || 'N/A',
-          paymentMethod: paymentMethod,
-        }, getAuthHeaders()); // 👈 Isinama na ang Auth Headers dito
+        await apiFetch("/notify/landlord-payment", {
+          method: "POST",
+          body: {
+            landlordEmail: landlordEmail,
+            landlordName: landlordName,
+            tenantName: tenantName,
+            amountPaid: amount,
+            invoiceNumber: billId,
+            referenceNumber: referenceNo || 'N/A',
+            paymentMethod: paymentMethod,
+          },
+          token: apiToken,
+        });
       } catch (emailErr) {
         console.error(`Error sa pagpapadala ng landlord payment email kay ${landlordEmail}:`, emailErr);
       }
@@ -201,11 +196,15 @@ export async function submitPaymentAction(formData: FormData) {
         const smsMessage = `Paupahan Alert: Nagbayad si ${tenantName} ng ${formattedAmount} para sa bill (${billId}) gamit ang ${paymentMethod}. Mag-log in para i-verify.`;
         const detectedCarrier = detectCarrier(landlordPhone);
 
-        await axios.post(`${API_BASE_URL}/notify/sms`, {
-          phoneNumber: landlordPhone,
-          carrier: detectedCarrier,
-          message: smsMessage,
-        }, getAuthHeaders()); // 👈 Isinama na rin ang Auth Headers dito
+        await apiFetch("/notify/sms", {
+          method: "POST",
+          body: {
+            phoneNumber: landlordPhone,
+            carrier: detectedCarrier,
+            message: smsMessage,
+          },
+          token: apiToken,
+        });
       } catch (smsErr) {
         console.error(`Error sa pagpapadala ng SMS kay landlord (${landlordPhone}):`, smsErr);
       }
