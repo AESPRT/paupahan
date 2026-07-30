@@ -1,10 +1,8 @@
-// ==========================================
-// 4. PROPERTY CARD COMPONENT (components/hanap-bahay/PropertyCard.tsx)
-// ==========================================
 "use client";
 
 import { useState } from "react";
-import { Heart, Bookmark, CheckCircle2, Bed, MapPin } from "lucide-react";
+import Image from "next/image";
+import { Heart, Bookmark, CheckCircle2, Bed, MapPin, ArrowRight } from "lucide-react";
 import { Property } from "@/src/types/property";
 
 interface PropertyCardProps {
@@ -19,94 +17,110 @@ export function PropertyCard({ property, onViewDetails }: PropertyCardProps) {
     return (
         <div
             onClick={() => onViewDetails(property)}
-            className="group relative flex flex-col overflow-hidden rounded-3xl border border-[#E4DDC9] bg-[#FFFDF8] shadow-[0_10px_30px_rgba(21,55,48,0.06)] transition-all duration-300 hover:-translate-y-1.5 hover:shadow-[0_20px_40px_rgba(21,55,48,0.12)] cursor-pointer"
+            className="group relative flex flex-col overflow-hidden rounded-[28px] border border-[var(--line)] bg-[var(--paper-card)] shadow-[0_15px_35px_rgba(21,55,48,0.08)] transition-all duration-500 hover:-translate-y-2 hover:shadow-[0_25px_50px_rgba(21,55,48,0.16)]"
         >
-            {/* Image Container */}
-            <div className="relative h-64 w-full overflow-hidden bg-[#1F4B3F]/10">
-                <img
+            {/* Image Container with Cinematic Aspect Ratio */}
+            <div className="relative h-72 w-full overflow-hidden bg-[var(--forest-deep)]/10">
+                <Image
                     src={property.coverImage}
                     alt={property.title}
-                    className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                    fill
+                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 380px"
+                    className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
                 />
 
-                {/* Top Badges */}
-                <div className="absolute top-3 left-3 flex items-center gap-2">
-                    <span className="rounded-full bg-[#153730]/90 backdrop-blur-md px-3 py-1 font-display text-xs font-bold text-white shadow-sm">
+                {/* Subtle top/bottom gradients for absolute readability */}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/30 pointer-events-none" />
+
+                {/* Top Status & Verified Badges */}
+                <div className="absolute top-4 left-4 flex items-center gap-2">
+                    <span className="rounded-full bg-[var(--forest-deep)]/90 backdrop-blur-md px-3.5 py-1.5 font-display text-xs font-bold text-white shadow-lg tracking-wide uppercase">
                         {property.status}
                     </span>
                     {property.verifiedLandlord && (
-                        <span className="flex items-center gap-1 rounded-full bg-[#F0A93A] px-2.5 py-1 font-display text-xs font-bold text-[#153730] shadow-sm">
+                        <span className="flex items-center gap-1.5 rounded-full bg-[var(--marigold)] backdrop-blur-md px-3 py-1.5 font-display text-xs font-bold text-[var(--forest-deep)] shadow-lg">
                             <CheckCircle2 className="h-3.5 w-3.5" />
                             Verified
                         </span>
                     )}
                 </div>
 
-                {/* Favorite & Bookmark Actions */}
-                <div className="absolute top-3 right-3 flex items-center gap-2">
+                {/* Floating Interactive Buttons */}
+                <div className="absolute top-4 right-4 flex items-center gap-2">
                     <button
                         onClick={(e) => { e.stopPropagation(); setIsFavorite(!isFavorite); }}
-                        className={`flex h-9 w-9 items-center justify-center rounded-full bg-white/80 backdrop-blur-md transition-all hover:scale-110 shadow-sm ${isFavorite ? "text-red-500" : "text-[#153730]"
-                            }`}
-                        aria-label="Favorite"
+                        className={`flex h-10 w-10 items-center justify-center rounded-full bg-white/95 backdrop-blur-md transition-all duration-300 hover:scale-110 shadow-lg ${
+                            isFavorite ? "text-[var(--coral)] bg-white" : "text-[var(--ink)]"
+                        }`}
+                        aria-label="Paborito"
                     >
                         <Heart className={`h-4 w-4 ${isFavorite ? "fill-current" : ""}`} />
                     </button>
                     <button
                         onClick={(e) => { e.stopPropagation(); setIsBookmarked(!isBookmarked); }}
-                        className={`flex h-9 w-9 items-center justify-center rounded-full bg-white/80 backdrop-blur-md transition-all hover:scale-110 shadow-sm ${isBookmarked ? "text-[#D98F1E]" : "text-[#153730]"
-                            }`}
-                        aria-label="Bookmark"
+                        className={`flex h-10 w-10 items-center justify-center rounded-full bg-white/95 backdrop-blur-md transition-all duration-300 hover:scale-110 shadow-lg ${
+                            isBookmarked ? "text-[var(--marigold-deep)] bg-white" : "text-[var(--ink)]"
+                        }`}
+                        aria-label="I-bookmark"
                     >
                         <Bookmark className={`h-4 w-4 ${isBookmarked ? "fill-current" : ""}`} />
                     </button>
                 </div>
+
+                {/* Floating Bottom Metadata inside Image */}
+                <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between text-white">
+                    <div className="flex items-center gap-1.5 text-xs font-medium bg-black/40 backdrop-blur-md px-3 py-1 rounded-full border border-white/10">
+                        <MapPin className="h-3.5 w-3.5 text-[var(--marigold)]" />
+                        <span className="truncate max-w-[200px]">{property.location}, {property.city}</span>
+                    </div>
+                </div>
             </div>
 
-            {/* Content */}
-            <div className="flex flex-1 flex-col p-5">
-                <div className="flex items-start justify-between gap-2 mb-2">
-                    <h3 className="font-display text-lg font-extrabold text-[#153730] group-hover:text-[#1F4B3F] transition-colors line-clamp-1">
+            {/* Content Section */}
+            <div className="flex flex-1 flex-col p-6">
+                <div className="mb-2">
+                    <h3 className="font-display text-xl font-extrabold text-[var(--ink)] group-hover:text-[var(--marigold-deep)] transition-colors line-clamp-1">
                         {property.title}
                     </h3>
                 </div>
 
-                <div className="flex items-center gap-1 text-xs font-medium text-[#6B7B74] mb-3">
-                    <MapPin className="h-3.5 w-3.5 text-[#D98F1E]" />
-                    <span>{property.location}, {property.city}</span>
-                </div>
-
-                <p className="text-xs text-[#6B7B74] line-clamp-2 mb-4">
+                <p className="font-body text-sm text-[var(--muted)] line-clamp-2 mb-5 font-normal leading-relaxed">
                     {property.description}
                 </p>
 
-                {/* Amenities row */}
-                <div className="flex flex-wrap gap-1.5 mb-4">
+                {/* Amenities Chips */}
+                <div className="flex flex-wrap gap-2 mb-6">
                     {property.amenities.slice(0, 3).map((amenity, idx) => (
-                        <span key={idx} className="rounded-lg bg-[#FAF7EF] border border-[#E4DDC9] px-2.5 py-1 text-[11px] font-semibold text-[#153730]">
+                        <span key={idx} className="rounded-xl bg-[var(--paper)] border border-[var(--line)] px-3 py-1 text-xs font-bold text-[var(--ink)]">
                             {amenity}
                         </span>
                     ))}
                     {property.amenities.length > 3 && (
-                        <span className="rounded-lg bg-[#FAF7EF] border border-[#E4DDC9] px-2 py-1 text-[11px] font-semibold text-[#6B7B74]">
+                        <span className="rounded-xl bg-[var(--paper)] border border-[var(--line)] px-2.5 py-1 text-xs font-bold text-[var(--muted)]">
                             +{property.amenities.length - 3} pa
                         </span>
                     )}
                 </div>
 
-                {/* Footer Details & Price Range */}
-                <div className="mt-auto flex items-center justify-between border-t border-[#E4DDC9] pt-4">
+                {/* Price and CTA Hierarchy */}
+                <div className="mt-auto flex items-center justify-between border-t border-[var(--line)] pt-5">
                     <div>
-                        <span className="text-[11px] font-bold uppercase tracking-wider text-[#6B7B74] block">Saklaw ng Renta</span>
-                        <div className="font-display text-base font-black text-[#153730]">
+                        <span className="text-[10px] font-extrabold uppercase tracking-widest text-[var(--muted)] block mb-0.5">Renta Kada Buwan</span>
+                        <div className="font-display text-xl sm:text-2xl font-black text-[var(--ink)]">
                             {typeof property.price === 'number'
                                 ? `₱${property.price.toLocaleString()}`
                                 : property.price}
                         </div>
                     </div>
-                    <div className="flex items-center gap-1 text-xs font-semibold text-[#1F4B3F] bg-[#1F4B3F]/10 px-3 py-1.5 rounded-xl">
-                        <Bed className="h-3.5 w-3.5" />
-                        <span>{property.availableUnits} unit bakante</span>
+
+                    <div className="flex items-center gap-2">
+                        <div className="hidden xs:flex items-center gap-1 text-xs font-bold text-[var(--ink)] bg-[var(--forest-deep)]/5 px-3 py-2 rounded-xl">
+                            <Bed className="h-3.5 w-3.5 text-[var(--marigold-deep)]" />
+                            <span>{property.availableUnits} unit</span>
+                        </div>
+                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--forest-deep)] text-white transition-transform duration-300 group-hover:scale-105 group-hover:bg-[var(--marigold-deep)]">
+                            <ArrowRight className="h-4 w-4" />
+                        </div>
                     </div>
                 </div>
             </div>

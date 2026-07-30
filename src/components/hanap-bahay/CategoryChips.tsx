@@ -13,7 +13,7 @@ import {
     Dog,
     Car,
     Wifi,
-    Snowflake
+    Snowflake,
 } from "lucide-react";
 
 interface CategoryChipsProps {
@@ -46,51 +46,51 @@ export function CategoryChips({ selectedCategory, onSelectCategory }: CategoryCh
     };
 
     return (
-        <div className="relative border-y border-[#E4DDC9] bg-[#FFFDF8] py-4 shadow-sm">
-            <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-                <div className="flex items-center gap-2">
-                    {/* Scroll Left Button */}
-                    <button
-                        onClick={() => scroll("left")}
-                        className="hidden sm:flex h-9 w-9 items-center justify-center rounded-full border border-[#E4DDC9] bg-white text-[#153730] hover:bg-[#FAF7EF] shadow-sm transition-all"
-                        aria-label="Scroll left"
-                    >
-                        <ChevronLeft className="h-5 w-5" />
-                    </button>
+        <div className="relative w-full">
+            <div className="flex items-center gap-1.5 relative">
+                {/* Scroll Left Button */}
+                <button
+                    onClick={() => scroll("left")}
+                    className="hidden sm:flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[#E4DDC9] bg-white text-[#6B7B74] shadow-sm hover:bg-[#153730] hover:text-white hover:border-[#153730] transition-all"
+                    aria-label="Scroll left"
+                >
+                    <ChevronLeft className="h-4 w-4" />
+                </button>
 
-                    {/* Chips Container */}
-                    <div
-                        ref={scrollRef}
-                        className="flex items-center gap-3 overflow-x-auto no-scrollbar scroll-smooth py-2 px-1"
-                    >
-                        {CATEGORIES.map((cat) => {
-                            const isSelected = selectedCategory === cat.id;
-                            const IconComponent = cat.icon;
-                            return (
-                                <button
-                                    key={cat.id}
-                                    onClick={() => onSelectCategory(cat.id)}
-                                    className={`flex items-center gap-2 whitespace-nowrap rounded-2xl px-5 py-3 font-display text-sm font-bold transition-all duration-200 shadow-sm ${isSelected
-                                            ? "bg-[#153730] text-[#FAF7EF] scale-105 shadow-md"
-                                            : "border border-[#E4DDC9] bg-white text-[#153730] hover:border-[#1F4B3F] hover:bg-[#FAF7EF]"
-                                        }`}
-                                >
-                                    <IconComponent className={`h-4 w-4 ${isSelected ? "text-[#F0A93A]" : "text-[#1F4B3F]"}`} />
-                                    <span>{cat.label}</span>
-                                </button>
-                            );
-                        })}
-                    </div>
-
-                    {/* Scroll Right Button */}
-                    <button
-                        onClick={() => scroll("right")}
-                        className="hidden sm:flex h-9 w-9 items-center justify-center rounded-full border border-[#E4DDC9] bg-white text-[#153730] hover:bg-[#FAF7EF] shadow-sm transition-all"
-                        aria-label="Scroll right"
-                    >
-                        <ChevronRight className="h-5 w-5" />
-                    </button>
+                {/* Chips Container */}
+                <div
+                    ref={scrollRef}
+                    className="flex items-center gap-2 overflow-x-auto no-scrollbar scroll-smooth py-1 px-0.5 w-full"
+                >
+                    {CATEGORIES.map((cat) => {
+                        const isSelected = selectedCategory === cat.id;
+                        const Icon = cat.icon;
+                        return (
+                            <button
+                                key={cat.id}
+                                onClick={() => onSelectCategory(cat.id)}
+                                aria-pressed={isSelected}
+                                className={`flex items-center gap-2 whitespace-nowrap rounded-full px-4 py-2 text-xs sm:text-sm font-semibold transition-all duration-200 border ${
+                                    isSelected
+                                        ? "bg-[#153730] text-white border-[#153730] shadow-md shadow-[#153730]/15 scale-[1.02]"
+                                        : "bg-white text-[#4B5750] border-[#E4DDC9]/80 hover:border-[#153730]/30 hover:bg-[#FAF7EF]"
+                                }`}
+                            >
+                                <Icon className={`h-3.5 w-3.5 transition-colors ${isSelected ? "text-[#FADA7A]" : "text-[#8A9A93]"}`} />
+                                <span>{cat.label}</span>
+                            </button>
+                        );
+                    })}
                 </div>
+
+                {/* Scroll Right Button */}
+                <button
+                    onClick={() => scroll("right")}
+                    className="hidden sm:flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[#E4DDC9] bg-white text-[#6B7B74] shadow-sm hover:bg-[#153730] hover:text-white hover:border-[#153730] transition-all"
+                    aria-label="Scroll right"
+                >
+                    <ChevronRight className="h-4 w-4" />
+                </button>
             </div>
         </div>
     );

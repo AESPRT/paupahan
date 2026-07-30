@@ -3,7 +3,6 @@
 import { useState, useTransition, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { HeroSection } from "@/src/components/hanap-bahay/HeroSection";
-import { CategoryChips } from "@/src/components/hanap-bahay/CategoryChips";
 import { FeaturedCarousel } from "@/src/components/hanap-bahay/FeaturedCarousel";
 import { NewestListings } from "@/src/components/hanap-bahay/NewestListings";
 import { MarketplaceResultsSection } from "@/src/components/hanap-bahay/MarketplaceResultsSection";
@@ -14,7 +13,6 @@ import { getMarketplaceProperties } from "@/src/actions/hanap-bahay/hanap-bahay-
 export default function HanapBahayPage() {
     const router = useRouter();
     const [properties, setProperties] = useState<Property[]>([]);
-    const [selectedCategory, setSelectedCategory] = useState<string>("all");
     const [isMobileFiltersOpen, setIsMobileFiltersOpen] = useState(false);
     const [isLoading, startTransition] = useTransition();
 
@@ -48,37 +46,10 @@ export default function HanapBahayPage() {
         });
     }, [filters]);
 
-    // Client-side filtering para sa mga kategorya at amenities
+    // Client-side filtering batay sa filters state
     const filteredProperties = properties.filter((p) => {
-        if (selectedCategory !== "all" && !["pets", "parking", "wifi", "aircon"].includes(selectedCategory)) {
-            if (p.type !== selectedCategory) return false;
-        }
-        if (selectedCategory === "pets" && !p.amenities.includes("Pets Allowed")) return false;
-        if (selectedCategory === "parking" && !p.amenities.includes("Parking")) return false;
-        if (selectedCategory === "wifi" && !p.amenities.includes("WiFi")) return false;
-        if (selectedCategory === "aircon" && !p.amenities.includes("Aircon")) return false;
-
         return true;
     });
-
-    const handleSearchSubmit = (loc: string, budget: string, type: string) => {
-        startTransition(() => {
-            setFilters((prev) => ({
-                ...prev,
-                location: loc,
-                priceRange: budget ? [0, Number(budget)] : [0, 50000],
-                propertyType: type,
-            }));
-            scrollToResults();
-        });
-    };
-
-    const handleLocationClick = (city: string) => {
-        startTransition(() => {
-            setFilters((prev) => ({ ...prev, city }));
-            scrollToResults();
-        });
-    };
 
     const handleViewDetails = (property: Property) => {
         router.push(`/hanap-bahay/${property.id}`);
@@ -94,36 +65,26 @@ export default function HanapBahayPage() {
             amenities: [],
             sort: "newest",
         });
-        setSelectedCategory("all");
     };
 
     return (
         <div className="min-h-screen bg-[#FAF7EF] text-[#153730] font-sans antialiased selection:bg-[#F0A93A] selection:text-[#153730]">
             {/* 1. Hero Section */}
-            <HeroSection
-                onSearchSubmit={handleSearchSubmit}
-                onLocationClick={handleLocationClick}
-            />
+            <HeroSection />
 
-            {/* 2. Quick Categories Chips */}
-            <CategoryChips
-                selectedCategory={selectedCategory}
-                onSelectCategory={setSelectedCategory}
-            />
-
-            {/* 3. Featured Properties Carousel */}
+            {/* 2. Featured Properties Carousel (May Hero design theme na rin) */}
             <FeaturedCarousel
                 properties={properties.filter(p => p.verifiedLandlord)}
                 onViewDetails={handleViewDetails}
             />
 
-            {/* 4. Newest Listings Section */}
+            {/* 3. Newest Listings Section */}
             <NewestListings
                 properties={properties}
                 onViewDetails={handleViewDetails}
             />
 
-            {/* 5. Main Search & Results Section Component */}
+            {/* 4. Main Search & Results Section Component */}
             <MarketplaceResultsSection
                 sectionRef={resultsRef}
                 properties={properties}
@@ -138,7 +99,7 @@ export default function HanapBahayPage() {
                 onResetFilters={handleResetAllFilters}
             />
 
-            {/* 6. Footer CTA Section */}
+            {/* 5. Footer CTA Section */}
             <FooterCTA />
         </div>
     );

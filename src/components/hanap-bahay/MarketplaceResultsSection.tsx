@@ -43,8 +43,7 @@ export function MarketplaceResultsSection({
                     onOpenMobileFilters={onOpenMobileFilters}
                 />
 
-                <div className="flex gap-8 items-start">
-                    {/* Filter Sidebar (Desktop & Mobile Modal) */}
+                <div className="flex gap-8 items-start mt-6">
                     <FilterSidebar
                         filters={filters}
                         onFilterChange={onFilterChange}
@@ -52,7 +51,6 @@ export function MarketplaceResultsSection({
                         onCloseMobile={onCloseMobileFilters}
                     />
 
-                    {/* Results Grid */}
                     <div className="flex-1">
                         {isLoading ? (
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -65,11 +63,12 @@ export function MarketplaceResultsSection({
                         ) : (
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                                 {filteredProperties.map((property) => (
-                                    <PropertyCard
-                                        key={property.id}
-                                        property={property}
-                                        onViewDetails={onViewDetails}
-                                    />
+                                    <div key={property.id} className="transition-transform hover:-translate-y-1">
+                                        <PropertyCard
+                                            property={property}
+                                            onViewDetails={onViewDetails}
+                                        />
+                                    </div>
                                 ))}
                             </div>
                         )}

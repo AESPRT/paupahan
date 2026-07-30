@@ -12,6 +12,8 @@
   --coral-deep: #C7452F;
   --line: #E4DDC9;
   --muted: #6B7B74;
+  --carousel-bg-mid: #F4EFE6;
+  --accent-gold: #FADA7A;
 }
 
 @theme inline {
@@ -32,7 +34,6 @@
   --font-mono-brand: var(--font-plex-mono), monospace;
 }
 
-/* 👈 Idinagdag para sa smooth scrolling tuwing may mag-click ng hash links */
 html {
   scroll-behavior: smooth;
 }
@@ -88,9 +89,7 @@ body {
 
 /* ── EmptyState scene animations ── */
 @keyframes houseFloat {
-
-  0%,
-  100% {
+  0%, 100% {
     transform: translateY(0px);
   }
 
@@ -100,9 +99,7 @@ body {
 }
 
 @keyframes houseBreathe {
-
-  0%,
-  100% {
+  0%, 100% {
     transform: scale(1);
   }
 
@@ -112,9 +109,7 @@ body {
 }
 
 @keyframes shadowPulse {
-
-  0%,
-  100% {
+  0%, 100% {
     opacity: 0.18;
   }
 
@@ -146,9 +141,7 @@ body {
 }
 
 @keyframes cloud1Drift {
-
-  0%,
-  100% {
+  0%, 100% {
     transform: translateX(0px);
   }
 
@@ -158,9 +151,7 @@ body {
 }
 
 @keyframes cloud2Drift {
-
-  0%,
-  100% {
+  0%, 100% {
     transform: translateX(0px);
   }
 
@@ -170,9 +161,7 @@ body {
 }
 
 @keyframes pinBounce {
-
-  0%,
-  100% {
+  0%, 100% {
     transform: translateY(0px);
   }
 
@@ -190,61 +179,48 @@ body {
 }
 
 @keyframes sparkle1 {
-
-  0%,
-  100% {
+  0%, 100% {
     opacity: 0;
     transform: scale(0.5);
   }
 
-  40%,
-  60% {
+  40%, 60% {
     opacity: 1;
     transform: scale(1);
   }
 }
 
 @keyframes sparkle2 {
-
-  0%,
-  100% {
+  0%, 100% {
     opacity: 0;
     transform: scale(0.3);
   }
 
-  30%,
-  65% {
+  30%, 65% {
     opacity: 0.85;
     transform: scale(1);
   }
 }
 
 @keyframes sparkle3 {
-
-  0%,
-  30%,
-  100% {
+  0%, 30%, 100% {
     opacity: 0;
     transform: scale(0.4);
   }
 
-  55%,
-  80% {
+  55%, 80% {
     opacity: 0.9;
     transform: scale(1);
   }
 }
 
 @keyframes qFadeIn {
-
-  0%,
-  100% {
+  0%, 100% {
     opacity: 0;
     transform: translateY(4px) scale(0.8);
   }
 
-  40%,
-  65% {
+  40%, 65% {
     opacity: 0.7;
     transform: translateY(0) scale(1);
   }
@@ -335,27 +311,7 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-
-  .es-house,
-  .es-house-body,
-  .es-shadow,
-  .es-mag,
-  .es-cloud1,
-  .es-cloud2,
-  .es-pin,
-  .es-sp1,
-  .es-sp2,
-  .es-sp3,
-  .es-sp4,
-  .es-q1,
-  .es-q2,
-  .es-q3,
-  .es-leaf1,
-  .es-leaf2,
-  .es-leaf3,
-  .es-bird,
-  .es-smoke1,
-  .es-smoke2 {
+  .es-house, .es-house-body, .es-shadow, .es-mag, .es-cloud1, .es-cloud2, .es-pin, .es-sp1, .es-sp2, .es-sp3, .es-sp4, .es-q1, .es-q2, .es-q3, .es-leaf1, .es-leaf2, .es-leaf3, .es-bird, .es-smoke1, .es-smoke2 {
     animation: none !important;
   }
 }
@@ -368,7 +324,6 @@ body {
   }
 }
 
-/* Scene animation classes */
 .es-house {
   animation: houseFloat 4s ease-in-out infinite;
   transform-origin: 200px 180px;
@@ -530,7 +485,6 @@ body {
   }
 }
 
-/* ── Appliers ── */
 .hero-badge {
   animation: badgePop .6s cubic-bezier(.2, 1.4, .5, 1) .1s both;
 }
@@ -556,9 +510,7 @@ body {
 }
 
 .tahanan-text {
-  background: linear-gradient(110deg,
-      #F0A93A 0%, #FADA7A 30%, #F0A93A 45%,
-      #D98F1E 55%, #F0A93A 70%, #FADA7A 100%);
+  background: linear-gradient(110deg, #F0A93A 0%, #FADA7A 30%, #F0A93A 45%, #D98F1E 55%, #F0A93A 70%, #FADA7A 100%);
   background-size: 200% auto;
   -webkit-background-clip: text;
   background-clip: text;
@@ -592,33 +544,50 @@ body {
     stroke-dashoffset: 0;
   }
 
-  .sc-house,
-  .sc-cloud1,
-  .sc-cloud2,
-  .sc-pin,
-  .sc-sp1,
-  .sc-sp2,
-  .sc-sp3,
-  .sc-sp4,
-  .sc-bird,
-  .sc-leaf1,
-  .sc-leaf2,
-  .sc-smoke1,
-  .sc-smoke2,
-  .sc-mag,
-  .sc-grass1,
-  .sc-grass2 {
-    animation: none;
-  }
-
-  .hero-badge,
-  .hero-headline,
-  .hero-sub,
-  .hero-card,
-  .hero-chips,
-  .hero-stats {
+  .hero-badge, .hero-headline, .hero-sub, .hero-card, .hero-chips, .hero-stats {
     animation: none;
     opacity: 1;
     transform: none;
+  }
+}
+
+@keyframes draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-draw {
+    animation: none !important;
+  }
+}
+
+.animate-draw {
+  animation: draw 0.9s 0.2s ease-out forwards;
+}
+
+@layer utilities {
+
+  /* Itinatago ang default scrollbar pero pwedeng i-scroll pa rin */
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  /* 3D Perspective para sa Cover Flow effect ng carousel */
+  .perspective-\[1200px\] {
+    perspective: 1200px;
+  }
+
+  /* Carousel Card Transitions & States */
+  .carousel-card {
+    flex-shrink: 0;
+    cursor: pointer;
+    transition: all 700ms cubic-bezier(0.16, 1, 0.3, 1);
   }
 }
