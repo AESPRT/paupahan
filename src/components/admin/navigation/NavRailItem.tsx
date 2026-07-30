@@ -99,10 +99,11 @@ function LockIcon() {
 interface NavRailItemProps {
   item: NavItem;
   isMobile?: boolean;
+  isExpanded?: boolean;
   onSelect?: () => void;
 }
 
-export function NavRailItem({ item, isMobile = false, onSelect }: NavRailItemProps) {
+export function NavRailItem({ item, isMobile = false, isExpanded = false, onSelect }: NavRailItemProps) {
   const pathname = usePathname();
   const isActive = pathname === item.href || pathname?.startsWith(`${item.href}/`);
   const isLocked = item.disabled; // 👈 Ginamit ang disabled property mula sa NavItem
@@ -146,44 +147,86 @@ export function NavRailItem({ item, isMobile = false, onSelect }: NavRailItemPro
     );
   }
 
-  // Desktop Vertical Rail Layout
+  // Desktop Vertical Rail Layout (collapsed — icon + tiny label below)
+  if (!isExpanded) {
+    return (
+      <Link
+        href={isLocked ? "/admin/dashboard/subscriptions" : item.href}
+        className="group relative flex flex-col items-center justify-center gap-1 focus:outline-none"
+      >
+        <div
+          className={`relative flex h-11 w-11 items-center justify-center rounded-2xl transition-all duration-200 ${
+            isLocked
+              ? "opacity-60 bg-forest/5 text-muted grayscale"
+              : isActive
+              ? "bg-coral text-white shadow-[0_6px_16px_rgba(225,91,78,0.35)] group-hover:scale-105 active:scale-95"
+              : "text-muted hover:bg-forest/10 hover:text-forest-deep group-hover:scale-105 active:scale-95"
+          }`}
+        >
+          <NavIcon name={item.icon} />
+
+          {isLocked ? (
+            <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-forest-deep text-white shadow-sm">
+              <LockIcon />
+            </span>
+          ) : (
+            item.badge && (
+              <span className="absolute -top-1 -right-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-marigold px-1 font-mono-brand text-[10px] font-extrabold text-forest-deep shadow-sm">
+                {item.badge}
+              </span>
+            )
+          )}
+        </div>
+
+        <span
+          className={`font-mono-brand text-[10.5px] font-semibold tracking-tight transition-colors ${
+            isLocked
+              ? "text-muted/60"
+              : isActive
+              ? "font-bold text-forest-deep"
+              : "text-muted/80 group-hover:text-forest-deep"
+          }`}
+        >
+          {item.label}
+        </span>
+      </Link>
+    );
+  }
+
+  // Desktop Expanded Rail Layout (full-width row — icon + label side by side)
   return (
     <Link
       href={isLocked ? "/admin/dashboard/subscriptions" : item.href}
-      className="group relative flex flex-col items-center justify-center gap-1 focus:outline-none"
+      className={`group relative flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 transition-all duration-200 focus:outline-none ${
+        isLocked
+          ? "opacity-60 text-muted"
+          : isActive
+          ? "bg-coral text-white shadow-[0_6px_16px_rgba(225,91,78,0.35)]"
+          : "text-muted hover:bg-forest/10 hover:text-forest-deep"
+      }`}
     >
-      <div
-        className={`relative flex h-11 w-11 items-center justify-center rounded-2xl transition-all duration-200 ${
-          isLocked
-            ? "opacity-60 bg-forest/5 text-muted grayscale"
-            : isActive
-            ? "bg-coral text-white shadow-[0_6px_16px_rgba(225,91,78,0.35)] group-hover:scale-105 active:scale-95"
-            : "text-muted hover:bg-forest/10 hover:text-forest-deep group-hover:scale-105 active:scale-95"
-        }`}
-      >
+      {/* Icon wrapper */}
+      <div className="relative flex h-8 w-8 shrink-0 items-center justify-center">
         <NavIcon name={item.icon} />
-
-        {/* Lock badge kung naka-lock, o notification badge kung active */}
         {isLocked ? (
           <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-forest-deep text-white shadow-sm">
             <LockIcon />
           </span>
         ) : (
           item.badge && (
-            <span className="absolute -top-1 -right-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-marigold px-1 font-mono-brand text-[10px] font-extrabold text-forest-deep shadow-sm">
+            <span className={`absolute -top-1 -right-1 flex h-4 min-w-[16px] items-center justify-center rounded-full px-1 font-mono-brand text-[10px] font-extrabold shadow-sm ${
+              isActive ? "bg-white text-coral-deep" : "bg-marigold text-forest-deep"
+            }`}>
               {item.badge}
             </span>
           )
         )}
       </div>
 
+      {/* Label */}
       <span
-        className={`font-mono-brand text-[10.5px] font-semibold tracking-tight transition-colors ${
-          isLocked
-            ? "text-muted/60"
-            : isActive
-            ? "font-bold text-forest-deep"
-            : "text-muted/80 group-hover:text-forest-deep"
+        className={`truncate text-sm font-semibold tracking-tight ${
+          isLocked ? "text-muted/60" : isActive ? "text-white" : ""
         }`}
       >
         {item.label}

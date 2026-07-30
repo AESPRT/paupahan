@@ -90,7 +90,6 @@ export async function getTenantsData(): Promise<Tenant[]> {
         phone: lease.tenant.phone || "",
         emergencyContactName: lease.tenant.emergencyContactName || "",
         emergencyContactPhone: lease.tenant.emergencyContactPhone || "",
-        // Siguraduhing na-serialize ang dates kung kinakailangan ng iyong Tenant type (hal. .toISOString() o iwan kung Date object na tinatanggap)
         createdAt: lease.tenant.createdAt,
         updatedAt: lease.tenant.updatedAt,
         unitName: lease.unit?.name || lease.room?.unit?.name || "",
@@ -100,8 +99,15 @@ export async function getTenantsData(): Promise<Tenant[]> {
         advanceAmount: Number(lease.advanceAmount || 0),
         depositMonths: Number(lease.depositMonths || 0),
         depositAmount: Number(lease.depositAmount || 0),
+
+        // 👈 Idinagdag ang mga ito para pumasa sa Tenant interface at Modal
+        movedInDate: lease.startDate || null,
+        startDate: lease.startDate || null,
+        dueDate: (lease as any).dueDate || (lease.startDate ? new Date(lease.startDate).getDate() : null),
+        dueDay: (lease as any).dueDay || (lease.startDate ? new Date(lease.startDate).getDate() : null),
+
         leaseStatus: lease.status,
-        paymentStatus: lease.paymentStatus, // 👈 Kinuha na diretso mula sa lease model
+        paymentStatus: lease.paymentStatus,
       };
     });
 
@@ -232,11 +238,11 @@ export async function addTenantAction(formData: {
     }
 
     await createAuditLog({
-        actorId: adminId,
-        action: `Nagdagdag ng bagong tenant kasama ang amenities: ${formData.fullName}`,
-        entityType: 'Tenant',
-        entityId: adminId,
-        metadata: { actionType: 'ADD' },
+      actorId: adminId,
+      action: `Nagdagdag ng bagong tenant kasama ang amenities: ${formData.fullName}`,
+      entityType: 'Tenant',
+      entityId: adminId,
+      metadata: { actionType: 'ADD' },
     });
 
     const randomString = crypto.randomBytes(3).toString('hex').toUpperCase();
@@ -250,12 +256,12 @@ export async function addTenantAction(formData: {
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    
+
     const start = new Date(formData.startDate);
     start.setHours(0, 0, 0, 0);
 
     const leaseStatus = start > today ? 'pending' : 'active';
-    
+
     // Pagtukoy sa status na tumutugma sa RoomStatus/UnitStatus enum (lahat lowercase)
     const targetStatus = leaseStatus === 'active' ? 'occupied' : 'reserved';
 
@@ -392,9 +398,9 @@ export async function addTenantAction(formData: {
 
     revalidatePath('/admin/tenants');
 
-    return { 
-      success: true, 
-      newTenant: formattedNewTenant ?? undefined 
+    return {
+      success: true,
+      newTenant: formattedNewTenant ?? undefined
     };
   } catch (error) {
     console.error('Error adding tenant:', error);
@@ -403,7 +409,7 @@ export async function addTenantAction(formData: {
 }
 
 export async function updateLeaseStatusAction(
-  tenantId: string, 
+  tenantId: string,
   newStatus: "active" | "pending" | "moving_out" | "inactive"
 ) {
   try {
@@ -415,7 +421,7 @@ export async function updateLeaseStatusAction(
     }
 
     const lease = await prisma.lease.findFirst({
-      where: { 
+      where: {
         tenantId,
         OR: [
           { unit: { property: { landlordId: adminId } } },
@@ -430,11 +436,11 @@ export async function updateLeaseStatusAction(
     }
 
     await createAuditLog({
-        actorId: adminId,
-        action: `Nag-update ng lease status para sa tenant ID: ${tenantId} sa status: ${newStatus}`,
-        entityType: 'Tenant',
-        entityId: adminId,
-        metadata: { actionType: 'UPDATE' },
+      actorId: adminId,
+      action: `Nag-update ng lease status para sa tenant ID: ${tenantId} sa status: ${newStatus}`,
+      entityType: 'Tenant',
+      entityId: adminId,
+      metadata: { actionType: 'UPDATE' },
     });
 
     await prisma.lease.update({
@@ -556,10 +562,10 @@ export async function getUnitsAndRoomsForTenantByTenantId(tenantId?: string) {
       }
     }
 
-    return { 
-      unitsData: serializedUnits, 
-      amenities: serializedAmenities, 
-      currentTenantAmenities 
+    return {
+      unitsData: serializedUnits,
+      amenities: serializedAmenities,
+      currentTenantAmenities
     };
   } catch (error) {
     console.error('Error fetching units and rooms:', error);
@@ -610,11 +616,11 @@ export async function updateTenantAction(formData: {
     }
 
     await createAuditLog({
-        actorId: adminId,
-        action: `Nag-update ng impormasyon ng tenant: ${formData.fullName}`,
-        entityType: 'Tenant',
-        entityId: formData.tenantId,
-        metadata: { actionType: 'UPDATE' },
+      actorId: adminId,
+      action: `Nag-update ng impormasyon ng tenant: ${formData.fullName}`,
+      entityType: 'Tenant',
+      entityId: formData.tenantId,
+      metadata: { actionType: 'UPDATE' },
     });
 
     // 1. I-update ang Tenant kasama ang Emergency Contact details
@@ -692,9 +698,9 @@ export async function updateTenantAction(formData: {
 
     revalidatePath('/admin/tenants');
 
-    return { 
-      success: true, 
-      updatedTenant: formattedUpdatedTenant ?? undefined 
+    return {
+      success: true,
+      updatedTenant: formattedUpdatedTenant ?? undefined
     };
   } catch (error) {
     console.error('Error updating tenant:', error);

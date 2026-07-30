@@ -6,6 +6,8 @@ import { UnitsHeader } from "./UnitsHeader";
 import { UnitCard } from "./UnitCard";
 import { AddRoomModal } from "./AddRoomModal";
 import { AddUnitModal } from "./AddUnitModal";
+// 👈 I-import ang Edit Unit Modal kung mayroon kang hiwalay na component para rito (palitan kung iba ang pangalan o path)
+import { EditUnitModal } from "@/src/components/admin/units/EditUnitModal";
 import { Footer } from "@/src/components/landing/Footer";
 import { addRoomAction, addUnitAction } from "@/src/actions/units-actions";
 
@@ -18,6 +20,7 @@ export default function UnitsClientWrapper({
 }: UnitsClientWrapperProps) {
   const [units, setUnits] = useState<Unit[]>(initialUnits);
   const [selectedUnitForRoom, setSelectedUnitForRoom] = useState<Unit | null>(null);
+  const [selectedUnitForEdit, setSelectedUnitForEdit] = useState<Unit | null>(null); // 👈 State para sa pag-edit ng unit
   const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
 
   const [searchQuery, setSearchQuery] = useState("");
@@ -37,7 +40,7 @@ export default function UnitsClientWrapper({
         unit.address?.toLowerCase().includes(searchQuery.toLowerCase());
 
       if (selectedFilter === "All") return matchesSearch;
-      
+
       if (selectedFilter === "Has Vacant") {
         const hasVacantRoom = unit.rooms?.some((r) => r.status === "Vacant");
         return matchesSearch && hasVacantRoom;
@@ -130,6 +133,14 @@ export default function UnitsClientWrapper({
     }
   };
 
+  // 👈 Handler kapag na-update na ang unit (I-update ang state list)
+  const handleUpdateUnit = (updatedUnitData: Unit) => {
+    setUnits((prevUnits) =>
+      prevUnits.map((unit) => (unit.id === updatedUnitData.id ? updatedUnitData : unit))
+    );
+    setSelectedUnitForEdit(null);
+  };
+
   return (
     <div className="space-y-6 p-4 sm:p-6 lg:p-8">
       {/* Header Section */}
@@ -140,7 +151,7 @@ export default function UnitsClientWrapper({
         onAddUnit={() => setIsAddUnitOpen(true)}
       />
 
-      {/* Units Search & Filter Controls Section (Na-ayos ang wrap para iwas overlap) */}
+      {/* Units Search & Filter Controls Section */}
       <div className="flex flex-col gap-4 rounded-2xl border border-line/60 bg-paper-card p-4 shadow-sm xl:flex-row xl:items-center xl:justify-between">
         <h2 className="font-mono-brand text-xs font-bold uppercase tracking-wider text-muted shrink-0">
           Mga Nakarehistrong Unit ({filteredUnits.length})
@@ -173,11 +184,10 @@ export default function UnitsClientWrapper({
               <button
                 key={filter.value}
                 onClick={() => handleFilterChange(filter.value)}
-                className={`rounded-xl px-3.5 py-2 font-mono-brand text-[11px] font-bold transition-all whitespace-nowrap shadow-sm ${
-                  selectedFilter === filter.value
-                    ? "bg-forest text-white"
-                    : "border border-line bg-paper text-muted hover:bg-line/30 hover:text-ink"
-                }`}
+                className={`rounded-xl px-3.5 py-2 font-mono-brand text-[11px] font-bold transition-all whitespace-nowrap shadow-sm cursor-pointer ${selectedFilter === filter.value
+                  ? "bg-forest text-white"
+                  : "border border-line bg-paper text-muted hover:bg-line/30 hover:text-ink"
+                  }`}
               >
                 {filter.label}
               </button>
@@ -196,6 +206,7 @@ export default function UnitsClientWrapper({
                   key={unit.id}
                   unit={unit}
                   onOpenAddRoom={(unitToEdit) => setSelectedUnitForRoom(unitToEdit)}
+                  onOpenEditUnit={(unitToEdit) => setSelectedUnitForEdit(unitToEdit)} // 👈 Ipinasa ang handler para magbukas ang Edit Modal
                 />
               ))}
             </div>
@@ -206,11 +217,10 @@ export default function UnitsClientWrapper({
                 <button
                   onClick={handlePrevPage}
                   disabled={currentPage === 1}
-                  className={`group flex items-center gap-2 rounded-xl px-4 py-2 font-mono-brand text-xs font-bold transition-all ${
-                    currentPage === 1
-                      ? "cursor-not-allowed opacity-40 bg-line/20 text-muted"
-                      : "bg-forest/10 text-forest hover:bg-forest hover:text-white active:scale-95"
-                  }`}
+                  className={`group flex items-center gap-2 rounded-xl px-4 py-2 font-mono-brand text-xs font-bold transition-all cursor-pointer ${currentPage === 1
+                    ? "cursor-not-allowed opacity-40 bg-line/20 text-muted"
+                    : "bg-forest/10 text-forest hover:bg-forest hover:text-white active:scale-95"
+                    }`}
                 >
                   <span className="transition-transform group-hover:-translate-x-0.5">←</span> Nakaraan
                 </button>
@@ -226,11 +236,10 @@ export default function UnitsClientWrapper({
                 <button
                   onClick={handleNextPage}
                   disabled={currentPage === totalPages}
-                  className={`group flex items-center gap-2 rounded-xl px-4 py-2 font-mono-brand text-xs font-bold transition-all ${
-                    currentPage === totalPages
-                      ? "cursor-not-allowed opacity-40 bg-line/20 text-muted"
-                      : "bg-forest/10 text-forest hover:bg-forest hover:text-white active:scale-95"
-                  }`}
+                  className={`group flex items-center gap-2 rounded-xl px-4 py-2 font-mono-brand text-xs font-bold transition-all cursor-pointer ${currentPage === totalPages
+                    ? "cursor-not-allowed opacity-40 bg-line/20 text-muted"
+                    : "bg-forest/10 text-forest hover:bg-forest hover:text-white active:scale-95"
+                    }`}
                 >
                   Susunod <span className="transition-transform group-hover:translate-x-0.5">→</span>
                 </button>
@@ -267,6 +276,16 @@ export default function UnitsClientWrapper({
         onClose={() => setIsAddUnitOpen(false)}
         onAddUnit={handleAddUnit}
       />
+
+      {/* 👉 Edit Unit Modal Dialog (I-enable kung mayroon ka nang EditUnitModal component) */}
+      {selectedUnitForEdit && (
+        <EditUnitModal
+          isOpen={!!selectedUnitForEdit}
+          unit={selectedUnitForEdit}
+          onClose={() => setSelectedUnitForEdit(null)}
+          onUpdateUnit={handleUpdateUnit}
+        />
+      )}
 
       <Footer showNavLinks={false} />
     </div>

@@ -26,15 +26,14 @@ export async function getUnitsData() {
       return [];
     }
 
-    // 2. Kunin ang mga unit kasama ang rooms nito at unit-level leases
+    // 2. Kunin ang mga unit kasama ang rooms, leases, at ang mga detalye (floor, type, description)
     const unitsList = await prisma.unit.findMany({
       where: { propertyId: { in: propertyIds } },
       include: {
         property: { select: { name: true, city: true, addressLine: true } },
-        // 👈 Isinama natin ang unit-level leases para malaman kung occupied/reserved ang buong unit
         leases: {
-          where: { 
-            status: { in: ['active', 'pending'] } 
+          where: {
+            status: { in: ['active', 'pending'] }
           },
           include: {
             tenant: { select: { fullName: true } },
@@ -44,8 +43,8 @@ export async function getUnitsData() {
         rooms: {
           include: {
             leases: {
-              where: { 
-                status: { in: ['active', 'pending'] } 
+              where: {
+                status: { in: ['active', 'pending'] }
               },
               include: {
                 tenant: { select: { fullName: true } },
@@ -63,9 +62,9 @@ export async function getUnitsData() {
 
       const formattedRooms = unit.rooms.map((room) => {
         const activeOrPendingLease = room.leases[0];
-        
+
         let status: "Occupied" | "Vacant" | "Maintenance" | "Reserved" = "Vacant";
-        
+
         if (room.status === 'maintenance') {
           status = "Maintenance";
         } else if (activeOrPendingLease) {
@@ -83,17 +82,27 @@ export async function getUnitsData() {
         };
       });
 
+      // Standardize floor and type values para laging may maayos na display
+      const standardizedFloor = unit.floor && unit.floor.trim() !== "" ? unit.floor : "1st Floor";
+      const standardizedType = unit.type && unit.type.trim() !== "" ? unit.type : "Studio";
+
       return {
         id: unit.id,
         name: unit.name,
         address: `${unit.property.addressLine}, ${unit.property.city}`,
         totalRooms: formattedRooms.length,
         rooms: formattedRooms,
-        monthlyRent: Number(unit.monthlyRent || 0), // 👈 Sinamahan na rin ng monthlyRent ng unit
-        // Maaari mo ring idagdag ang mga ito kung kailangan sa frontend interface mo:
+        monthlyRent: Number(unit.monthlyRent || 0),
         unitStatus: unit.status,
-        unitLeaseStatus: activeOrPendingUnitLease ? (activeOrPendingUnitLease.status === 'pending' ? "Reserved" : "Occupied") : "Vacant",
+        unitLeaseStatus: activeOrPendingUnitLease
+          ? (activeOrPendingUnitLease.status === 'pending' ? ("Reserved" as const) : ("Occupied" as const))
+          : ("Vacant" as const),
         unitTenantName: activeOrPendingUnitLease?.tenant?.fullName,
+
+        // ✨ Siguradong standard at consistent ang mga values na ito sa UI
+        floor: standardizedFloor,
+        type: standardizedType,
+        description: unit.description || "",
       };
     });
 
@@ -104,22 +113,27 @@ export async function getUnitsData() {
   }
 }
 
-export async function addUnitAction(data: { unitName: string; monthlyRent: number }) {
+export async function addUnitAction(data: {
+  unitName: string;
+  monthlyRent: number;
+  floor?: string; // 👈 Idagdag para sa floor
+  type?: string;  // 👈 Idagdag para sa unit type
+}) {
   try {
     const cookieStore = await cookies();
     const adminId = cookieStore.get("session_user_id")?.value;
-    
+
     if (!adminId) {
       return { success: false, error: "Walang active session." };
     }
 
     // 1. Suriin ang subscription limits ng user
     const limits = await checkUserSubscriptionLimits();
-    
+
     if (!limits.canAddMoreUnits) {
-      return { 
-        success: false, 
-        error: `Naabot mo na ang limit ng iyong plan (${limits.planDisplayName}: ${limits.maxUnitsDisplay}). Mag-upgrade para makapagdagdag pa ng unit!` 
+      return {
+        success: false,
+        error: `Naabot mo na ang limit ng iyong plan (${limits.planDisplayName}: ${limits.maxUnitsDisplay}). Mag-upgrade para makapagdagdag pa ng unit!`
       };
     }
 
@@ -140,12 +154,16 @@ export async function addUnitAction(data: { unitName: string; monthlyRent: numbe
       });
     }
 
-    // 4. I-create ang Unit sa ilalim ng property ng landlord kasama ang monthlyRent
+    // 4. I-create ang Unit sa ilalim ng property kasama ang floor, type, at unitNumber para sa Hanap-Bahay
     const newUnit = await prisma.unit.create({
       data: {
         propertyId: property.id,
-        name: `${property.name} - ${data.unitName}`,
+        name: data.unitName,
+        unitNumber: data.unitName, // I-sync para madaling makuha sa marketplace details
         monthlyRent: data.monthlyRent,
+        floor: data.floor || "1st Floor",
+        type: data.type || "Studio",
+        status: "vacant", // Naka-vacant default para lumabas agad sa Hanap-Bahay
       },
       include: {
         rooms: true,
@@ -159,9 +177,10 @@ export async function addUnitAction(data: { unitName: string; monthlyRent: numbe
       entityId: newUnit.id,
       metadata: { actionType: 'ADD' },
     });
-    
+
     revalidatePath('/admin/dashboard/units');
-    
+    revalidatePath('/hanap-bahay');
+
     // ✨ I-convert ang Prisma Decimals patungong plain number para sa Client Component
     const serializedUnit = {
       ...newUnit,
@@ -183,17 +202,17 @@ export async function addRoomAction(propertyOrUnitId: string, roomNumber: string
   try {
     const cookieStore = await cookies();
     const adminId = cookieStore.get("session_user_id")?.value;
-    
+
     if (!adminId) {
       return { success: false, error: "Walang active session." };
     }
 
     const limits = await checkUserSubscriptionLimits();
-    
+
     if (!limits.canAddMoreRooms) {
-      return { 
-        success: false, 
-        error: `Naabot mo na ang limit ng iyong plan (${limits.planDisplayName}: ${limits.maxRoomLimit}). Mag-upgrade sa Standard o Pro para magdagdag pa!` 
+      return {
+        success: false,
+        error: `Naabot mo na ang limit ng iyong plan (${limits.planDisplayName}: ${limits.maxRoomLimit}). Mag-upgrade sa Standard o Pro para magdagdag pa!`
       };
     }
 
@@ -201,7 +220,7 @@ export async function addRoomAction(propertyOrUnitId: string, roomNumber: string
 
     // 1. Suriin muna kung ang ID ay direktang isang Unit na pag-aari ng landlord
     const unitExists = await prisma.unit.findFirst({
-      where: { 
+      where: {
         id: propertyOrUnitId,
         property: { landlordId: adminId }
       },
@@ -210,7 +229,7 @@ export async function addRoomAction(propertyOrUnitId: string, roomNumber: string
     // 2. Kung hindi unit, baka ito ay isang Property ID ng landlord
     if (!unitExists) {
       const propertyExists = await prisma.property.findFirst({
-        where: { 
+        where: {
           id: propertyOrUnitId,
           landlordId: adminId
         },
@@ -255,11 +274,44 @@ export async function addRoomAction(propertyOrUnitId: string, roomNumber: string
         status: 'vacant',
       },
     });
-    
+
     revalidatePath('/admin/dashboard/units');
     return { success: true };
   } catch (error) {
     console.error('Error adding room:', error);
     return { success: false, error: 'May naganap na error sa pagdagdag ng kwarto. Baka pareho ang numero ng kwarto sa unit na ito.' };
+  }
+}
+
+export async function updateUnitAction(data: {
+  id: string;
+  name: string;
+  monthlyRent: number;
+  floor: string;
+  type: string;
+  description: string;
+}) {
+  try {
+    const updated = await prisma.unit.update({
+      where: { id: data.id },
+      data: {
+        name: data.name,
+        monthlyRent: data.monthlyRent,
+        floor: data.floor,
+        type: data.type,
+        description: data.description,
+      },
+    });
+
+    // ✨ I-convert ang monthlyRent patungong plain number para maiwasan ang Decimal serialization error
+    const formattedUnit = {
+      ...updated,
+      monthlyRent: updated.monthlyRent ? Number(updated.monthlyRent) : 0,
+    };
+
+    return { success: true, unit: formattedUnit };
+  } catch (error) {
+    console.error("Error updating unit:", error);
+    return { success: false, error: "Hindi nai-save ang mga pagbabago sa unit." };
   }
 }

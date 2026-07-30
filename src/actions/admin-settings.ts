@@ -45,6 +45,11 @@ export async function getAdminSettings() {
       property: property ? {
         propertyName: property.name,
         address: property.addressLine,
+        city: property.city || "",
+        province: property.province || "",
+        postalCode: property.postalCode || "",
+        coverImage: property.coverPhotoUrl || "",
+        isPublic: property.isPublic ?? false,
         defaultGracePeriodDays: (property.propertySettings as any)?.defaultGracePeriodDays || 5,
         lateFeePercentage: (property.propertySettings as any)?.lateFeePercentage || 0,
         // Kunin ang rate mula sa UtilityRate table kung mayroon, o fallback sa JSON settings
@@ -53,6 +58,11 @@ export async function getAdminSettings() {
       } : {
         propertyName: "",
         address: "",
+        city: "",
+        province: "",
+        postalCode: "",
+        coverImage: "",
+        isPublic: false,
         defaultGracePeriodDays: 5,
         lateFeePercentage: 0,
         waterRatePerCubic: waterRate ? Number(waterRate.ratePerUnit) : 0,
@@ -109,6 +119,11 @@ export async function updateProfileSettings(data: { fullName: string; phone: str
 export async function updatePropertySettings(data: {
   propertyName: string;
   address: string;
+  city?: string;
+  province?: string;
+  postalCode?: string;
+  coverImage?: string;
+  isPublic?: boolean;
   defaultGracePeriodDays: number;
   lateFeePercentage: number;
   waterRatePerCubic: number;
@@ -136,6 +151,11 @@ export async function updatePropertySettings(data: {
         data: {
           name: data.propertyName,
           addressLine: data.address,
+          city: data.city || property.city || "Quezon City",
+          province: data.province,
+          postalCode: data.postalCode,
+          coverPhotoUrl: data.coverImage,
+          isPublic: data.isPublic ?? false,
           propertySettings: propertySettingsJson,
         },
       });
@@ -145,7 +165,11 @@ export async function updatePropertySettings(data: {
           landlordId: userId,
           name: data.propertyName,
           addressLine: data.address,
-          city: "Quezon City",
+          city: data.city || "Quezon City",
+          province: data.province,
+          postalCode: data.postalCode,
+          coverPhotoUrl: data.coverImage,
+          isPublic: data.isPublic ?? false,
           propertySettings: propertySettingsJson,
         },
       });

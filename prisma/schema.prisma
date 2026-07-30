@@ -115,6 +115,17 @@ enum PaymentStatus {
   @@map("payment_status")
 }
 
+enum BookingStatus {
+  requested
+  confirmed
+  cancelled
+  completed
+  expired
+  rejected
+
+  @@map("booking_status")
+}
+
 model User {
   id            String   @id @default(uuid())
   email         String   @unique
@@ -159,22 +170,28 @@ model LandlordStaff {
 }
 
 model Property {
-  id               String   @id @default(uuid())
-  landlordId       String   @map("landlord_id")
+  id               String  @id @default(uuid())
+  landlordId       String  @map("landlord_id")
   name             String
-  addressLine      String   @map("address_line")
+  addressLine      String  @map("address_line")
   city             String
   province         String?
-  postalCode       String?  @map("postal_code")
-  propertySettings Json?    @map("property_settings")
-  coverPhotoUrl    String?  @map("cover_photo_url")
-  createdAt        DateTime @default(now()) @map("created_at")
-  updatedAt        DateTime @updatedAt @map("updated_at")
+  postalCode       String? @map("postal_code")
+  propertySettings Json?   @map("property_settings")
+  coverPhotoUrl    String? @map("cover_photo_url")
+
+  // 👈 Mga bagong kolum para sa Public Marketplace
+  isPublic    Boolean   @default(false) @map("is_public")
+  publishedAt DateTime? @map("published_at") @db.Timestamptz
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   landlord           User                @relation(fields: [landlordId], references: [id], onDelete: Cascade)
-  units              Unit[] // Mga Building / Floor / Section
-  analyticsSnapshots AnalyticsSnapshot[]
+  units              Unit[]
   amenities          Amenity[]
+  analyticsSnapshots AnalyticsSnapshot[]
+  bookings           Booking[] // 👈 Relasyon sa mga bookings
 
   @@map("properties")
 }
@@ -183,18 +200,50 @@ model Unit {
   id          String     @id @default(uuid())
   propertyId  String     @map("property_id")
   monthlyRent Decimal?   @map("monthly_rent") @db.Decimal(12, 2)
-  name        String     // Halimbawa: "Building A" o "2nd Floor"
+  name        String // Dito natin ilalagay ang pangalan o unitNumber (Hal. "Unit 101")
+  unitNumber  String?    @map("unit_number") // Opsyonal o pwede ring i-sync sa name
+  floor       String?    @default("Standard") // 👈 Idagdag para sa floor display (Hal. "1st Floor")
+  type        String?    @default("Studio") // 👈 Idagdag para sa uri ng unit (Hal. "Studio", "1-Bedroom")
   description String?
   status      UnitStatus @default(vacant)
-  createdAt   DateTime   @default(now()) @map("created_at")
-  updatedAt   DateTime   @updatedAt @map("updated_at")
+
+  availableFrom DateTime? @map("available_from") @db.Date
+  display_order Int?      @default(0) @map("display_order")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   property            Property             @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  rooms               Room[]               // Mga kuwarto/pintuan sa loob ng unit na ito
+  rooms               Room[]
   leases              Lease[]
   maintenanceRequests MaintenanceRequest[]
+  bookings            Booking[]
 
   @@map("units")
+}
+
+model Booking {
+  id              String        @id @default(uuid())
+  propertyId      String        @map("property_id")
+  unitId          String?       @map("unit_id")
+  visitorName     String        @map("visitor_name")
+  visitorEmail    String?       @map("visitor_email")
+  visitorPhone    String        @map("visitor_phone")
+  bookingStatus   BookingStatus @default(requested) @map("booking_status")
+  preferredDate   DateTime?     @map("preferred_date") @db.Date
+  preferredTime   String?       @map("preferred_time")
+  prospectMessage String?       @map("prospect_message")
+  landlordNotes   String?       @map("landlord_notes")
+  expiresAt       DateTime?     @map("expires_at") @db.Timestamptz
+  confirmedBy     String?       @map("confirmed_by") // User ID ng landlord o staff na umapruba
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  unit     Unit?    @relation(fields: [unitId], references: [id], onDelete: Cascade)
+
+  @@index([propertyId, bookingStatus])
+  @@map("bookings")
 }
 
 model Room {
@@ -253,11 +302,11 @@ model Lease {
   depositMonths Decimal @default(1) @map("deposit_months") @db.Decimal(4, 2)
   depositAmount Decimal @default(0) @map("deposit_amount") @db.Decimal(12, 2)
 
-  status        LeaseStatus @default(active)
+  status        LeaseStatus   @default(active)
   paymentStatus PaymentStatus @default(pending) @map("payment_status")
-  utilityConfig Json        @default("{}") @map("utility_config")
-  createdAt     DateTime    @default(now()) @map("created_at")
-  updatedAt     DateTime    @updatedAt @map("updated_at")
+  utilityConfig Json          @default("{}") @map("utility_config")
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
 
   tenant    Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   unit      Unit?          @relation(fields: [unitId], references: [id]) // 👈 Idagdag ito para sa Opposite Relation

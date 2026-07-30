@@ -17,7 +17,7 @@ export function TenantDetailModal({ tenant, isOpen, onClose }: TenantDetailModal
     if (isOpen && tenant && tenant.loginCode) {
       const baseUrl = window.location.origin;
       const loginUrl = `${baseUrl}/tenant/login?code=${tenant.loginCode}`;
-      
+
       QRCode.toDataURL(loginUrl, { width: 300, margin: 2 })
         .then((url) => setQrCodeUrl(url))
         .catch((err) => console.error("Error generating QR code:", err));
@@ -40,11 +40,34 @@ export function TenantDetailModal({ tenant, isOpen, onClose }: TenantDetailModal
     }
   };
 
+  // Helper para sa pag-format ng petsa (idinagdag ang null sa type)
+  const formatDate = (dateInput?: string | Date | null) => {
+    if (!dateInput) return "N/A";
+    const date = new Date(dateInput);
+    if (isNaN(date.getTime())) return "N/A";
+    return date.toLocaleDateString("fil-PH", {
+      month: "long",
+      day: "numeric",
+      year: "numeric",
+    });
+  };
+
+  // Siguraduhing magiging undefined ang null para hindi magreklamo ang TypeScript
+  const displayMovedInDate = tenant.movedInDate ?? tenant.startDate ?? undefined;
+
+  // Kunin ang due date (kung wala, gamitin ang araw mula sa moved in date)
+  const rawDueDay = tenant.dueDate ?? tenant.dueDay;
+  const displayDueDate = rawDueDay
+    ? `Araw ng ${rawDueDay}`
+    : displayMovedInDate
+      ? `Araw ng ${new Date(displayMovedInDate).getDate()}`
+      : "N/A";
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/50 backdrop-blur-xs p-2 sm:p-4">
       {/* Full view modal container na may nakatakdang taas at overflow-hidden sa labas */}
       <div className="relative w-full max-w-2xl h-[92vh] sm:h-[88vh] rounded-2xl bg-paper-card shadow-2xl border border-line flex flex-col overflow-hidden">
-        
+
         {/* Fixed Header */}
         <div className="flex justify-between items-start border-b border-line p-5 bg-paper-card shrink-0">
           <div>
@@ -67,14 +90,14 @@ export function TenantDetailModal({ tenant, isOpen, onClose }: TenantDetailModal
               className="p-1.5 rounded-xl text-muted hover:bg-line/60 transition-colors cursor-pointer"
               aria-label="Isara"
             >
-              <svg 
-                xmlns="http://www.w3.org/2000/svg" 
-                viewBox="0 0 24 24" 
-                fill="none" 
-                stroke="currentColor" 
-                strokeWidth="2" 
-                strokeLinecap="round" 
-                strokeLinejoin="round" 
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
                 className="w-5 h-5"
               >
                 <line x1="18" y1="6" x2="6" y2="18" />
@@ -127,6 +150,14 @@ export function TenantDetailModal({ tenant, isOpen, onClose }: TenantDetailModal
             </h4>
             <div className="space-y-1.5 bg-paper p-3 rounded-xl border border-line text-xs">
               <div className="flex justify-between py-1 border-b border-line/50">
+                <span className="text-muted">Petsa ng Paglipat (Moved In):</span>
+                <span className="font-semibold text-ink">{formatDate(displayMovedInDate)}</span>
+              </div>
+              <div className="flex justify-between py-1 border-b border-line/50">
+                <span className="text-muted">Buwanang Takdang Araw (Due Date):</span>
+                <span className="font-semibold text-ink">{displayDueDate}</span>
+              </div>
+              <div className="flex justify-between py-1 border-b border-line/50">
                 <span className="text-muted">Buwanang Upa (Monthly Rent):</span>
                 <span className="font-bold text-ink">₱{tenant.monthlyRent.toLocaleString()}</span>
               </div>
@@ -161,19 +192,19 @@ export function TenantDetailModal({ tenant, isOpen, onClose }: TenantDetailModal
                 <div className="rounded-xl bg-white p-3 border border-line shadow-xs">
                   <img src={qrCodeUrl} alt="Tenant QR Code" className="w-36 h-36 object-contain" />
                 </div>
-                <a 
-                  href={qrCodeUrl} 
+                <a
+                  href={qrCodeUrl}
                   download={`QR-${tenant.fullName.replace(/\s+/g, '-')}.png`}
                   className="text-xs text-forest font-semibold hover:text-forest-deep hover:underline inline-flex items-center gap-1.5 transition-all"
                 >
-                  <svg 
-                    xmlns="http://www.w3.org/2000/svg" 
-                    viewBox="0 0 24 24" 
-                    fill="none" 
-                    stroke="currentColor" 
-                    strokeWidth="2" 
-                    strokeLinecap="round" 
-                    strokeLinejoin="round" 
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
                     className="w-3.5 h-3.5"
                   >
                     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />

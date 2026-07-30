@@ -6,8 +6,12 @@ interface AddUnitModalProps {
   isOpen: boolean;
   propertyName: string;
   onClose: () => void;
-  // Binago para tanggapin ang object na may unitName at monthlyRent
-  onAddUnit: (unitData: { unitName: string; monthlyRent: number }) => void;
+  onAddUnit: (unitData: {
+    unitName: string;
+    monthlyRent: number;
+    floor: string;
+    type: string;
+  }) => void;
 }
 
 export function AddUnitModal({
@@ -17,7 +21,9 @@ export function AddUnitModal({
   onAddUnit,
 }: AddUnitModalProps) {
   const [unitName, setUnitName] = useState("");
-  const [monthlyRent, setMonthlyRent] = useState(""); // 👈 Bagong state para sa rent
+  const [monthlyRent, setMonthlyRent] = useState("");
+  const [floor, setFloor] = useState("1st Floor"); // 👈 Bagong state para sa floor
+  const [type, setType] = useState("Studio");       // 👈 Bagong state para sa unit type
 
   if (!isOpen) return null;
 
@@ -28,10 +34,14 @@ export function AddUnitModal({
     onAddUnit({
       unitName,
       monthlyRent: Number(monthlyRent) || 0,
+      floor,
+      type,
     });
 
     setUnitName("");
     setMonthlyRent("");
+    setFloor("1st Floor");
+    setType("Studio");
     onClose();
   };
 
@@ -41,7 +51,7 @@ export function AddUnitModal({
         <div className="flex items-center justify-between border-b border-line pb-4">
           <div>
             <h2 className="font-display text-lg font-bold text-forest-deep">
-              Magdagdag ng Unit / Building
+              Magdagdag ng Unit sa Hanap-Bahay
             </h2>
             <p className="text-xs text-muted">Para sa Property: {propertyName}</p>
           </div>
@@ -56,31 +66,62 @@ export function AddUnitModal({
         <form onSubmit={handleSubmit} className="mt-4 space-y-4">
           <div>
             <label className="block text-xs font-bold text-forest-deep mb-1">
-              Pangalan ng Unit / Building
+              Pangalan / Numero ng Unit (Hal. Unit 101)
             </label>
             <input
               type="text"
               required
-              placeholder="e.g. Building A o Floor 2"
+              placeholder="e.g. Unit 101 o Building A"
               value={unitName}
               onChange={(e) => setUnitName(e.target.value)}
               className="w-full rounded-xl border border-line bg-paper px-3.5 py-2.5 text-xs font-medium text-ink outline-none focus:border-forest"
             />
           </div>
 
-          {/* 👈 Bagong Input Field para sa Buwanang Renta ng Unit */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-bold text-forest-deep mb-1">
+                Palapag / Floor
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. 1st Floor"
+                value={floor}
+                onChange={(e) => setFloor(e.target.value)}
+                className="w-full rounded-xl border border-line bg-paper px-3.5 py-2.5 text-xs font-medium text-ink outline-none focus:border-forest"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-forest-deep mb-1">
+                Uri ng Unit (Type)
+              </label>
+              <select
+                value={type}
+                onChange={(e) => setType(e.target.value)}
+                className="w-full rounded-xl border border-line bg-paper px-3.5 py-2.5 text-xs font-medium text-ink outline-none focus:border-forest"
+              >
+                <option value="Studio">Studio</option>
+                <option value="1-Bedroom">1-Bedroom</option>
+                <option value="2-Bedroom">2-Bedroom</option>
+                <option value="Solo Room">Solo Room</option>
+                <option value="Bedspace">Bedspace</option>
+              </select>
+            </div>
+          </div>
+
           <div>
             <label className="block text-xs font-bold text-forest-deep mb-1">
-              Buwanang Renta (Monthly Rent) - Opsyonal kung may Rooms
+              Buwanang Renta (Monthly Rent - ₱)
             </label>
             <input
               type="number"
               min="0"
               step="0.01"
-              placeholder="e.g. 5000"
+              required
+              placeholder="e.g. 6500"
               value={monthlyRent}
               onChange={(e) => setMonthlyRent(e.target.value)}
-              className="w-full rounded-xl border border-line bg-paper px-3.5 py-2.5 text-xs font-medium text-ink outline-none focus:border-forest"
+              className="w-full rounded-xl border border-line bg-paper px-3.5 py-2.5 font-mono-brand text-xs font-bold text-ink outline-none focus:border-forest"
             />
           </div>
 
@@ -96,7 +137,7 @@ export function AddUnitModal({
               type="submit"
               className="rounded-xl bg-forest px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-forest-deep cursor-pointer"
             >
-              Idagdag ang Unit
+              I-save ang Unit
             </button>
           </div>
         </form>

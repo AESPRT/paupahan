@@ -6,6 +6,7 @@ import { Button } from "./Button";
 import { PaupahanLogo } from "../ui/PaupahanLogo";
 
 const LINKS = [
+  { href: "/hanap-bahay", label: "Hanap Bahay" }, // 👈 Idinagdag para sa mga seekers/visitors
   { href: "#features", label: "Features" },
   { href: "#how", label: "Paano Gumagana" },
   { href: "#pricing", label: "Pricing" },
@@ -43,9 +44,13 @@ export function Navbar() {
           {/* Desktop nav — hidden below lg */}
           <div className="hidden items-center gap-6 text-[15px] font-semibold text-forest-deep lg:flex xl:gap-8">
             {LINKS.map((l) => (
-              <a key={l.href} href={l.href} className="opacity-80 transition-opacity hover:opacity-100">
+              <Link
+                key={l.href}
+                href={l.href}
+                className={`opacity-80 transition-opacity hover:opacity-100 ${l.href === "/properties" ? "text-marigold-deep font-bold opacity-100" : ""}`}
+              >
                 {l.label}
-              </a>
+              </Link>
             ))}
           </div>
 
@@ -87,15 +92,15 @@ export function Navbar() {
       >
         <div className="flex flex-col overflow-y-auto">
           {LINKS.map((l) => (
-            <a
+            <Link
               key={l.href}
               href={l.href}
               role="menuitem"
               onClick={() => setOpen(false)}
-              className="border-b border-line px-5 py-4 text-[15px] font-semibold text-forest-deep transition-colors hover:bg-forest/[0.04] sm:px-6"
+              className={`border-b border-line px-5 py-4 text-[15px] font-semibold text-forest-deep transition-colors hover:bg-forest/[0.04] sm:px-6 ${l.href === "/properties" ? "bg-forest/[0.02] text-marigold-deep font-bold" : ""}`}
             >
               {l.label}
-            </a>
+            </Link>
           ))}
           <div className="flex flex-col gap-2.5 px-5 py-4 sm:px-6">
             <Button href="/admin/login" variant="ghost" onClick={() => setOpen(false)} className="!py-3 !text-sm">

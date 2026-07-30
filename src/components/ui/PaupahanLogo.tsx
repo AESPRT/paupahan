@@ -11,7 +11,7 @@ export function PaupahanLogo({ className = "", size = 34 }: PaupahanLogoProps) {
       viewBox="0 0 512 512"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
-      className={`-rotate-3 transition-transform hover:rotate-0 ${className}`}
+      className={className}
     >
       {/* Container Background */}
       <rect width="512" height="512" rx="120" fill="#153730" />

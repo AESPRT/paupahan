@@ -8,6 +8,11 @@ export interface ProfileSettings {
 export interface PropertySettings {
   propertyName: string;
   address: string;
+  city?: string;
+  province?: string;
+  postalCode?: string;
+  coverImage?: string;
+  isPublic?: boolean;
   defaultGracePeriodDays: number;
   lateFeePercentage: number;
   waterRatePerCubic: number;

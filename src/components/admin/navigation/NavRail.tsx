@@ -6,9 +6,11 @@ import { DASHBOARD_NAV_ITEMS, NavItem } from "./nav-data";
 import { NavRailItem } from "./NavRailItem";
 import { PaupahanLogo } from "@/src/components/ui/PaupahanLogo";
 import { getDashboardBadgeCounts } from "@/src/actions/dashboard-counts";
+import { useNavExpand } from "./NavExpandContext";
 
 export function NavRail() {
   const [isOpen, setIsOpen] = useState(false);
+  const { isExpanded, setIsExpanded } = useNavExpand();
   const [navItems, setNavItems] = useState<NavItem[]>(DASHBOARD_NAV_ITEMS);
   const [userInfo, setUserInfo] = useState({
     name: "Juan Dela Cruz",
@@ -165,33 +167,60 @@ export function NavRail() {
       {/* ---------------------------------------------------- */}
       {/* 3. DESKTOP / TABLET SCROLLABLE RAIL (≥ md)            */}
       {/* ---------------------------------------------------- */}
-      <aside className="fixed left-0 top-0 z-40 hidden h-screen w-[88px] flex-col items-center justify-between border-r border-line bg-paper-card py-5 shadow-[4px_0_24px_rgba(27,58,52,0.04)] md:flex">
-        <div className="flex shrink-0 flex-col items-center gap-3">
-          <Link
-            href="/admin/dashboard/home"
-            className="flex items-center gap-2.5 font-display text-lg font-bold text-forest-deep"
+      <aside
+        style={{ width: isExpanded ? "220px" : "88px" }}
+        className="fixed left-0 top-0 z-40 hidden h-screen flex-col items-center justify-between border-r border-line bg-paper-card py-5 shadow-[4px_0_24px_rgba(27,58,52,0.04)] transition-[width] duration-300 ease-in-out md:flex overflow-hidden"
+      >
+        {/* Logo / toggle button */}
+        <div className="flex w-full shrink-0 flex-col items-center gap-3">
+          <button
+            onClick={() => setIsExpanded((prev) => !prev)}
+            aria-label={isExpanded ? "Collapse navigation" : "Expand navigation"}
+            className="flex items-center gap-2.5 px-2 font-display text-lg font-bold text-forest-deep transition-all hover:opacity-80 active:scale-95 focus:outline-none"
           >
-            <PaupahanLogo size={42}/>
-          </Link>
+            <PaupahanLogo size={42} className="shrink-0" />
+            {isExpanded && (
+              <span className="whitespace-nowrap overflow-hidden text-forest-deep">
+                Paupahan
+              </span>
+            )}
+          </button>
           <div className="h-[1px] w-8 bg-line" />
         </div>
 
-        <nav className="my-3 flex w-full flex-1 flex-col items-center gap-4 overflow-y-auto px-2 py-2 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+        {/* Nav items */}
+        <nav
+          className={`my-3 flex w-full flex-1 flex-col gap-2 overflow-y-auto py-2 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden ${
+            isExpanded ? "items-stretch px-3" : "items-center px-2"
+          }`}
+        >
           {navItems.map((item) => (
-            <NavRailItem key={item.id} item={item} />
+            <NavRailItem key={item.id} item={item} isExpanded={isExpanded} />
           ))}
         </nav>
 
-        <div className="flex shrink-0 flex-col items-center gap-3">
+        {/* Profile avatar */}
+        <div className="flex w-full shrink-0 flex-col items-center gap-3 px-3">
           <div className="h-[1px] w-8 bg-line" />
           <Link
             href="/admin/dashboard/profile"
-            className="group relative flex h-10 w-10 items-center justify-center rounded-full border-2 border-forest/30 bg-coral/10 font-mono-brand text-xs font-bold text-coral-deep shadow-sm transition-all hover:scale-105 hover:border-coral"
+            className={`group relative flex items-center gap-3 rounded-2xl transition-all hover:bg-forest/10 ${
+              isExpanded ? "w-full px-3 py-2" : "h-10 w-10 justify-center"
+            }`}
           >
-            {userInfo.initials}
-            <div className="pointer-events-none absolute left-full z-50 ml-3 hidden rounded-xl border border-line bg-forest-deep px-3 py-1.5 text-xs font-semibold text-white shadow-lg group-hover:block whitespace-nowrap">
-              {userInfo.name}
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 border-forest/30 bg-coral/10 font-mono-brand text-xs font-bold text-coral-deep shadow-sm transition-all hover:border-coral">
+              {userInfo.initials}
             </div>
+            {isExpanded ? (
+              <div className="overflow-hidden text-left">
+                <p className="truncate text-xs font-bold text-forest-deep">{userInfo.name}</p>
+                <p className="text-[11px] text-muted capitalize">{userInfo.role.toLowerCase()}</p>
+              </div>
+            ) : (
+              <div className="pointer-events-none absolute left-full z-50 ml-3 hidden rounded-xl border border-line bg-forest-deep px-3 py-1.5 text-xs font-semibold text-white shadow-lg group-hover:block whitespace-nowrap">
+                {userInfo.name}
+              </div>
+            )}
           </Link>
         </div>
       </aside>

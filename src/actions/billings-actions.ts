@@ -8,6 +8,7 @@ import { cookies } from 'next/headers'
 import { createAuditLog } from '@/src/actions/audit-actions'
 import { detectCarrier } from '@/src/utils/carrierDetector';
 import { apiFetch } from "@/src/lib/api";
+import { calculateTenantDueDate } from "@/src/utils/calculateDueDate";
 
 export async function getBillingsData() {
   try {
@@ -65,7 +66,7 @@ export async function getBillingsData() {
 
     const invoices: Invoice[] = dbBills.map((bill) => {
       const activeLease = bill.tenant?.leases?.[0];
-      
+
       // 💡 Suriin kung room-level o unit-level ang lease para sa tamang pag-display ng lokasyon
       let unitRoomText = "N/A";
       if (activeLease?.room) {
@@ -75,9 +76,9 @@ export async function getBillingsData() {
       } else if (activeLease?.unit) {
         unitRoomText = `${activeLease.unit.name} (Buong Unit)`;
       }
-      
+
       const lineItems: { description: string; amount: number }[] = [];
-      
+
       let computedTotalAmount = Number(bill.rentAmount) || 0;
       if (computedTotalAmount > 0) {
         lineItems.push({ description: "Buwanang Renta", amount: computedTotalAmount });
@@ -104,10 +105,10 @@ export async function getBillingsData() {
         bill.items.forEach((item) => {
           const itemAmount = Number(item.amount);
           const isUtility = item.type === "electricity" || item.type === "water";
-          const isApproved = item.status === "approved" && item.type !== "other";
+          const isApproved = item.status === "approved";
 
           if (itemAmount > 0 && item.type) {
-            if (!isUtility) {
+            if (!isUtility && item.type !== "other") {
               computedTotalAmount += itemAmount;
               lineItems.push({
                 description: `${item.type.toUpperCase()} (${item.currentReading ? `Reading: ${item.currentReading}` : 'Item'})`,
@@ -134,7 +135,7 @@ export async function getBillingsData() {
       } else if (bill.status === "overdue") {
         status = "Overdue";
       } else if (bill.status === "payment_submitted" || bill.status === "pending" || (bill.payments && bill.payments.length > 0)) {
-        status = "Pending"; 
+        status = "Pending";
       }
 
       const latestPayment = bill.payments[0];
@@ -168,7 +169,7 @@ export async function createInvoiceAction(newInvoiceData: Omit<Invoice, "id" | "
   try {
     const cookieStore = await cookies();
     const adminId = cookieStore.get("session_user_id")?.value;
-    
+
     if (!adminId) {
       return { success: false, error: "Walang active session." };
     }
@@ -198,9 +199,9 @@ export async function createInvoiceAction(newInvoiceData: Omit<Invoice, "id" | "
     });
 
     if (!tenant || tenant.leases.length === 0) {
-      return { 
-        success: false, 
-        error: `Hindi mahanap ang aktibong lease para sa tenant na si "${newInvoiceData.tenantName}" sa iyong mga property.` 
+      return {
+        success: false,
+        error: `Hindi mahanap ang aktibong lease para sa tenant na si "${newInvoiceData.tenantName}" sa iyong mga property.`
       };
     }
 
@@ -216,9 +217,9 @@ export async function createInvoiceAction(newInvoiceData: Omit<Invoice, "id" | "
     });
 
     if (existingBill) {
-      return { 
-        success: false, 
-        error: `Mayroon na palang bill ang tenant na ito para sa buwan ng ${billingMonthYear}. Hindi maaaring magkaroon ng dobleng bill sa iisang buwan.` 
+      return {
+        success: false,
+        error: `Mayroon na palang bill ang tenant na ito para sa buwan ng ${billingMonthYear}. Hindi maaaring magkaroon ng dobleng bill sa iisang buwan.`
       };
     }
 
@@ -240,7 +241,7 @@ export async function createInvoiceAction(newInvoiceData: Omit<Invoice, "id" | "
     if (rentAmount === 0 && newInvoiceData.totalAmount > 0) {
       rentAmount = newInvoiceData.totalAmount;
     }
-    
+
     const locationDescription = activeLease.roomId ? `Room ID: ${activeLease.roomId}` : `Unit ID: ${activeLease.unitId}`;
 
     await createAuditLog({
@@ -266,7 +267,7 @@ export async function createInvoiceAction(newInvoiceData: Omit<Invoice, "id" | "
         items: {
           create: newInvoiceData.lineItems.map(item => {
             const desc = item.description.toLowerCase();
-            
+
             let itemType: "electricity" | "water" | "amenities" | "other" = "other";
             if (desc.includes('tubig') || desc.includes('water')) {
               itemType = 'water';
@@ -303,7 +304,7 @@ export async function createInvoiceAction(newInvoiceData: Omit<Invoice, "id" | "
     const tenantPhone = tenant.phone;
     const tenantName = tenant.fullName;
     const formattedDueDate = new Date(newInvoiceData.dueDate).toLocaleDateString('fil-PH', { year: 'numeric', month: 'long', day: 'numeric' });
-    
+
     // Token para sa API authentication
     const apiToken = process.env.NEXT_PUBLIC_API_SECRET_TOKEN;
 
@@ -371,7 +372,7 @@ export async function markInvoiceAsPaidAction(id: string) {
   try {
     const cookieStore = await cookies();
     const adminId = cookieStore.get("session_user_id")?.value;
-    
+
     if (!adminId) {
       return { success: false, error: "Walang active session." };
     }
@@ -409,7 +410,7 @@ export async function markInvoiceAsPaidAction(id: string) {
         paidAt: new Date(),
       },
     });
-    
+
     // --- 💡 I-update ang paymentStatus ng Lease sa 'paid' kapag nabayaran na ang bill ---
     if (updatedBill.leaseId) {
       await prisma.lease.update({
@@ -431,7 +432,7 @@ export async function markInvoiceAsPaidAction(id: string) {
     const tenantName = billCheck.tenant.fullName;
     const totalAmount = Number(updatedBill.totalAmount);
     const formattedDate = new Date().toLocaleDateString('fil-PH', { year: 'numeric', month: 'long', day: 'numeric' });
-    
+
     // Token para sa API authentication
     const apiToken = process.env.NEXT_PUBLIC_API_SECRET_TOKEN;
 
@@ -551,9 +552,9 @@ export async function getOccupiedRoomsForBilling() {
 
       // 💡 Kalkulahin ang monthly rent kung ito ba ay galing sa Room o Unit
       const monthlyRent = Number(
-        lease.monthlyRent ?? 
-        lease.room?.monthlyRent ?? 
-        lease.unit?.monthlyRent ?? 
+        lease.monthlyRent ??
+        lease.room?.monthlyRent ??
+        lease.unit?.monthlyRent ??
         0
       );
 
@@ -566,6 +567,10 @@ export async function getOccupiedRoomsForBilling() {
         tenantName: lease.tenant?.fullName ?? "Unknown Tenant",
         monthlyRent: monthlyRent,
         amenities: formattedAmenities,
+
+        // 👈 IDINAGDAG ITO: Ipasa ang startDate at movedInDate para mabasa ng due date utility!
+        startDate: lease.startDate ?? null,
+        movedInDate: lease.startDate ?? null,
       };
     });
 
@@ -585,7 +590,7 @@ export async function runAutoBillingForLandlord(adminId: string) {
       where: { userId: adminId },
       select: { id: true, fullName: true, email: true, phone: true },
     });
-    
+
     if (landlordTenants.length === 0) {
       console.log("--> HUMINTO: Walang tenants sa ilalim ng landlord na ito.");
       return;
@@ -640,9 +645,9 @@ export async function runAutoBillingForLandlord(adminId: string) {
 
       // 💡 Kunin ang buwanang renta base sa lease, room, o unit
       const monthlyRent = Number(
-        lease.monthlyRent ?? 
-        lease.room?.monthlyRent ?? 
-        lease.unit?.monthlyRent ?? 
+        lease.monthlyRent ??
+        lease.room?.monthlyRent ??
+        lease.unit?.monthlyRent ??
         0
       );
       let totalAmount = monthlyRent;
@@ -677,9 +682,16 @@ export async function runAutoBillingForLandlord(adminId: string) {
 
       totalAmount = monthlyRent + amenitiesFeeTotal;
 
-      const leaseStartDate = new Date(lease.startDate);
-      const startDay = leaseStartDate.getDate();
-      const dueDate = new Date(currentYear, Number(currentMonth) - 1, startDay, 23, 59, 59);
+      // ✨ GINAMIT NA ANG UTILITY: Kinukuha nito ang tamang due date string (YYYY-MM-DD)
+      const computedDueDateStr = calculateTenantDueDate({
+        startDate: lease.startDate,
+        movedInDate: lease.startDate,
+        dueDate: (lease as any).dueDate,
+        dueDay: (lease as any).dueDay,
+      });
+
+      // I-convert ang YYYY-MM-DD string pabalik sa Date object na may dulo ng araw (23:59:59) para sa Prisma database
+      const dueDate = new Date(`${computedDueDateStr}T23:59:59`);
 
       const newBill = await prisma.bill.create({
         data: {
@@ -761,7 +773,7 @@ export async function runAutoBillingForLandlord(adminId: string) {
             method: "POST",
             body: {
               phoneNumber: tenantPhone,
-              carrier: detectedCarrier, 
+              carrier: detectedCarrier,
               message: smsMessage,
             },
             token: apiToken,
@@ -832,9 +844,9 @@ export async function sendBillingReminderAction(invoiceId: string, tenantName: s
     }
 
     // 2. Kunin ang Landlord Name mula sa room lease o unit lease
-    const landlordName = 
-      bill.lease?.room?.unit?.property?.landlord?.fullName || 
-      bill.lease?.unit?.property?.landlord?.fullName || 
+    const landlordName =
+      bill.lease?.room?.unit?.property?.landlord?.fullName ||
+      bill.lease?.unit?.property?.landlord?.fullName ||
       "Landlord";
 
     // 3. Kalkulahin o kunin ang total amount

@@ -3,6 +3,7 @@
 
 import { useState } from "react";
 import { Invoice } from "@/src/types/admin/billing";
+import { calculateTenantDueDate } from "@/src/utils/calculateDueDate";
 
 // Uri para sa mga Amenities na naka-assign o nakakabit sa kuwarto/unit/tenant
 interface RoomAmenity {
@@ -21,6 +22,10 @@ interface ActiveTenantRoom {
   tenantName: string;
   monthlyRent: number;
   amenities?: RoomAmenity[]; // 👈 Mga amenities para sa kuwarto/unit na ito
+  dueDate?: number | string | null; // 👈 Idinagdag para suportahan ang due day
+  dueDay?: number | string | null;
+  movedInDate?: string | Date | null;
+  startDate?: string | Date | null;
 }
 
 interface CreateInvoiceModalProps {
@@ -42,17 +47,18 @@ export function CreateInvoiceModal({
   const [unitRoom, setUnitRoom] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [rentAmount, setRentAmount] = useState("");
-  
+
   // State para sa mga napiling amenities at kani-kanilang halaga
   const [roomAmenities, setRoomAmenities] = useState<RoomAmenity[]>([]);
 
-  // Kapag nagbago ang piniling lease, auto-fill ang tenant name, rent, at amenities
+  // Kapag nagbago ang piniling lease, auto-fill ang tenant name, rent, amenities, at due date
   const handleLeaseChange = (leaseId: string) => {
     setSelectedLeaseId(leaseId);
     const found = roomsWithTenants.find((r) => r.leaseId === leaseId);
+
     if (found) {
       setTenantName(found.tenantName);
-      
+
       // 💡 Suriin kung ito ba ay buong unit o may kasamang room number
       if (found.roomNumber === "Buong Unit" || !found.roomId) {
         setUnitRoom(`${found.unitName} (Buong Unit)`);
@@ -62,11 +68,17 @@ export function CreateInvoiceModal({
 
       setRentAmount(found.monthlyRent ? found.monthlyRent.toString() : "");
       setRoomAmenities(found.amenities || []); // 👈 Kunin ang amenities kung meron man
+
+      // ✨ Gamitin na ang ginawa nating utility function para sa Due Date
+      const computedDueDate = calculateTenantDueDate(found);
+      setDueDate(computedDueDate);
+
     } else {
       setTenantName("");
       setUnitRoom("");
       setRentAmount("");
       setRoomAmenities([]);
+      setDueDate("");
     }
   };
 
@@ -79,7 +91,7 @@ export function CreateInvoiceModal({
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.SubmitEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!tenantName || !unitRoom || !dueDate) return;
 
@@ -134,7 +146,7 @@ export function CreateInvoiceModal({
           </h2>
           <button
             onClick={onClose}
-            className="rounded-full p-1 text-muted hover:bg-paper hover:text-ink"
+            className="rounded-full p-1 text-muted hover:bg-paper hover:text-ink cursor-pointer"
           >
             ✕
           </button>
@@ -253,13 +265,13 @@ export function CreateInvoiceModal({
             <button
               type="button"
               onClick={onClose}
-              className="rounded-xl border border-line px-4 py-2 text-xs font-bold text-muted hover:bg-paper"
+              className="rounded-xl border border-line px-4 py-2 text-xs font-bold text-muted hover:bg-paper cursor-pointer"
             >
               Kanselahin
             </button>
             <button
               type="submit"
-              className="rounded-xl bg-forest px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-forest-deep"
+              className="rounded-xl bg-forest px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-forest-deep cursor-pointer"
             >
               I-issue ang Invoice
             </button>
