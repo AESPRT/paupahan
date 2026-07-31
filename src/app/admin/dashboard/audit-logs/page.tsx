@@ -3,6 +3,7 @@
 
 import { useState, useEffect } from "react";
 import { AdminAuditLogs } from "@/src/components/admin/dashboard/AdminAuditLogs";
+import { AuditLogsHeader } from "@/src/components/admin/dashboard/AuditLogsHeader";
 import { Footer } from "@/src/components/landing/Footer";
 import { getDashboardData } from "@/src/actions/dashboard-actions";
 import FullPageLoader from "@/src/components/ui/FullPageLoader";
@@ -31,6 +32,14 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6 p-4 sm:p-6 lg:p-8">
+      <AuditLogsHeader 
+        totalLogs={auditLogs.length} 
+        todayLogsCount={auditLogs.filter((log) => {
+          if (!log.timestamp) return false;
+          const logDate = new Date(log.timestamp).toDateString();
+          return logDate === new Date().toDateString();
+        }).length}
+      />
       <AdminAuditLogs logs={auditLogs} />
       <Footer showNavLinks={false} />
     </div>

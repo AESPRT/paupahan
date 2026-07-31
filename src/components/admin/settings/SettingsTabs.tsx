@@ -19,10 +19,11 @@ const TABS: { id: TabType; label: string; shortLabel: string; icon: LucideIcon }
 export function SettingsTabs({ activeTab, onTabChange }: SettingsTabsProps) {
   return (
     <div className="relative">
+      {/* Scrollable Container with Subtle Backdrop Blur */}
       <div
         role="tablist"
         aria-label="Settings sections"
-        className="flex items-center gap-1 overflow-x-auto rounded-2xl border border-line bg-paper p-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="flex items-center gap-1.5 overflow-x-auto rounded-2xl border border-line/80 bg-paper/80 p-1.5 backdrop-blur-xs [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         {TABS.map((tab) => {
           const Icon = tab.icon;
@@ -34,14 +35,16 @@ export function SettingsTabs({ activeTab, onTabChange }: SettingsTabsProps) {
               role="tab"
               aria-selected={isActive}
               onClick={() => onTabChange(tab.id)}
-              className={`group relative inline-flex shrink-0 items-center gap-2 rounded-xl px-3.5 py-2.5 font-mono-brand text-xs font-bold transition-all duration-200 sm:px-4 ${isActive
-                  ? "bg-forest text-white shadow-[0_2px_10px_rgba(31,75,63,0.25)]"
-                  : "text-muted hover:bg-line/40 hover:text-forest-deep"
-                }`}
+              className={`group relative inline-flex shrink-0 cursor-pointer items-center gap-2 rounded-xl px-3.5 py-2.5 font-mono-brand text-xs font-bold transition-all duration-200 active:scale-[0.98] sm:px-4 ${
+                isActive
+                  ? "bg-forest text-white shadow-xs shadow-forest/20"
+                  : "text-muted hover:bg-line/30 hover:text-forest-deep"
+              }`}
             >
               <Icon
-                className={`h-4 w-4 shrink-0 transition-transform duration-200 ${isActive ? "scale-105" : "group-hover:scale-105"
-                  }`}
+                className={`h-4 w-4 shrink-0 transition-transform duration-200 ${
+                  isActive ? "scale-110" : "group-hover:scale-105"
+                }`}
                 aria-hidden="true"
               />
               <span className="hidden sm:inline">{tab.label}</span>
@@ -51,8 +54,11 @@ export function SettingsTabs({ activeTab, onTabChange }: SettingsTabsProps) {
         })}
       </div>
 
-      {/* Edge fade hints that there's more to scroll on mobile */}
-      <div className="pointer-events-none absolute inset-y-0 right-0 w-8 rounded-r-2xl bg-gradient-to-l from-paper to-transparent sm:hidden" aria-hidden="true" />
+      {/* Subtle Right Fade Gradient for Mobile Scroll Hint */}
+      <div
+        className="pointer-events-none absolute inset-y-0 right-0 w-8 rounded-r-2xl bg-gradient-to-l from-paper to-transparent sm:hidden"
+        aria-hidden="true"
+      />
     </div>
   );
 }

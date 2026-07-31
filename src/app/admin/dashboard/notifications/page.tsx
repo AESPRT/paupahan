@@ -3,6 +3,7 @@
 
 import { useState, useEffect } from "react";
 import { RecentActivities } from "@/src/components/admin/dashboard/RecentActivities";
+import { NotificationsHeader } from "@/src/components/admin/dashboard/NotificationsHeader";
 import { Footer } from "@/src/components/landing/Footer";
 import { getDashboardData } from "@/src/actions/dashboard-actions";
 import FullPageLoader from "@/src/components/ui/FullPageLoader";
@@ -31,6 +32,10 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6 p-4 sm:p-6 lg:p-8">
+      <NotificationsHeader 
+        totalActivities={recentActivities.length} 
+        unreadCount={recentActivities.filter((a) => !a.isRead).length}
+      />
       <RecentActivities activities={recentActivities} />
       <Footer showNavLinks={false} />
     </div>

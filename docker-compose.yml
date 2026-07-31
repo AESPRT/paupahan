@@ -1,4 +1,5 @@
 services:
+  # 1. Next.js Web App
   paupahan-app:
     build: .
     container_name: paupahan_app
@@ -10,8 +11,40 @@ services:
       - PORT=3000
       - DATABASE_URL=postgresql://aedev_admin:admin123@fold_go_postgres:5432/paupahan_db?schema=public
       - NEXT_PUBLIC_API_URL=https://api.aesprt.com
+      - REDIS_HOST=paupahan-redis
+      - REDIS_PORT=6379
+    depends_on:
+      - paupahan-redis
     networks:
       - foldgo-api_default
+      - default
+
+  # 2. BullMQ Worker Container
+  paupahan-worker:
+    build: .
+    container_name: paupahan_worker
+    restart: always
+    command: npm run worker
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://aedev_admin:admin123@fold_go_postgres:5432/paupahan_db?schema=public
+      - NEXT_PUBLIC_API_URL=https://api.aesprt.com
+      - REDIS_HOST=paupahan-redis
+      - REDIS_PORT=6379
+    depends_on:
+      - paupahan-redis
+    networks:
+      - foldgo-api_default
+      - default
+
+  # 3. Redis Container
+  paupahan-redis:
+    image: redis:alpine
+    container_name: paupahan_redis
+    restart: always
+    ports:
+      - "6379:6379"
+    networks:
       - default
 
 networks:

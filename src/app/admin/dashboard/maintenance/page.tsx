@@ -67,7 +67,7 @@ export default function MaintenancePage() {
       ? requests
       : requests.filter((r) => r.status === filterStatus);
 
-  // ✨ FullPageLoader sa pinakataas bago i-render ang buong layout
+  // FullPageLoader sa pinakataas bago i-render ang buong layout
   if (isLoading) {
     return <FullPageLoader message="Kinukuha ang mga maintenance requests..." />;
   }
@@ -81,21 +81,30 @@ export default function MaintenancePage() {
         totalResolved={totalResolved}
       />
 
-      {/* Filter Tabs */}
-      <div className="flex items-center gap-2 border-b border-line pb-3 overflow-x-auto">
-        {["All", "Pending", "In Progress", "Resolved"].map((tab) => (
-          <button
-            key={tab}
-            onClick={() => setFilterStatus(tab)}
-            className={`rounded-xl px-4 py-2 font-mono-brand text-xs font-bold transition-all whitespace-nowrap ${
-              filterStatus === tab
-                ? "bg-forest text-white shadow-sm"
-                : "border border-line bg-paper text-muted hover:bg-line/40"
-            }`}
-          >
-            {tab === "All" ? "Lahat ng Requests" : tab}
-          </button>
-        ))}
+      {/* Modern Minimalist Filter Tabs */}
+      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 no-scrollbar">
+        {[
+          { label: "Lahat ng Requests", value: "All" },
+          { label: "Pending", value: "Pending" },
+          { label: "In Progress", value: "In Progress" },
+          { label: "Resolved", value: "Resolved" },
+        ].map((tab) => {
+          const isActive = filterStatus === tab.value;
+          return (
+            <button
+              key={tab.value}
+              type="button"
+              onClick={() => setFilterStatus(tab.value)}
+              className={`rounded-full px-4 py-2 text-xs font-medium transition-all duration-200 cursor-pointer whitespace-nowrap ${
+                isActive
+                  ? "bg-slate-900 text-white shadow-xs"
+                  : "bg-slate-100/80 text-slate-600 hover:bg-slate-200/60 hover:text-slate-900"
+              }`}
+            >
+              {tab.label}
+            </button>
+          );
+        })}
       </div>
 
       {/* Maintenance Cards */}

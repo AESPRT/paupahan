@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Tenant, LeaseStatus, BillStatus } from "@/src/types/tenant/tenant";
 import { updateLeaseStatusAction } from "@/src/actions/tenants-actions";
@@ -11,21 +11,29 @@ interface TenantsTableProps {
   onEditTenant: (tenant: Tenant) => void;
 }
 
+const STATUS_OPTIONS: { label: string; value: LeaseStatus }[] = [
+  { label: "Active", value: "active" },
+  { label: "Pending", value: "pending" },
+  { label: "Moving Out", value: "moving_out" },
+  { label: "Inactive", value: "inactive" },
+];
+
 export function TenantsTable({ tenants, onSelectTenant, onEditTenant }: TenantsTableProps) {
   const router = useRouter();
-  
-  // States para sa pagination at responsive itemsPerPage (3 kapag mobile, 5 kapag desktop)
+
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(3);
 
-  // Gamitin ang local override states para sa instant UI feedback habang umaasa sa prop para sa main data
   const [statusOverrides, setStatusOverrides] = useState<Record<string, LeaseStatus>>({});
   const [loadingTenantId, setLoadingTenantId] = useState<string | null>(null);
+  
+  // State para sa nakabukang Custom Dropdown
+  const [activeDropdownId, setActiveDropdownId] = useState<string | null>(null);
+  const tableRef = useRef<HTMLDivElement>(null);
 
-  // I-detect ang screen size para i-set ang itemsPerPage (3 sa mobile, 5 sa md pataas)
   useEffect(() => {
     const handleResize = () => {
-      if (window.innerWidth >= 768) { // md breakpoint sa Tailwind (768px)
+      if (window.innerWidth >= 768) {
         setItemsPerPage(5);
       } else {
         setItemsPerPage(3);
@@ -37,37 +45,47 @@ export function TenantsTable({ tenants, onSelectTenant, onEditTenant }: TenantsT
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  const getStatusBadge = (status: LeaseStatus) => {
+  // Isara ang pop-up kapag nag-click sa labas
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (tableRef.current && !tableRef.current.contains(event.target as Node)) {
+        setActiveDropdownId(null);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const getStatusBadgeStyle = (status: LeaseStatus) => {
     switch (status) {
       case "active":
-        return "bg-forest/10 text-forest border-forest/20";
+        return "bg-emerald-50 text-emerald-700 border-emerald-200/60";
       case "pending":
-        return "bg-amber-100 text-amber-700 border-amber-200";
+        return "bg-amber-50 text-amber-700 border-amber-200/60";
       case "moving_out":
-        return "bg-purple-100 text-purple-700 border-purple-200";
+        return "bg-purple-50 text-purple-700 border-purple-200/60";
       case "inactive":
-        return "bg-gray-100 text-gray-600 border-gray-200";
+        return "bg-slate-100 text-slate-600 border-slate-200";
       default:
-        return "bg-gray-100 text-gray-600 border-gray-200";
+        return "bg-slate-100 text-slate-600 border-slate-200";
     }
   };
 
   const getPaymentBadge = (status: BillStatus) => {
     switch (status) {
       case "paid":
-        return "bg-emerald-100 text-emerald-700";
+        return "bg-emerald-50 text-emerald-700 border border-emerald-200/50";
       case "pending":
-        return "bg-marigold/20 text-forest-deep";
+        return "bg-amber-50 text-amber-700 border border-amber-200/50";
       case "overdue":
-        return "bg-coral/15 text-coral-deep font-bold";
+        return "bg-rose-50 text-rose-700 border border-rose-200/50 font-bold";
       case "draft":
-        return "bg-gray-100 text-gray-600";
+        return "bg-slate-100 text-slate-600 border border-slate-200";
       default:
-        return "bg-gray-100 text-gray-600";
+        return "bg-slate-100 text-slate-600 border border-slate-200";
     }
   };
 
-  // Pagsamahin ang prop data at ang local overrides para laging updated
   const displayTenants = useMemo(() => {
     return tenants.map((tenant) => ({
       ...tenant,
@@ -75,9 +93,7 @@ export function TenantsTable({ tenants, onSelectTenant, onEditTenant }: TenantsT
     }));
   }, [tenants, statusOverrides]);
 
-  // Kalkulahin ang pagination
   const totalPages = Math.ceil(displayTenants.length / itemsPerPage);
-  
   const startIndex = (currentPage - 1) * itemsPerPage;
   const currentTenants = displayTenants.slice(startIndex, startIndex + itemsPerPage);
 
@@ -92,11 +108,10 @@ export function TenantsTable({ tenants, onSelectTenant, onEditTenant }: TenantsT
   const handleStatusChange = async (tenantId: string, newStatus: LeaseStatus) => {
     try {
       setLoadingTenantId(tenantId);
+      setActiveDropdownId(null);
 
-      // 1. I-update agad ang local override para sa instant real-time feedback
       setStatusOverrides((prev) => ({ ...prev, [tenantId]: newStatus }));
 
-      // 2. Tawagin ang server action para i-save sa database
       const result = await updateLeaseStatusAction(tenantId, newStatus);
       
       if (!result.success) {
@@ -124,82 +139,110 @@ export function TenantsTable({ tenants, onSelectTenant, onEditTenant }: TenantsT
 
   if (displayTenants.length === 0) {
     return (
-      <div className="rounded-2xl border border-dashed border-line bg-paper-card p-8 sm:p-12 text-center text-xs sm:text-sm text-muted">
+      <div className="rounded-3xl border border-dashed border-line bg-paper-card p-8 sm:p-12 text-center text-xs sm:text-sm text-muted">
         Walang nahanap na tenant na tumutugma sa iyong search o filter.
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" ref={tableRef}>
       {/* ----------------------------------------------------------------- */}
-      {/* 1. MOBILE VIEW: Stacked Cards (Lalabas lang sa Mobile Screen < md) */}
+      {/* 1. MOBILE VIEW: Modern Cards (< md)                               */}
       {/* ----------------------------------------------------------------- */}
-      <div className="grid grid-cols-1 gap-3 md:hidden">
+      <div className="grid grid-cols-1 gap-3.5 md:hidden">
         {currentTenants.map((tenant) => (
           <div
             key={tenant.id}
             onClick={() => onSelectTenant(tenant)}
-            className="flex flex-col gap-3 rounded-2xl border border-line bg-paper-card p-4 shadow-sm transition-all active:scale-[0.99] cursor-pointer"
+            className="flex flex-col gap-3.5 rounded-3xl border border-line/80 bg-paper-card p-4 shadow-sm transition-all hover:border-line active:scale-[0.99] cursor-pointer"
           >
-            {/* Header: Avatar, Name, at Status Select */}
+            {/* Header: Avatar, Name, at Custom Pop-up Status */}
             <div className="flex items-center justify-between border-b border-line/60 pb-3 gap-2">
               <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-forest/20 bg-coral/10 font-mono-brand text-xs font-bold text-coral-deep">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-line bg-paper text-xs font-bold text-ink shadow-xs">
                   {tenant.fullName ? tenant.fullName.substring(0, 2).toUpperCase() : "TN"}
                 </div>
                 <div>
-                  <h3 className="font-bold text-forest-deep text-sm">{tenant.fullName}</h3>
+                  <h3 className="font-bold text-ink text-sm">{tenant.fullName}</h3>
                   <p className="text-[11px] text-muted">{tenant.phone || 'Walang telepono'}</p>
                 </div>
               </div>
 
-              {/* Status Dropdown Mobile */}
-              <div onClick={(e) => e.stopPropagation()}>
-                <select
-                  value={tenant.leaseStatus}
+              {/* Mobile Custom Status Pop-up */}
+              <div className="relative" onClick={(e) => e.stopPropagation()}>
+                <button
+                  type="button"
                   disabled={loadingTenantId === tenant.id}
-                  onChange={(e) => handleStatusChange(tenant.id, e.target.value as LeaseStatus)}
-                  className={`rounded-md border px-2 py-1 font-mono-brand text-[10px] font-bold uppercase outline-none cursor-pointer ${getStatusBadge(tenant.leaseStatus)} ${loadingTenantId === tenant.id ? 'opacity-50' : ''}`}
+                  onClick={() => setActiveDropdownId(activeDropdownId === tenant.id ? null : tenant.id)}
+                  className={`flex items-center gap-1.5 rounded-xl border px-2.5 py-1 text-[11px] font-semibold transition-all cursor-pointer ${getStatusBadgeStyle(tenant.leaseStatus)} ${loadingTenantId === tenant.id ? 'opacity-50' : ''}`}
                 >
-                  <option value="active">Active</option>
-                  <option value="pending">Pending</option>
-                  <option value="moving_out">Moving Out</option>
-                  <option value="inactive">Inactive</option>
-                </select>
+                  <span className="capitalize">{tenant.leaseStatus.replace("_", " ")}</span>
+                  <svg className="h-3 w-3 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+
+                {/* Pop-up Options */}
+                {activeDropdownId === tenant.id && (
+                  <div className="absolute right-0 z-30 mt-1.5 w-36 rounded-2xl border border-line bg-paper p-1.5 shadow-xl transition-all animate-in fade-in zoom-in-95 duration-150">
+                    {STATUS_OPTIONS.map((opt) => {
+                      const isSelected = tenant.leaseStatus === opt.value;
+                      return (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          onClick={() => handleStatusChange(tenant.id, opt.value)}
+                          className={`flex w-full items-center justify-between rounded-xl px-2.5 py-1.5 text-xs font-medium transition-colors cursor-pointer ${
+                            isSelected
+                              ? "bg-line/40 text-ink font-semibold"
+                              : "text-ink/80 hover:bg-line/20 hover:text-ink"
+                          }`}
+                        >
+                          <span>{opt.label}</span>
+                          {isSelected && (
+                            <svg className="h-3.5 w-3.5 text-ink" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                            </svg>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             </div>
 
-            {/* Details Grid (Mobile) */}
+            {/* Details */}
             <div className="flex flex-col gap-1 text-xs">
               <div>
-                <span className="text-[10px] uppercase font-mono-brand text-muted block">Unit / Room</span>
+                <span className="text-[10px] font-semibold text-muted uppercase tracking-wider block">Unit / Room</span>
                 <span className="font-semibold text-ink">
                   {tenant.roomNumber ? `${tenant.unitName} - Room ${tenant.roomNumber}` : tenant.unitName}
                 </span>
               </div>
               <div className="mt-1">
-                <span className="text-[10px] uppercase font-mono-brand text-muted block">Upa (Rent)</span>
-                <span className="font-bold text-forest-deep">₱{tenant.monthlyRent.toLocaleString()}/mo</span>
+                <span className="text-[10px] font-semibold text-muted uppercase tracking-wider block">Upa (Rent)</span>
+                <span className="font-bold text-ink">₱{tenant.monthlyRent.toLocaleString()}/mo</span>
               </div>
             </div>
 
-            {/* Footer: Payment Status & Action Buttons */}
+            {/* Footer: Payment Status & Modern Actions */}
             <div className="flex items-center justify-between pt-1">
-              <span className={`rounded-full px-2.5 py-0.5 font-mono-brand text-[10px] font-bold uppercase ${getPaymentBadge(tenant.paymentStatus)}`}>
+              <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-semibold capitalize ${getPaymentBadge(tenant.paymentStatus)}`}>
                 Bayad: {tenant.paymentStatus}
               </span>
 
-              <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
                 <button
                   onClick={() => onEditTenant(tenant)}
-                  className="rounded-lg border border-forest/30 bg-forest/5 px-3 py-1 text-[11px] font-bold text-forest hover:bg-forest/10 cursor-pointer"
+                  className="rounded-xl border border-line bg-paper px-3 py-1.5 text-[11px] font-medium text-ink transition-all hover:bg-line/30 active:scale-95 cursor-pointer"
                 >
                   I-edit
                 </button>
                 <button
                   onClick={() => onSelectTenant(tenant)}
-                  className="rounded-lg border border-line bg-paper px-3 py-1 text-[11px] font-bold text-forest-deep hover:bg-paper-card cursor-pointer"
+                  className="rounded-xl border border-ink/20 bg-ink px-3 py-1.5 text-[11px] font-medium text-paper transition-all hover:bg-ink/90 active:scale-95 cursor-pointer"
                 >
                   Tignan
                 </button>
@@ -210,42 +253,42 @@ export function TenantsTable({ tenants, onSelectTenant, onEditTenant }: TenantsT
       </div>
 
       {/* ----------------------------------------------------------------- */}
-      {/* 2. DESKTOP/TABLET VIEW: Table Layout na may Pababang Detalye       */}
+      {/* 2. DESKTOP VIEW: Modern Minimalist Table Layout                    */}
       {/* ----------------------------------------------------------------- */}
-      <div className="hidden overflow-hidden rounded-2xl border border-line bg-paper-card shadow-sm md:block">
-        <div className="overflow-x-auto">
+      <div className="hidden rounded-3xl border border-line/80 bg-paper-card shadow-sm md:block">
+        <div className="overflow-x-visible">
           <table className="w-full text-left text-xs">
-            <thead className="border-b border-line bg-paper font-mono-brand uppercase text-muted">
+            <thead className="border-b border-line/80 bg-paper/50 text-[11px] font-semibold text-muted">
               <tr>
-                <th className="px-5 py-4 font-bold">Tenant</th>
-                <th className="px-5 py-4 font-bold">Detalye (Unit / Upa)</th>
-                <th className="px-5 py-4 font-bold">Status</th>
-                <th className="px-5 py-4 font-bold">Bayad</th>
-                <th className="px-5 py-4 text-right font-bold">Aksyon</th>
+                <th className="px-6 py-4">Tenant</th>
+                <th className="px-6 py-4">Detalye (Unit / Upa)</th>
+                <th className="px-6 py-4">Status</th>
+                <th className="px-6 py-4">Bayad</th>
+                <th className="px-6 py-4 text-right">Aksyon</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-line/60">
               {currentTenants.map((tenant) => (
                 <tr
                   key={tenant.id}
-                  className="transition-colors hover:bg-paper/60 cursor-pointer"
+                  className="transition-colors hover:bg-paper/40 cursor-pointer"
                   onClick={() => onSelectTenant(tenant)}
                 >
                   {/* Column 1: Tenant Info */}
-                  <td className="px-5 py-4">
+                  <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
-                      <div className="flex h-9 w-9 items-center justify-center rounded-full border border-forest/20 bg-coral/10 font-mono-brand text-xs font-bold text-coral-deep">
+                      <div className="flex h-9 w-9 items-center justify-center rounded-2xl border border-line bg-paper text-xs font-bold text-ink shadow-xs">
                         {tenant.fullName ? tenant.fullName.substring(0, 2).toUpperCase() : "TN"}
                       </div>
                       <div>
-                        <p className="font-bold text-forest-deep">{tenant.fullName}</p>
+                        <p className="font-bold text-ink">{tenant.fullName}</p>
                         <p className="text-[11px] text-muted">{tenant.phone || 'Walang telepono'}</p>
                       </div>
                     </div>
                   </td>
 
-                  {/* Column 2: Unit / Room at Upa (Pababa / Stacked nang walang room kung unit-level) */}
-                  <td className="px-5 py-4">
+                  {/* Column 2: Unit & Rent */}
+                  <td className="px-6 py-4">
                     <div className="flex flex-col gap-0.5">
                       <span className="font-semibold text-ink">
                         {tenant.unitName}
@@ -253,46 +296,76 @@ export function TenantsTable({ tenants, onSelectTenant, onEditTenant }: TenantsT
                       {tenant.roomNumber && (
                         <span className="text-[11px] text-muted">Room {tenant.roomNumber}</span>
                       )}
-                      <span className="font-bold text-forest-deep text-xs mt-0.5">
+                      <span className="font-bold text-ink text-xs mt-0.5">
                         ₱{tenant.monthlyRent.toLocaleString()}/mo
                       </span>
                     </div>
                   </td>
 
-                  {/* Column 3: Lease Status */}
-                  <td className="px-5 py-4" onClick={(e) => e.stopPropagation()}>
-                    <select
-                      value={tenant.leaseStatus}
-                      disabled={loadingTenantId === tenant.id}
-                      onChange={(e) => handleStatusChange(tenant.id, e.target.value as LeaseStatus)}
-                      className={`rounded-md border px-2.5 py-1 font-mono-brand text-[10px] font-bold uppercase outline-none cursor-pointer ${getStatusBadge(tenant.leaseStatus)} ${loadingTenantId === tenant.id ? 'opacity-50' : ''}`}
-                    >
-                      <option value="active">Active</option>
-                      <option value="pending">Pending</option>
-                      <option value="moving_out">Moving Out</option>
-                      <option value="inactive">Inactive</option>
-                    </select>
+                  {/* Column 3: Custom Pop-up Lease Status */}
+                  <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
+                    <div className="relative inline-block text-left">
+                      <button
+                        type="button"
+                        disabled={loadingTenantId === tenant.id}
+                        onClick={() => setActiveDropdownId(activeDropdownId === tenant.id ? null : tenant.id)}
+                        className={`flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-[11px] font-semibold transition-all cursor-pointer ${getStatusBadgeStyle(tenant.leaseStatus)} ${loadingTenantId === tenant.id ? 'opacity-50' : ''}`}
+                      >
+                        <span className="capitalize">{tenant.leaseStatus.replace("_", " ")}</span>
+                        <svg className="h-3.5 w-3.5 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </button>
+
+                      {/* Desktop Pop-up Menu */}
+                      {activeDropdownId === tenant.id && (
+                        <div className="absolute left-0 z-30 mt-1.5 w-40 rounded-2xl border border-line/80 bg-paper p-1.5 shadow-xl transition-all animate-in fade-in zoom-in-95 duration-150">
+                          {STATUS_OPTIONS.map((opt) => {
+                            const isSelected = tenant.leaseStatus === opt.value;
+                            return (
+                              <button
+                                key={opt.value}
+                                type="button"
+                                onClick={() => handleStatusChange(tenant.id, opt.value)}
+                                className={`flex w-full items-center justify-between rounded-xl px-3 py-1.5 text-xs font-medium transition-colors cursor-pointer ${
+                                  isSelected
+                                    ? "bg-line/40 text-ink font-semibold"
+                                    : "text-ink/80 hover:bg-line/20 hover:text-ink"
+                                }`}
+                              >
+                                <span>{opt.label}</span>
+                                {isSelected && (
+                                  <svg className="h-3.5 w-3.5 text-ink" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                                  </svg>
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
                   </td>
 
                   {/* Column 4: Payment Status */}
-                  <td className="px-5 py-4">
-                    <span className={`rounded-full px-2.5 py-1 font-mono-brand text-[10px] font-bold uppercase ${getPaymentBadge(tenant.paymentStatus)}`}>
+                  <td className="px-6 py-4">
+                    <span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold capitalize ${getPaymentBadge(tenant.paymentStatus)}`}>
                       {tenant.paymentStatus}
                     </span>
                   </td>
 
-                  {/* Column 5: Actions */}
-                  <td className="px-5 py-4 text-right" onClick={(e) => e.stopPropagation()}>
+                  {/* Column 5: Modern Action Buttons */}
+                  <td className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
                     <div className="flex items-center justify-end gap-2">
                       <button
                         onClick={() => onEditTenant(tenant)}
-                        className="rounded-lg border border-forest/30 bg-forest/5 px-3 py-1.5 text-[11px] font-bold text-forest hover:bg-forest/10 cursor-pointer"
+                        className="rounded-xl border border-line bg-paper px-3 py-1.5 text-xs font-medium text-ink transition-all hover:border-ink/30 hover:bg-line/30 active:scale-95 cursor-pointer"
                       >
                         I-edit
                       </button>
                       <button
                         onClick={() => onSelectTenant(tenant)}
-                        className="rounded-lg border border-line px-3 py-1.5 text-[11px] font-bold text-forest-deep hover:bg-paper cursor-pointer"
+                        className="rounded-xl border border-ink/20 bg-ink px-3 py-1.5 text-xs font-medium text-paper transition-all hover:bg-ink/90 active:scale-95 cursor-pointer shadow-xs"
                       >
                         Tignan
                       </button>
@@ -306,40 +379,44 @@ export function TenantsTable({ tenants, onSelectTenant, onEditTenant }: TenantsT
       </div>
 
       {/* ----------------------------------------------------------------- */}
-      {/* 3. PLAYFUL PAGINATION CONTROLS                                    */}
+      {/* 3. MODERN MINIMALIST PAGINATION                                   */}
       {/* ----------------------------------------------------------------- */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-between rounded-2xl border border-line bg-paper-card px-4 sm:px-6 py-3 shadow-sm">
+        <div className="flex items-center justify-between rounded-3xl border border-line/80 bg-paper-card px-4 sm:px-6 py-3 shadow-sm">
           <button
             onClick={handlePrevPage}
             disabled={currentPage === 1}
-            className={`group flex items-center gap-1.5 sm:gap-2 rounded-xl px-3 sm:px-4 py-2 font-mono-brand text-xs font-bold transition-all ${
+            className={`group flex items-center gap-1.5 rounded-2xl border border-line bg-paper px-3.5 py-2 text-xs font-medium transition-all ${
               currentPage === 1
-                ? "cursor-not-allowed opacity-40 bg-line/20 text-muted"
-                : "bg-forest/10 text-forest hover:bg-forest hover:text-white active:scale-95"
+                ? "cursor-not-allowed opacity-40 text-muted"
+                : "text-ink hover:border-ink/30 hover:bg-line/30 active:scale-95 cursor-pointer"
             }`}
           >
-            <span className="transition-transform group-hover:-translate-x-0.5">←</span> Nakaraan
+            <span className="transition-transform group-hover:-translate-x-0.5">←</span>
+            <span>Nakaraan</span>
           </button>
 
-          <div className="flex items-center gap-2 font-mono-brand text-xs font-bold text-forest-deep">
-            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-forest text-white shadow-sm">
+          <div className="flex items-center gap-1.5 text-xs font-semibold text-ink">
+            <span className="flex h-7 w-7 items-center justify-center rounded-xl bg-ink text-paper shadow-xs">
               {currentPage}
             </span>
-            <span className="text-muted">ng</span>
-            <span className="rounded-lg bg-line/40 px-2 py-1 text-ink">{totalPages}</span>
+            <span className="text-muted text-[11px] px-1">ng</span>
+            <span className="flex h-7 w-7 items-center justify-center rounded-xl border border-line bg-paper text-muted">
+              {totalPages}
+            </span>
           </div>
 
           <button
             onClick={handleNextPage}
             disabled={currentPage === totalPages}
-            className={`group flex items-center gap-1.5 sm:gap-2 rounded-xl px-3 sm:px-4 py-2 font-mono-brand text-xs font-bold transition-all ${
+            className={`group flex items-center gap-1.5 rounded-2xl border border-line bg-paper px-3.5 py-2 text-xs font-medium transition-all ${
               currentPage === totalPages
-                ? "cursor-not-allowed opacity-40 bg-line/20 text-muted"
-                : "bg-forest/10 text-forest hover:bg-forest hover:text-white active:scale-95"
+                ? "cursor-not-allowed opacity-40 text-muted"
+                : "text-ink hover:border-ink/30 hover:bg-line/30 active:scale-95 cursor-pointer"
             }`}
           >
-            Susunod <span className="transition-transform group-hover:translate-x-0.5">→</span>
+            <span>Susunod</span>
+            <span className="transition-transform group-hover:translate-x-0.5">→</span>
           </button>
         </div>
       )}

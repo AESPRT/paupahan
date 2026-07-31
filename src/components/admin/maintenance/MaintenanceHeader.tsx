@@ -38,39 +38,66 @@ export function MaintenanceHeader({
             <svg className="h-4 w-4 shrink-0 text-marigold" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
             </svg>
-            <span className="font-mono-brand text-xs font-bold text-marigold">
+            <span className="font-mono text-xs font-semibold text-marigold">
               Live Tenant Requests Feed
             </span>
           </div>
         </div>
       </div>
 
-      {/* Stats Overview */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <div className="rounded-2xl border border-line bg-paper-card p-4 shadow-sm">
-          <span className="font-mono-brand text-[11px] font-bold uppercase tracking-wider text-muted">
-            Kailangang Asikasuhin (Pending)
-          </span>
-          <div className="mt-1 font-display text-2xl font-bold text-coral-deep">
-            {totalPending}
+      {/* Modern Minimalist Stats Overview */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        {/* Pending Card */}
+        <div className="group rounded-3xl border border-slate-200/80 bg-white/80 p-5 shadow-xs backdrop-blur-xl transition-all duration-300 hover:border-rose-200 hover:bg-rose-50/20">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+              Pending Requests
+            </span>
+            <span className="flex h-2 w-2 rounded-full bg-rose-500 animate-pulse" />
+          </div>
+          <div className="mt-3 flex items-baseline justify-between">
+            <div className="text-3xl font-extrabold tracking-tight text-slate-900">
+              {totalPending}
+            </div>
+            <span className="inline-flex items-center rounded-md border border-rose-200/60 bg-rose-50 px-2 py-0.5 text-[10px] font-semibold text-rose-700">
+              Kailangang Asikasuhin
+            </span>
           </div>
         </div>
 
-        <div className="rounded-2xl border border-line bg-paper-card p-4 shadow-sm">
-          <span className="font-mono-brand text-[11px] font-bold uppercase tracking-wider text-muted">
-            Kasalukuyang Ginagawa (In Progress)
-          </span>
-          <div className="mt-1 font-display text-2xl font-bold text-marigold-deep">
-            {totalInProgress}
+        {/* In Progress Card */}
+        <div className="group rounded-3xl border border-slate-200/80 bg-white/80 p-5 shadow-xs backdrop-blur-xl transition-all duration-300 hover:border-amber-200 hover:bg-amber-50/20">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+              In Progress
+            </span>
+            <span className="flex h-2 w-2 rounded-full bg-amber-500" />
+          </div>
+          <div className="mt-3 flex items-baseline justify-between">
+            <div className="text-3xl font-extrabold tracking-tight text-slate-900">
+              {totalInProgress}
+            </div>
+            <span className="inline-flex items-center rounded-md border border-amber-200/60 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
+              Kasalukuyang Ginagawa
+            </span>
           </div>
         </div>
 
-        <div className="rounded-2xl border border-line bg-paper-card p-4 shadow-sm">
-          <span className="font-mono-brand text-[11px] font-bold uppercase tracking-wider text-muted">
-            Ayos Na (Resolved)
-          </span>
-          <div className="mt-1 font-display text-2xl font-bold text-forest">
-            {totalResolved}
+        {/* Resolved Card */}
+        <div className="group rounded-3xl border border-slate-200/80 bg-white/80 p-5 shadow-xs backdrop-blur-xl transition-all duration-300 hover:border-emerald-200 hover:bg-emerald-50/20">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+              Resolved
+            </span>
+            <span className="flex h-2 w-2 rounded-full bg-emerald-500" />
+          </div>
+          <div className="mt-3 flex items-baseline justify-between">
+            <div className="text-3xl font-extrabold tracking-tight text-slate-900">
+              {totalResolved}
+            </div>
+            <span className="inline-flex items-center rounded-md border border-emerald-200/60 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
+              Ayos Na
+            </span>
           </div>
         </div>
       </div>

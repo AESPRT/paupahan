@@ -15,16 +15,50 @@ export async function getAdminReportsData() {
       return { success: false, error: "Walang active session." };
     }
 
-    // 💡 Kunin ang parehong Rooms at Units para sa Occupancy at Bilang
+    // 1. Kunin ang Landlord Properties
+    const landlordProperties = await prisma.property.findMany({
+      where: { landlordId: userId },
+      select: { id: true },
+    });
+    const propertyIds = landlordProperties.map((p) => p.id);
+
+    // 2. Dual-Layer Tenant IDs (Direct + Leases)
+    const directTenants = await prisma.tenant.findMany({
+      where: { userId },
+      select: { id: true },
+    });
+
+    const leaseTenants = await prisma.tenant.findMany({
+      where: {
+        leases: {
+          some: {
+            OR: [
+              { unit: { propertyId: { in: propertyIds } } },
+              { room: { unit: { propertyId: { in: propertyIds } } } },
+            ],
+          },
+        },
+      },
+      select: { id: true },
+    });
+
+    const tenantIds = Array.from(
+      new Set([
+        ...directTenants.map((t) => t.id),
+        ...leaseTenants.map((t) => t.id),
+      ])
+    );
+
+    // 3. Occupancy Calculation (Units & Rooms)
     const units = await prisma.unit.findMany({
-      where: { property: { landlordId: userId } },
+      where: { propertyId: { in: propertyIds } },
       include: {
         rooms: {
           include: {
-            leases: { where: { status: "active" } },
+            leases: { where: { status: { in: ["active"] } } },
           },
         },
-        leases: { where: { status: "active" } }, // Para sa unit-level leases
+        leases: { where: { status: { in: ["active"] } } },
       },
     });
 
@@ -35,93 +69,88 @@ export async function getAdminReportsData() {
       if (unit.rooms && unit.rooms.length > 0) {
         unit.rooms.forEach((room) => {
           totalRoomsOrUnits++;
-          if ((room.leases && room.leases.length > 0) || room.status === "occupied") {
+          if (
+            (room.leases && room.leases.length > 0) ||
+            room.status?.toLowerCase() === "occupied"
+          ) {
             occupiedCount++;
           }
         });
       } else {
         totalRoomsOrUnits++;
-        if (unit.leases && unit.leases.length > 0) {
+        if (
+          (unit.leases && unit.leases.length > 0) ||
+          unit.status?.toLowerCase() === "occupied"
+        ) {
           occupiedCount++;
         }
       }
     });
 
-    const occupancyRate = totalRoomsOrUnits > 0 ? Math.round((occupiedCount / totalRoomsOrUnits) * 100) : 0;
+    const occupancyRate =
+      totalRoomsOrUnits > 0
+        ? Math.round((occupiedCount / totalRoomsOrUnits) * 100)
+        : 0;
 
-    // 💡 Ayusin ang query para sa Payments / Bills (suportahan ang Room at Unit level lease)
-    const payments = await prisma.bill.findMany({
-      where: {
-        lease: {
-          OR: [
-            { room: { unit: { property: { landlordId: userId } } } },
-            { unit: { property: { landlordId: userId } } },
-          ],
+    // 4. Revenue / Paid Bills Calculation
+    let totalRevenue = 0;
+    let overdueBillsCount = 0;
+    let paidBillsCount = 0;
+
+    if (tenantIds.length > 0) {
+      const paidBills = await prisma.bill.findMany({
+        where: {
+          tenantId: { in: tenantIds },
+          status: { in: ["paid"] },
         },
-        status: "paid",
-      },
-    });
+        select: { totalAmount: true },
+      });
 
-    const totalRevenue = payments.reduce((acc, bill) => acc + Number(bill.totalAmount || 0), 0);
+      paidBillsCount = paidBills.length;
+      totalRevenue = paidBills.reduce(
+        (acc, bill) => acc + Number(bill.totalAmount || 0),
+        0
+      );
 
-    const maintenanceExpenses = await prisma.maintenanceRequest.findMany({
+      overdueBillsCount = await prisma.bill.count({
+        where: {
+          tenantId: { in: tenantIds },
+          status: { in: ["overdue"] },
+        },
+      });
+    }
+
+    // 5. Maintenance / Expenses
+    const maintenanceRequests = await prisma.maintenanceRequest.findMany({
       where: {
         OR: [
-          { room: { unit: { property: { landlordId: userId } } } },
-          { unit: { property: { landlordId: userId } } },
+          { room: { unit: { propertyId: { in: propertyIds } } } },
+          { unit: { propertyId: { in: propertyIds } } },
         ],
       },
       select: { expenses: true },
     });
 
-    const totalExpenses = maintenanceExpenses.reduce(
-      (acc, req) => acc + Number(req.expenses || 0), 
+    const maintenanceCount = maintenanceRequests.length;
+    const totalExpenses = maintenanceRequests.reduce(
+      (acc, req) => acc + Number(req.expenses || 0),
       0
     );
 
     const netIncome = totalRevenue - totalExpenses;
 
     const financialSummary = {
-      period: new Date().toLocaleString("fil-PH", { month: "long", year: "numeric" }),
+      period: new Date().toLocaleString("fil-PH", {
+        month: "long",
+        year: "numeric",
+      }),
       totalRevenue,
       totalExpenses,
       netIncome,
       occupancyRate,
     };
 
-    const totalTenants = await prisma.tenant.count({
-      where: {
-        leases: {
-          some: {
-            OR: [
-              { room: { unit: { property: { landlordId: userId } } } },
-              { unit: { property: { landlordId: userId } } },
-            ],
-          },
-        },
-      },
-    });
-
-    const overdueBillsCount = await prisma.bill.count({
-      where: {
-        lease: {
-          OR: [
-            { room: { unit: { property: { landlordId: userId } } } },
-            { unit: { property: { landlordId: userId } } },
-          ],
-        },
-        status: "overdue",
-      },
-    });
-
-    const maintenanceCount = await prisma.maintenanceRequest.count({
-      where: {
-        OR: [
-          { room: { unit: { property: { landlordId: userId } } } },
-          { unit: { property: { landlordId: userId } } },
-        ],
-      },
-    });
+    const totalTenants = tenantIds.length;
 
     const reportsList = [
       {
@@ -129,7 +158,7 @@ export async function getAdminReportsData() {
         title: "Financial & Income Statement",
         description: "Buong ulat ng koleksyon ng renta, utilities, at natanggap na bayad sa napiling buwan.",
         lastGenerated: "Ngayon",
-        fileSize: `${(payments.length * 0.1 + 0.8).toFixed(1)} MB`,
+        fileSize: `${(paidBillsCount * 0.05 + 0.5).toFixed(1)} MB`,
       },
       {
         id: "rep-tenants",
@@ -189,11 +218,44 @@ export async function generateReportAction(reportId: string, format: string) {
     let mimeType = "application/octet-stream";
     let fileExtension = lowerFormat;
 
-    // Helper condition para sa landlord filter
-    const landlordFilter = {
+    // 1. Kunin ang Landlord Properties & Tenant IDs (Dual-Layer Match)
+    const landlordProperties = await prisma.property.findMany({
+      where: { landlordId: userId },
+      select: { id: true },
+    });
+    const propertyIds = landlordProperties.map((p) => p.id);
+
+    const directTenants = await prisma.tenant.findMany({
+      where: { userId },
+      select: { id: true },
+    });
+
+    const leaseTenants = await prisma.tenant.findMany({
+      where: {
+        leases: {
+          some: {
+            OR: [
+              { unit: { propertyId: { in: propertyIds } } },
+              { room: { unit: { propertyId: { in: propertyIds } } } },
+            ],
+          },
+        },
+      },
+      select: { id: true },
+    });
+
+    const tenantIds = Array.from(
+      new Set([
+        ...directTenants.map((t) => t.id),
+        ...leaseTenants.map((t) => t.id),
+      ])
+    );
+
+    // Filter helper para sa Direct Lease / Property Relations
+    const propertyRelationFilter = {
       OR: [
-        { room: { unit: { property: { landlordId: userId } } } },
-        { unit: { property: { landlordId: userId } } },
+        { room: { unit: { propertyId: { in: propertyIds } } } },
+        { unit: { propertyId: { in: propertyIds } } },
       ],
     };
 
@@ -220,8 +282,12 @@ export async function generateReportAction(reportId: string, format: string) {
         doc.text("Financial & Income Statement", 14, currentY);
         currentY += 10;
 
+        // PAID ONLY (Excluding pending, draft, unpaid)
         const payments = await prisma.bill.findMany({
-          where: { lease: landlordFilter },
+          where: {
+            tenantId: { in: tenantIds },
+            status: { in: ["paid"] },
+          },
           include: { tenant: true },
         });
 
@@ -238,7 +304,7 @@ export async function generateReportAction(reportId: string, format: string) {
           if (currentY > 270) { doc.addPage(); currentY = 20; }
           doc.text(p.id.substring(0, 8) + "...", 14, currentY);
           doc.text(p.tenant?.fullName || "N/A", 70, currentY);
-          doc.text(`PHP ${Number(p.totalAmount).toLocaleString()}`, 140, currentY);
+          doc.text(`PHP ${Number(p.totalAmount || 0).toLocaleString()}`, 140, currentY);
           doc.text(p.status, 180, currentY);
           currentY += 8;
         });
@@ -251,7 +317,7 @@ export async function generateReportAction(reportId: string, format: string) {
         currentY += 10;
 
         const tenants = await prisma.tenant.findMany({
-          where: { leases: { some: landlordFilter } },
+          where: { id: { in: tenantIds } },
         });
 
         doc.setFontSize(10);
@@ -277,10 +343,11 @@ export async function generateReportAction(reportId: string, format: string) {
         doc.text("Overdue & Balanse (Delinquency)", 14, currentY);
         currentY += 10;
 
+        // INCLUDES OVERDUE, PENDING, UNPAID BALANCES
         const overdueBills = await prisma.bill.findMany({
           where: {
-            lease: landlordFilter,
-            status: "overdue",
+            tenantId: { in: tenantIds },
+            status: { in: ["pending", "overdue", "draft"] },
           },
           include: { tenant: true },
         });
@@ -289,15 +356,17 @@ export async function generateReportAction(reportId: string, format: string) {
         doc.setFont("helvetica", "bold");
         doc.text("Tenant", 14, currentY);
         doc.text("Amount", 90, currentY);
-        doc.text("Due Date", 140, currentY);
+        doc.text("Status", 130, currentY);
+        doc.text("Due Date", 170, currentY);
         currentY += 6;
 
         doc.setFont("helvetica", "normal");
         overdueBills.forEach((b) => {
           if (currentY > 270) { doc.addPage(); currentY = 20; }
           doc.text(b.tenant?.fullName || "N/A", 14, currentY);
-          doc.text(`PHP ${Number(b.totalAmount).toLocaleString()}`, 90, currentY);
-          doc.text(new Date(b.dueDate).toLocaleDateString(), 140, currentY);
+          doc.text(`PHP ${Number(b.totalAmount || 0).toLocaleString()}`, 90, currentY);
+          doc.text(b.status, 130, currentY);
+          doc.text(b.dueDate ? new Date(b.dueDate).toLocaleDateString("fil-PH") : "N/A", 170, currentY);
           currentY += 8;
         });
       }
@@ -310,7 +379,7 @@ export async function generateReportAction(reportId: string, format: string) {
 
         const billItems = await prisma.billItem.findMany({
           where: {
-            bill: { lease: landlordFilter },
+            bill: { tenantId: { in: tenantIds } },
           },
           include: { bill: { include: { tenant: true } } },
         });
@@ -326,10 +395,10 @@ export async function generateReportAction(reportId: string, format: string) {
         doc.setFont("helvetica", "normal");
         billItems.forEach((item) => {
           if (currentY > 270) { doc.addPage(); currentY = 20; }
-          doc.text(item.bill.tenant?.fullName || "N/A", 14, currentY);
+          doc.text(item.bill?.tenant?.fullName || "N/A", 14, currentY);
           doc.text(item.type, 80, currentY);
           doc.text(String(item.currentReading || 0), 130, currentY);
-          doc.text(`PHP ${Number(item.amount).toLocaleString()}`, 175, currentY);
+          doc.text(`PHP ${Number(item.amount || 0).toLocaleString()}`, 175, currentY);
           currentY += 8;
         });
       }
@@ -340,26 +409,44 @@ export async function generateReportAction(reportId: string, format: string) {
         doc.text("Occupancy & Vacancy Report", 14, currentY);
         currentY += 10;
 
+        // Kunin ang lahat ng rooms at units (Occupied + Vacant / Bedspace)
         const rooms = await prisma.room.findMany({
-          where: { unit: { property: { landlordId: userId } } },
+          where: { unit: { propertyId: { in: propertyIds } } },
           include: { unit: true },
+        });
+
+        const units = await prisma.unit.findMany({
+          where: { propertyId: { in: propertyIds } },
+          include: { rooms: true },
         });
 
         doc.setFontSize(10);
         doc.setFont("helvetica", "bold");
-        doc.text("Room Number", 14, currentY);
-        doc.text("Unit", 70, currentY);
+        doc.text("Room / Unit", 14, currentY);
+        doc.text("Property Unit", 70, currentY);
         doc.text("Status", 130, currentY);
         doc.text("Monthly Rent", 170, currentY);
         currentY += 6;
 
         doc.setFont("helvetica", "normal");
+
+        // Display Rooms
         rooms.forEach((r) => {
           if (currentY > 270) { doc.addPage(); currentY = 20; }
-          doc.text(r.roomNumber, 14, currentY);
+          doc.text(`Room ${r.roomNumber}`, 14, currentY);
           doc.text(r.unit.name, 70, currentY);
-          doc.text(r.status, 130, currentY);
-          doc.text(`PHP ${Number(r.monthlyRent).toLocaleString()}`, 170, currentY);
+          doc.text(r.status || "Vacant", 130, currentY);
+          doc.text(`PHP ${Number(r.monthlyRent || 0).toLocaleString()}`, 170, currentY);
+          currentY += 8;
+        });
+
+        // Display Direct Units (kung walang sub-rooms / whole unit rental o vacant)
+        units.filter((u) => u.rooms.length === 0).forEach((u) => {
+          if (currentY > 270) { doc.addPage(); currentY = 20; }
+          doc.text(`Unit: ${u.name}`, 14, currentY);
+          doc.text(u.name, 70, currentY);
+          doc.text(u.status || "Vacant", 130, currentY);
+          doc.text(`PHP ${Number(u.monthlyRent || 0).toLocaleString()}`, 170, currentY);
           currentY += 8;
         });
       }
@@ -371,12 +458,7 @@ export async function generateReportAction(reportId: string, format: string) {
         currentY += 10;
 
         const expenses = await prisma.maintenanceRequest.findMany({
-          where: {
-            OR: [
-              { room: { unit: { property: { landlordId: userId } } } },
-              { unit: { property: { landlordId: userId } } },
-            ],
-          },
+          where: propertyRelationFilter,
         });
 
         doc.setFontSize(10);
@@ -409,8 +491,12 @@ export async function generateReportAction(reportId: string, format: string) {
       const sheet = workbook.addWorksheet("Report Data");
 
       if (reportId === "rep-income") {
+        // PAID ONLY
         const payments = await prisma.bill.findMany({
-          where: { lease: landlordFilter },
+          where: {
+            tenantId: { in: tenantIds },
+            status: { in: ["paid"] },
+          },
           include: { tenant: true },
         });
 
@@ -426,15 +512,15 @@ export async function generateReportAction(reportId: string, format: string) {
           sheet.addRow({
             id: p.id,
             tenant: p.tenant?.fullName || "N/A",
-            amount: Number(p.totalAmount),
+            amount: Number(p.totalAmount || 0),
             status: p.status,
-            dueDate: p.dueDate.toISOString().split("T")[0],
+            dueDate: p.dueDate ? new Date(p.dueDate).toISOString().split("T")[0] : "N/A",
           });
         });
       } 
       else if (reportId === "rep-tenants") {
         const tenants = await prisma.tenant.findMany({
-          where: { leases: { some: landlordFilter } },
+          where: { id: { in: tenantIds } },
         });
 
         sheet.columns = [
@@ -456,10 +542,11 @@ export async function generateReportAction(reportId: string, format: string) {
         });
       }
       else if (reportId === "rep-unpaid") {
+        // OVERDUE, PENDING, UNPAID BALANCES
         const overdueBills = await prisma.bill.findMany({
           where: {
-            lease: landlordFilter,
-            status: "overdue",
+            tenantId: { in: tenantIds },
+            status: { in: ["pending", "overdue", "draft"] },
           },
           include: { tenant: true },
         });
@@ -468,6 +555,7 @@ export async function generateReportAction(reportId: string, format: string) {
           { header: "Bill ID", key: "id", width: 30 },
           { header: "Tenant", key: "tenant", width: 25 },
           { header: "Total Amount", key: "amount", width: 15 },
+          { header: "Status", key: "status", width: 15 },
           { header: "Due Date", key: "dueDate", width: 15 },
         ];
 
@@ -475,15 +563,16 @@ export async function generateReportAction(reportId: string, format: string) {
           sheet.addRow({
             id: b.id,
             tenant: b.tenant?.fullName || "N/A",
-            amount: Number(b.totalAmount),
-            dueDate: b.dueDate.toISOString().split("T")[0],
+            amount: Number(b.totalAmount || 0),
+            status: b.status,
+            dueDate: b.dueDate ? new Date(b.dueDate).toISOString().split("T")[0] : "N/A",
           });
         });
       }
       else if (reportId === "rep-utilities") {
         const billItems = await prisma.billItem.findMany({
           where: {
-            bill: { lease: landlordFilter },
+            bill: { tenantId: { in: tenantIds } },
           },
           include: { bill: { include: { tenant: true } } },
         });
@@ -498,22 +587,27 @@ export async function generateReportAction(reportId: string, format: string) {
 
         billItems.forEach((item) => {
           sheet.addRow({
-            tenant: item.bill.tenant?.fullName || "N/A",
+            tenant: item.bill?.tenant?.fullName || "N/A",
             type: item.type,
             prev: Number(item.previousReading || 0),
             curr: Number(item.currentReading || 0),
-            amount: Number(item.amount),
+            amount: Number(item.amount || 0),
           });
         });
       }
       else if (reportId === "rep-occupancy") {
         const rooms = await prisma.room.findMany({
-          where: { unit: { property: { landlordId: userId } } },
+          where: { unit: { propertyId: { in: propertyIds } } },
           include: { unit: true },
         });
 
+        const units = await prisma.unit.findMany({
+          where: { propertyId: { in: propertyIds } },
+          include: { rooms: true },
+        });
+
         sheet.columns = [
-          { header: "Room Number", key: "roomNumber", width: 15 },
+          { header: "Room / Unit Number", key: "roomNumber", width: 20 },
           { header: "Unit Name", key: "unit", width: 25 },
           { header: "Status", key: "status", width: 15 },
           { header: "Monthly Rent", key: "rent", width: 15 },
@@ -521,21 +615,25 @@ export async function generateReportAction(reportId: string, format: string) {
 
         rooms.forEach((r) => {
           sheet.addRow({
-            roomNumber: r.roomNumber,
+            roomNumber: `Room ${r.roomNumber}`,
             unit: r.unit.name,
-            status: r.status,
-            rent: Number(r.monthlyRent),
+            status: r.status || "Vacant",
+            rent: Number(r.monthlyRent || 0),
+          });
+        });
+
+        units.filter((u) => u.rooms.length === 0).forEach((u) => {
+          sheet.addRow({
+            roomNumber: `Unit: ${u.name}`,
+            unit: u.name,
+            status: u.status || "Vacant",
+            rent: Number(u.monthlyRent || 0),
           });
         });
       }
       else if (reportId === "rep-expenses") {
         const expenses = await prisma.maintenanceRequest.findMany({
-          where: {
-            OR: [
-              { room: { unit: { property: { landlordId: userId } } } },
-              { unit: { property: { landlordId: userId } } },
-            ],
-          },
+          where: propertyRelationFilter,
         });
 
         sheet.columns = [
@@ -582,7 +680,6 @@ export async function generateReportAction(reportId: string, format: string) {
 }
 
 export async function generateAllReportsAction(format: unknown) {
-  // Katulad ng ginawa sa itaas, ang mga filters ay maaari ding i-update gamit ang landlordFilter kung kinakailangan.
   try {
     const cookieStore = await cookies();
     const userId = cookieStore.get("session_user_id")?.value;
@@ -593,13 +690,55 @@ export async function generateAllReportsAction(format: unknown) {
 
     const formatStr = typeof format === "string" ? format : "pdf";
     const lowerFormat = formatStr.toLowerCase();
-    const reportIds = ["rep-income", "rep-tenants", "rep-unpaid", "rep-utilities", "rep-occupancy", "rep-expenses"];
-    
+    const reportIds = [
+      "rep-income",
+      "rep-tenants",
+      "rep-unpaid",
+      "rep-utilities",
+      "rep-occupancy",
+      "rep-expenses",
+    ];
+
     const zip = new AdmZip();
-    const landlordFilter = {
+
+    // 1. Kunin ang Landlord Properties & Tenant IDs (Dual-Layer Match)
+    const landlordProperties = await prisma.property.findMany({
+      where: { landlordId: userId },
+      select: { id: true },
+    });
+    const propertyIds = landlordProperties.map((p) => p.id);
+
+    const directTenants = await prisma.tenant.findMany({
+      where: { userId },
+      select: { id: true },
+    });
+
+    const leaseTenants = await prisma.tenant.findMany({
+      where: {
+        leases: {
+          some: {
+            OR: [
+              { unit: { propertyId: { in: propertyIds } } },
+              { room: { unit: { propertyId: { in: propertyIds } } } },
+            ],
+          },
+        },
+      },
+      select: { id: true },
+    });
+
+    const tenantIds = Array.from(
+      new Set([
+        ...directTenants.map((t) => t.id),
+        ...leaseTenants.map((t) => t.id),
+      ])
+    );
+
+    // Filter helper para sa Direct Lease / Property Relations
+    const propertyRelationFilter = {
       OR: [
-        { room: { unit: { property: { landlordId: userId } } } },
-        { unit: { property: { landlordId: userId } } },
+        { room: { unit: { propertyId: { in: propertyIds } } } },
+        { unit: { propertyId: { in: propertyIds } } },
       ],
     };
 
@@ -617,7 +756,11 @@ export async function generateAllReportsAction(format: unknown) {
         doc.setFont("helvetica", "normal");
         doc.setFontSize(10);
         doc.setTextColor(100);
-        doc.text(`Report ID: ${reportId} | Petsa: ${new Date().toLocaleDateString("fil-PH")}`, 14, 28);
+        doc.text(
+          `Report ID: ${reportId} | Petsa: ${new Date().toLocaleDateString("fil-PH")}`,
+          14,
+          28
+        );
 
         let currentY = 40;
 
@@ -625,14 +768,24 @@ export async function generateAllReportsAction(format: unknown) {
           doc.setFont("helvetica", "bold");
           doc.text("Financial & Income Statement", 14, currentY);
           currentY += 8;
+
+          // PAID ONLY
           const payments = await prisma.bill.findMany({
-            where: { lease: landlordFilter },
+            where: {
+              tenantId: { in: tenantIds },
+              status: { in: ["paid"] },
+            },
             include: { tenant: true },
           });
+
           doc.setFont("helvetica", "normal");
           payments.forEach((p) => {
             if (currentY > 270) { doc.addPage(); currentY = 20; }
-            doc.text(`${p.tenant?.fullName || "N/A"} - PHP ${Number(p.totalAmount).toLocaleString()} (${p.status})`, 14, currentY);
+            doc.text(
+              `${p.tenant?.fullName || "N/A"} - PHP ${Number(p.totalAmount || 0).toLocaleString()} (${p.status})`,
+              14,
+              currentY
+            );
             currentY += 7;
           });
         } 
@@ -640,13 +793,19 @@ export async function generateAllReportsAction(format: unknown) {
           doc.setFont("helvetica", "bold");
           doc.text("Tenant Masterlist & Records", 14, currentY);
           currentY += 8;
+
           const tenants = await prisma.tenant.findMany({
-            where: { leases: { some: landlordFilter } },
+            where: { id: { in: tenantIds } },
           });
+
           doc.setFont("helvetica", "normal");
           tenants.forEach((t) => {
             if (currentY > 270) { doc.addPage(); currentY = 20; }
-            doc.text(`${t.fullName} | ${t.email || "N/A"} | ${t.phone || "N/A"}`, 14, currentY);
+            doc.text(
+              `${t.fullName} | ${t.email || "N/A"} | ${t.phone || "N/A"}`,
+              14,
+              currentY
+            );
             currentY += 7;
           });
         }
@@ -654,14 +813,27 @@ export async function generateAllReportsAction(format: unknown) {
           doc.setFont("helvetica", "bold");
           doc.text("Overdue & Balanse (Delinquency)", 14, currentY);
           currentY += 8;
+
+          // OVERDUE, PENDING, & UNPAID
           const overdueBills = await prisma.bill.findMany({
-            where: { lease: landlordFilter, status: "overdue" },
+            where: {
+              tenantId: { in: tenantIds },
+              status: { in: ["pending", "overdue", "draft"] },
+            },
             include: { tenant: true },
           });
+
           doc.setFont("helvetica", "normal");
           overdueBills.forEach((b) => {
             if (currentY > 270) { doc.addPage(); currentY = 20; }
-            doc.text(`${b.tenant?.fullName || "N/A"} - PHP ${Number(b.totalAmount).toLocaleString()} (Due: ${new Date(b.dueDate).toLocaleDateString()})`, 14, currentY);
+            const dateStr = b.dueDate
+              ? new Date(b.dueDate).toLocaleDateString("fil-PH")
+              : "N/A";
+            doc.text(
+              `${b.tenant?.fullName || "N/A"} - PHP ${Number(b.totalAmount || 0).toLocaleString()} | Status: ${b.status} (Due: ${dateStr})`,
+              14,
+              currentY
+            );
             currentY += 7;
           });
         }
@@ -669,14 +841,20 @@ export async function generateAllReportsAction(format: unknown) {
           doc.setFont("helvetica", "bold");
           doc.text("Sub-meter & Utility Readings", 14, currentY);
           currentY += 8;
+
           const billItems = await prisma.billItem.findMany({
-            where: { bill: { lease: landlordFilter } },
+            where: { bill: { tenantId: { in: tenantIds } } },
             include: { bill: { include: { tenant: true } } },
           });
+
           doc.setFont("helvetica", "normal");
           billItems.forEach((item) => {
             if (currentY > 270) { doc.addPage(); currentY = 20; }
-            doc.text(`${item.bill.tenant?.fullName || "N/A"} - ${item.type}: ${item.currentReading || 0} (PHP ${Number(item.amount).toLocaleString()})`, 14, currentY);
+            doc.text(
+              `${item.bill?.tenant?.fullName || "N/A"} - ${item.type}: ${item.currentReading || 0} (PHP ${Number(item.amount || 0).toLocaleString()})`,
+              14,
+              currentY
+            );
             currentY += 7;
           });
         }
@@ -684,14 +862,38 @@ export async function generateAllReportsAction(format: unknown) {
           doc.setFont("helvetica", "bold");
           doc.text("Occupancy & Vacancy Report", 14, currentY);
           currentY += 8;
+
           const rooms = await prisma.room.findMany({
-            where: { unit: { property: { landlordId: userId } } },
+            where: { unit: { propertyId: { in: propertyIds } } },
             include: { unit: true },
           });
+
+          const units = await prisma.unit.findMany({
+            where: { propertyId: { in: propertyIds } },
+            include: { rooms: true },
+          });
+
           doc.setFont("helvetica", "normal");
+
+          // Display Rooms
           rooms.forEach((r) => {
             if (currentY > 270) { doc.addPage(); currentY = 20; }
-            doc.text(`Room ${r.roomNumber} (${r.unit.name}) - ${r.status} - PHP ${Number(r.monthlyRent).toLocaleString()}`, 14, currentY);
+            doc.text(
+              `Room ${r.roomNumber} (${r.unit.name}) - ${r.status || "Vacant"} - PHP ${Number(r.monthlyRent || 0).toLocaleString()}`,
+              14,
+              currentY
+            );
+            currentY += 7;
+          });
+
+          // Display Direct Units (kung walang rooms / whole unit rental o vacant)
+          units.filter((u) => u.rooms.length === 0).forEach((u) => {
+            if (currentY > 270) { doc.addPage(); currentY = 20; }
+            doc.text(
+              `Unit: ${u.name} - ${u.status || "Vacant"} - PHP ${Number(u.monthlyRent || 0).toLocaleString()}`,
+              14,
+              currentY
+            );
             currentY += 7;
           });
         }
@@ -699,13 +901,19 @@ export async function generateAllReportsAction(format: unknown) {
           doc.setFont("helvetica", "bold");
           doc.text("Maintenance & Expenses Log", 14, currentY);
           currentY += 8;
+
           const expenses = await prisma.maintenanceRequest.findMany({
-            where: landlordFilter,
+            where: propertyRelationFilter,
           });
+
           doc.setFont("helvetica", "normal");
           expenses.forEach((e) => {
             if (currentY > 270) { doc.addPage(); currentY = 20; }
-            doc.text(`${e.title} [${e.category}] - ${e.status} - PHP ${Number(e.expenses || 0).toLocaleString()}`, 14, currentY);
+            doc.text(
+              `${e.title} [${e.category}] - ${e.status} - PHP ${Number(e.expenses || 0).toLocaleString()}`,
+              14,
+              currentY
+            );
             currentY += 7;
           });
         }
@@ -718,89 +926,155 @@ export async function generateAllReportsAction(format: unknown) {
         const sheet = workbook.addWorksheet("Report Data");
 
         if (reportId === "rep-income") {
+          // PAID ONLY
           const payments = await prisma.bill.findMany({
-            where: { lease: landlordFilter },
+            where: {
+              tenantId: { in: tenantIds },
+              status: { in: ["paid"] },
+            },
             include: { tenant: true },
           });
+
           sheet.columns = [
             { header: "Billing ID", key: "id", width: 30 },
             { header: "Tenant", key: "tenant", width: 25 },
             { header: "Total Amount", key: "amount", width: 15 },
             { header: "Status", key: "status", width: 15 },
           ];
+
           payments.forEach((p) => {
-            sheet.addRow({ id: p.id, tenant: p.tenant?.fullName || "N/A", amount: Number(p.totalAmount), status: p.status });
+            sheet.addRow({
+              id: p.id,
+              tenant: p.tenant?.fullName || "N/A",
+              amount: Number(p.totalAmount || 0),
+              status: p.status,
+            });
           });
         } 
         else if (reportId === "rep-tenants") {
           const tenants = await prisma.tenant.findMany({
-            where: { leases: { some: landlordFilter } },
+            where: { id: { in: tenantIds } },
           });
+
           sheet.columns = [
             { header: "Full Name", key: "fullName", width: 25 },
             { header: "Email", key: "email", width: 25 },
             { header: "Phone", key: "phone", width: 15 },
           ];
+
           tenants.forEach((t) => {
-            sheet.addRow({ fullName: t.fullName, email: t.email || "N/A", phone: t.phone || "N/A" });
+            sheet.addRow({
+              fullName: t.fullName,
+              email: t.email || "N/A",
+              phone: t.phone || "N/A",
+            });
           });
         }
         else if (reportId === "rep-unpaid") {
+          // OVERDUE, PENDING, & UNPAID
           const overdueBills = await prisma.bill.findMany({
-            where: { lease: landlordFilter, status: "overdue" },
+            where: {
+              tenantId: { in: tenantIds },
+              status: { in: ["pending", "overdue", "draft"] },
+            },
             include: { tenant: true },
           });
+
           sheet.columns = [
             { header: "Tenant", key: "tenant", width: 25 },
             { header: "Total Amount", key: "amount", width: 15 },
+            { header: "Status", key: "status", width: 15 },
             { header: "Due Date", key: "dueDate", width: 15 },
           ];
+
           overdueBills.forEach((b) => {
-            sheet.addRow({ tenant: b.tenant?.fullName || "N/A", amount: Number(b.totalAmount), dueDate: b.dueDate.toISOString().split("T")[0] });
+            sheet.addRow({
+              tenant: b.tenant?.fullName || "N/A",
+              amount: Number(b.totalAmount || 0),
+              status: b.status,
+              dueDate: b.dueDate
+                ? new Date(b.dueDate).toISOString().split("T")[0]
+                : "N/A",
+            });
           });
         }
         else if (reportId === "rep-utilities") {
           const billItems = await prisma.billItem.findMany({
-            where: { bill: { lease: landlordFilter } },
+            where: { bill: { tenantId: { in: tenantIds } } },
             include: { bill: { include: { tenant: true } } },
           });
+
           sheet.columns = [
             { header: "Tenant", key: "tenant", width: 25 },
             { header: "Utility Type", key: "type", width: 15 },
             { header: "Current Reading", key: "curr", width: 15 },
             { header: "Amount", key: "amount", width: 15 },
           ];
+
           billItems.forEach((item) => {
-            sheet.addRow({ tenant: item.bill.tenant?.fullName || "N/A", type: item.type, curr: Number(item.currentReading || 0), amount: Number(item.amount) });
+            sheet.addRow({
+              tenant: item.bill?.tenant?.fullName || "N/A",
+              type: item.type,
+              curr: Number(item.currentReading || 0),
+              amount: Number(item.amount || 0),
+            });
           });
         }
         else if (reportId === "rep-occupancy") {
           const rooms = await prisma.room.findMany({
-            where: { unit: { property: { landlordId: userId } } },
+            where: { unit: { propertyId: { in: propertyIds } } },
             include: { unit: true },
           });
+
+          const units = await prisma.unit.findMany({
+            where: { propertyId: { in: propertyIds } },
+            include: { rooms: true },
+          });
+
           sheet.columns = [
-            { header: "Room Number", key: "roomNumber", width: 15 },
+            { header: "Room / Unit Number", key: "roomNumber", width: 20 },
             { header: "Unit Name", key: "unit", width: 25 },
             { header: "Status", key: "status", width: 15 },
             { header: "Monthly Rent", key: "rent", width: 15 },
           ];
+
           rooms.forEach((r) => {
-            sheet.addRow({ roomNumber: r.roomNumber, unit: r.unit.name, status: r.status, rent: Number(r.monthlyRent) });
+            sheet.addRow({
+              roomNumber: `Room ${r.roomNumber}`,
+              unit: r.unit.name,
+              status: r.status || "Vacant",
+              rent: Number(r.monthlyRent || 0),
+            });
+          });
+
+          units.filter((u) => u.rooms.length === 0).forEach((u) => {
+            sheet.addRow({
+              roomNumber: `Unit: ${u.name}`,
+              unit: u.name,
+              status: u.status || "Vacant",
+              rent: Number(u.monthlyRent || 0),
+            });
           });
         }
         else if (reportId === "rep-expenses") {
           const expenses = await prisma.maintenanceRequest.findMany({
-            where: landlordFilter,
+            where: propertyRelationFilter,
           });
+
           sheet.columns = [
             { header: "Title", key: "title", width: 25 },
             { header: "Category", key: "category", width: 15 },
             { header: "Status", key: "status", width: 15 },
             { header: "Expenses", key: "expenses", width: 15 },
           ];
+
           expenses.forEach((e) => {
-            sheet.addRow({ title: e.title, category: e.category, status: e.status, expenses: Number(e.expenses || 0) });
+            sheet.addRow({
+              title: e.title,
+              category: e.category,
+              status: e.status,
+              expenses: Number(e.expenses || 0),
+            });
           });
         }
 
@@ -808,7 +1082,10 @@ export async function generateAllReportsAction(format: unknown) {
         fileBuffer = Buffer.from(uint8Array);
       }
 
-      zip.addFile(`${reportId}-${new Date().toISOString().split("T")[0]}.${fileExtension}`, fileBuffer);
+      zip.addFile(
+        `${reportId}-${new Date().toISOString().split("T")[0]}.${fileExtension}`,
+        fileBuffer
+      );
     }
 
     const zipBuffer = zip.toBuffer();
@@ -823,6 +1100,9 @@ export async function generateAllReportsAction(format: unknown) {
     };
   } catch (error) {
     console.error("Error generating all reports:", error);
-    return { success: false, error: "Nagkaroon ng problema sa pag-generate ng lahat ng ulat." };
+    return {
+      success: false,
+      error: "Nagkaroon ng problema sa pag-generate ng lahat ng ulat.",
+    };
   }
 }

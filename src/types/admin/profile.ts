@@ -15,5 +15,5 @@ export interface ActivityLog {
   id: string;
   action: string;
   timestamp: string;
-  category: "Billing" | "Tenant" | "Maintenance" | "Security";
+  category: string;
 }

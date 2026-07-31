@@ -9,6 +9,14 @@ import { Footer } from "@/src/components/landing/Footer";
 import { getAdminReportsData, generateReportAction, generateAllReportsAction } from "@/src/actions/admin-reports";
 import FullPageLoader from "@/src/components/ui/FullPageLoader";
 
+const DEFAULT_SUMMARY: FinancialReportSummary = {
+  period: "Kasalukuyang Buwan",
+  totalRevenue: 0,
+  totalExpenses: 0,
+  netIncome: 0,
+  occupancyRate: 0,
+};
+
 // Helper function para ibalik ang tamang SVG icon batay sa report id
 const getReportIconSvg = (id: string) => {
   switch (id) {
@@ -59,34 +67,33 @@ const getReportIconSvg = (id: string) => {
 };
 
 export default function ReportsPage() {
-  const [summary, setSummary] = useState<FinancialReportSummary>({
-    period: "Kasalukuyang Buwan",
-    totalRevenue: 0,
-    totalExpenses: 0,
-    netIncome: 0,
-    occupancyRate: 0,
-  });
+  const [summary, setSummary] = useState<FinancialReportSummary>(DEFAULT_SUMMARY);
   const [reportsList, setReportsList] = useState<ReportCategory[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [, startTransition] = useTransition();
+  const [isPending, startTransition] = useTransition();
 
   useEffect(() => {
     async function fetchData() {
       setIsLoading(true);
-      const res = await getAdminReportsData();
-      if (res.success) {
-        if (res.financialSummary) {
-          setSummary(res.financialSummary);
+      try {
+        const res = await getAdminReportsData();
+        if (res.success) {
+          if (res.financialSummary) {
+            setSummary({ ...DEFAULT_SUMMARY, ...res.financialSummary });
+          }
+          if (res.reportsList) {
+            const formattedReports = res.reportsList.map((rep: any) => ({
+              ...rep,
+              icon: getReportIconSvg(rep.id),
+            }));
+            setReportsList(formattedReports);
+          }
         }
-        if (res.reportsList) {
-          const formattedReports = res.reportsList.map((rep: any) => ({
-            ...rep,
-            icon: getReportIconSvg(rep.id),
-          }));
-          setReportsList(formattedReports);
-        }
+      } catch (error) {
+        console.error("Nabigong kunin ang reports data:", error);
+      } finally {
+        setIsLoading(false);
       }
-      setIsLoading(false);
     }
     fetchData();
   }, []);
@@ -134,7 +141,7 @@ export default function ReportsPage() {
   }
 
   return (
-    <div className="space-y-6 p-4 sm:p-6 lg:p-8">
+    <div className={`space-y-6 p-4 sm:p-6 lg:p-8 ${isPending ? 'opacity-75 transition-opacity' : ''}`}>
       {/* Header & Quick Financial Overview */}
       <ReportsHeader summary={summary} onGenerateAll={handleGenerateAll} />
 
@@ -150,9 +157,6 @@ export default function ReportsPage() {
           ))}
         </div>
       </div>
-
-      {/* Recent Download Logs */}
-      {/* <ExportHistory /> */}
 
       <Footer showNavLinks={false} />
     </div>

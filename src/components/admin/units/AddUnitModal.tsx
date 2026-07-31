@@ -1,6 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
+import { ChevronDown, Check } from "lucide-react";
+import { UnitType, UnitFloor, DEFAULT_UNIT_FLOOR } from "@/src/types/admin/unit";
 
 interface AddUnitModalProps {
   isOpen: boolean;
@@ -9,11 +11,98 @@ interface AddUnitModalProps {
   onAddUnit: (unitData: {
     unitName: string;
     monthlyRent: number;
-    floor: string;
-    type: string;
+    floor: UnitFloor;
+    type: UnitType;
   }) => void;
 }
 
+// ── Reusable Modern Minimalist Select Component ──
+interface CustomSelectProps<T extends string> {
+  label: string;
+  value: T;
+  options: { key: string; value: T }[];
+  onChange: (val: T) => void;
+}
+
+function CustomSelect<T extends string>({
+  label,
+  value,
+  options,
+  onChange,
+}: CustomSelectProps<T>) {
+  const [open, setOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Isara ang dropdown kapag nag-click sa labas
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  return (
+    <div className="relative" ref={dropdownRef}>
+      <label className="block text-xs font-bold text-forest-deep mb-1.5">
+        {label}
+      </label>
+      
+      {/* Trigger Button */}
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className={`w-full flex items-center justify-between rounded-2xl border px-3.5 py-2.5 text-xs font-medium transition-all duration-200 cursor-pointer bg-paper ${
+          open
+            ? "border-forest ring-2 ring-forest/10 text-forest-deep shadow-sm"
+            : "border-line text-ink hover:border-forest/50"
+        }`}
+      >
+        <span className="truncate">{value}</span>
+        <ChevronDown
+          className={`h-4 w-4 text-muted transition-transform duration-200 ${
+            open ? "rotate-180 text-forest" : ""
+          }`}
+        />
+      </button>
+
+      {/* Modern Floating Popover Options */}
+      {open && (
+        <div className="absolute left-0 right-0 z-30 mt-1.5 max-h-56 overflow-y-auto rounded-2xl border border-line/80 bg-paper-card p-1.5 shadow-xl backdrop-blur-md transition-all animate-in fade-in slide-in-from-top-2 duration-150 no-scrollbar">
+          {options.map((opt) => {
+            const isSelected = opt.value === value;
+            return (
+              <button
+                type="button"
+                key={opt.key}
+                onClick={() => {
+                  onChange(opt.value);
+                  setOpen(false);
+                }}
+                className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-all duration-150 cursor-pointer ${
+                  isSelected
+                    ? "bg-forest/10 text-forest-deep font-semibold"
+                    : "text-ink hover:bg-paper hover:text-forest-deep"
+                }`}
+              >
+                <span className="truncate">{opt.value}</span>
+                {isSelected && (
+                  <span className="flex h-4 w-4 items-center justify-center rounded-full bg-forest text-white">
+                    <Check className="h-2.5 w-2.5" />
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Main Modal Component ──
 export function AddUnitModal({
   isOpen,
   propertyName,
@@ -22,12 +111,12 @@ export function AddUnitModal({
 }: AddUnitModalProps) {
   const [unitName, setUnitName] = useState("");
   const [monthlyRent, setMonthlyRent] = useState("");
-  const [floor, setFloor] = useState("1st Floor"); // 👈 Bagong state para sa floor
-  const [type, setType] = useState("Studio");       // 👈 Bagong state para sa unit type
+  const [floor, setFloor] = useState<UnitFloor>(DEFAULT_UNIT_FLOOR);
+  const [type, setType] = useState<UnitType>(UnitType.STUDIO);
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!unitName.trim()) return;
 
@@ -40,10 +129,20 @@ export function AddUnitModal({
 
     setUnitName("");
     setMonthlyRent("");
-    setFloor("1st Floor");
-    setType("Studio");
+    setFloor(DEFAULT_UNIT_FLOOR);
+    setType(UnitType.STUDIO);
     onClose();
   };
+
+  const floorOptions = Object.entries(UnitFloor).map(([key, val]) => ({
+    key,
+    value: val,
+  }));
+
+  const typeOptions = Object.entries(UnitType).map(([key, val]) => ({
+    key,
+    value: val,
+  }));
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
@@ -57,7 +156,8 @@ export function AddUnitModal({
           </div>
           <button
             onClick={onClose}
-            className="rounded-full p-1 text-muted hover:bg-paper hover:text-ink cursor-pointer"
+            type="button"
+            className="rounded-full p-1 text-muted hover:bg-paper hover:text-ink cursor-pointer transition-colors"
           >
             ✕
           </button>
@@ -65,7 +165,7 @@ export function AddUnitModal({
 
         <form onSubmit={handleSubmit} className="mt-4 space-y-4">
           <div>
-            <label className="block text-xs font-bold text-forest-deep mb-1">
+            <label className="block text-xs font-bold text-forest-deep mb-1.5">
               Pangalan / Numero ng Unit (Hal. Unit 101)
             </label>
             <input
@@ -74,43 +174,30 @@ export function AddUnitModal({
               placeholder="e.g. Unit 101 o Building A"
               value={unitName}
               onChange={(e) => setUnitName(e.target.value)}
-              className="w-full rounded-xl border border-line bg-paper px-3.5 py-2.5 text-xs font-medium text-ink outline-none focus:border-forest"
+              className="w-full rounded-2xl border border-line bg-paper px-3.5 py-2.5 text-xs font-medium text-ink outline-none transition-all focus:border-forest focus:ring-2 focus:ring-forest/10"
             />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-bold text-forest-deep mb-1">
-                Palapag / Floor
-              </label>
-              <input
-                type="text"
-                placeholder="e.g. 1st Floor"
-                value={floor}
-                onChange={(e) => setFloor(e.target.value)}
-                className="w-full rounded-xl border border-line bg-paper px-3.5 py-2.5 text-xs font-medium text-ink outline-none focus:border-forest"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-forest-deep mb-1">
-                Uri ng Unit (Type)
-              </label>
-              <select
-                value={type}
-                onChange={(e) => setType(e.target.value)}
-                className="w-full rounded-xl border border-line bg-paper px-3.5 py-2.5 text-xs font-medium text-ink outline-none focus:border-forest"
-              >
-                <option value="Studio">Studio</option>
-                <option value="1-Bedroom">1-Bedroom</option>
-                <option value="2-Bedroom">2-Bedroom</option>
-                <option value="Solo Room">Solo Room</option>
-                <option value="Bedspace">Bedspace</option>
-              </select>
-            </div>
+            {/* Custom Modern Floor Select */}
+            <CustomSelect
+              label="Palapag / Floor"
+              value={floor}
+              options={floorOptions}
+              onChange={(val) => setFloor(val)}
+            />
+
+            {/* Custom Modern Unit Type Select */}
+            <CustomSelect
+              label="Uri ng Unit (Type)"
+              value={type}
+              options={typeOptions}
+              onChange={(val) => setType(val)}
+            />
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-forest-deep mb-1">
+            <label className="block text-xs font-bold text-forest-deep mb-1.5">
               Buwanang Renta (Monthly Rent - ₱)
             </label>
             <input
@@ -121,7 +208,7 @@ export function AddUnitModal({
               placeholder="e.g. 6500"
               value={monthlyRent}
               onChange={(e) => setMonthlyRent(e.target.value)}
-              className="w-full rounded-xl border border-line bg-paper px-3.5 py-2.5 font-mono-brand text-xs font-bold text-ink outline-none focus:border-forest"
+              className="w-full rounded-2xl border border-line bg-paper px-3.5 py-2.5 font-mono-brand text-xs font-bold text-ink outline-none transition-all focus:border-forest focus:ring-2 focus:ring-forest/10"
             />
           </div>
 
@@ -129,13 +216,13 @@ export function AddUnitModal({
             <button
               type="button"
               onClick={onClose}
-              className="rounded-xl border border-line px-4 py-2 text-xs font-bold text-muted hover:bg-paper cursor-pointer"
+              className="rounded-xl border border-line px-4 py-2.5 text-xs font-bold text-muted hover:bg-paper cursor-pointer transition-colors"
             >
               Kanselahin
             </button>
             <button
               type="submit"
-              className="rounded-xl bg-forest px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-forest-deep cursor-pointer"
+              className="rounded-xl bg-forest px-4 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-forest-deep cursor-pointer transition-all active:scale-95"
             >
               I-save ang Unit
             </button>

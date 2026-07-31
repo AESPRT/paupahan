@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { cookies } from 'next/headers'
 import { createAuditLog } from '@/src/actions/audit-actions'
 import { checkUserSubscriptionLimits } from "@/src/actions/subscription-actions";
+import { DEFAULT_UNIT_FLOOR, UnitType } from '@/src/types/admin/unit'
 
 export async function getUnitsData() {
   try {
@@ -154,19 +155,20 @@ export async function addUnitAction(data: {
       });
     }
 
-    // 4. I-create ang Unit sa ilalim ng property kasama ang floor, type, at unitNumber para sa Hanap-Bahay
+    // 4. I-create ang Unit at I-INCLUDE ang Property at Rooms
     const newUnit = await prisma.unit.create({
       data: {
         propertyId: property.id,
         name: data.unitName,
-        unitNumber: data.unitName, // I-sync para madaling makuha sa marketplace details
+        unitNumber: data.unitName,
         monthlyRent: data.monthlyRent,
-        floor: data.floor || "1st Floor",
-        type: data.type || "Studio",
-        status: "vacant", // Naka-vacant default para lumabas agad sa Hanap-Bahay
+        floor: data.floor || (DEFAULT_UNIT_FLOOR as string),
+        type: data.type || (UnitType.STUDIO as string),
+        status: "vacant",
       },
       include: {
         rooms: true,
+        property: true, // 👈 Idinagdag para mai-return ang buong Property object (address, city, etc.)
       },
     });
 
@@ -181,14 +183,23 @@ export async function addUnitAction(data: {
     revalidatePath('/admin/dashboard/units');
     revalidatePath('/hanap-bahay');
 
-    // ✨ I-convert ang Prisma Decimals patungong plain number para sa Client Component
+    // ✨ I-serialize ang Unit at Isama ang Property Details
     const serializedUnit = {
       ...newUnit,
       monthlyRent: newUnit.monthlyRent ? Number(newUnit.monthlyRent) : 0,
-      rooms: newUnit.rooms.map(room => ({
+      rooms: newUnit.rooms.map((room) => ({
         ...room,
         monthlyRent: room.monthlyRent ? Number(room.monthlyRent) : 0,
       })),
+      // 👈 Kasama na ang property details
+      property: newUnit.property
+        ? {
+            id: newUnit.property.id,
+            name: newUnit.property.name,
+            addressLine: newUnit.property.addressLine,
+            city: newUnit.property.city,
+          }
+        : null,
     };
 
     return { success: true, unit: serializedUnit };

@@ -8,133 +8,182 @@ import { createAuditLog } from '@/src/actions/audit-actions'
 
 export async function getDashboardData() {
   try {
-    const cookieStore = await cookies()
-    const userId = cookieStore.get('session_user_id')?.value
+    const cookieStore = await cookies();
+    const userId = cookieStore.get("session_user_id")?.value;
 
     if (!userId) {
-      return {
-        adminName: 'Admin',
-        stats: { totalProperties: 0, totalUnits: 0, totalRooms: 0, occupiedRooms: 0, vacantRooms: 0, reservedRooms: 0, monthlyRevenue: 0, pendingBillsAmount: 0, occupancyRate: 0 },
-        roomsSummary: { totalUnits: 0, availableRooms: 0, occupiedRooms: 0, totalRooms: 0 },
-        chartData: [],
-        pendingReadings: [],
-        recentActivities: [],
-        auditLogs: [],
-      }
+      return getEmptyDashboardData();
     }
 
     // 1. Kunin ang impormasyon ng kasalukuyang nag-login na admin/landlord
     const user = await prisma.user.findUnique({
       where: { id: userId },
       select: { fullName: true },
-    })
-    const adminName = user?.fullName || 'Admin'
+    });
+    const adminName = user?.fullName || "Admin";
 
-    // 2. Kunin ang mga Property ID na pagmamay-ari ng landlord na ito para sa filtering ng units at rooms
+    // 2. Kunin ang mga Property ID ng landlord
     const landlordProperties = await prisma.property.findMany({
       where: { landlordId: userId },
       select: { id: true },
-    })
-    const propertyIds = landlordProperties.map((p) => p.id)
+    });
+    const propertyIds = landlordProperties.map((p) => p.id);
 
-    // Kunin ang mga Unit ID sa ilalim ng mga property na ito
+    // 3. Kunin ang UNITS at i-filter ang mga status nito
     const landlordUnits = await prisma.unit.findMany({
       where: { propertyId: { in: propertyIds } },
-      select: { id: true },
-    })
-    const unitIds = landlordUnits.map((u) => u.id)
+      select: { id: true, status: true },
+    });
 
-    // Kunin ang mga Room ID sa ilalim ng mga unit na ito
+    const unitIds = landlordUnits.map((u) => u.id);
+    const totalProperties = propertyIds.length;
+    const totalUnits = unitIds.length;
+
+    // Kalkulahin ang Status ng Units
+    const occupiedUnits = landlordUnits.filter(
+      (u) => u.status?.toLowerCase() === "occupied"
+    ).length;
+
+    const reservedUnits = landlordUnits.filter(
+      (u) => u.status?.toLowerCase() === "reserved"
+    ).length;
+
+    const vacantUnits = landlordUnits.filter(
+      (u) =>
+        u.status?.toLowerCase() === "vacant" ||
+        u.status?.toLowerCase() === "available" ||
+        !u.status
+    ).length;
+
+    // 4. Kunin ang ROOMS
     const landlordRooms = await prisma.room.findMany({
       where: { unitId: { in: unitIds } },
-      select: { id: true },
-    })
-    const roomIds = landlordRooms.map((r) => r.id)
+      select: { id: true, status: true },
+    });
 
-    // 3. Kunin ang kabuuang stats na naka-isolate sa landlord na ito
-    const totalProperties = propertyIds.length
-    const totalUnits = unitIds.length
-    const totalRooms = roomIds.length
+    const totalRooms = landlordRooms.length;
+    let occupiedRooms = 0;
+    let vacantRooms = 0;
+    let reservedRooms = 0;
 
-    const occupiedRooms = roomIds.length > 0 ? await prisma.room.count({
-      where: { id: { in: roomIds }, status: 'occupied' },
-    }) : 0
+    landlordRooms.forEach((room) => {
+      const status = room.status?.toLowerCase();
+      if (status === "occupied") {
+        occupiedRooms++;
+      } else if (status === "reserved") {
+        reservedRooms++;
+      } else {
+        vacantRooms++;
+      }
+    });
 
-    const vacantRooms = roomIds.length > 0 ? await prisma.room.count({
-      where: { id: { in: roomIds }, status: 'vacant' },
-    }) : 0
+    const occupancyRate = totalRooms > 0 ? (occupiedRooms / totalRooms) * 100 : 0;
+    const availableRooms = vacantRooms;
 
-    const reservedRooms = roomIds.length > 0 ? await prisma.room.count({
-      where: { id: { in: roomIds }, status: 'reserved' },
-    }) : 0
-    
-    const occupancyRate = totalRooms > 0 ? (occupiedRooms / totalRooms) * 100 : 0
-    const availableRooms = vacantRooms; // Magagamit para sa roomsSummary
-
-    // Kunin ang mga Tenant ID sa ilalim ng landlord na ito para sa pag-filter ng Bills
-    const landlordTenants = await prisma.tenant.findMany({
+    // 5. KUNIN LAHAT NG TENANT IDS (Direct + Leased Tenants)
+    const directTenants = await prisma.tenant.findMany({
       where: { userId: userId },
       select: { id: true },
-    })
-    const tenantIds = landlordTenants.map((t) => t.id)
+    });
 
-    // Pag-compute ng buwanang kita (Paid bills para sa mga tenant niya lang)
-    const paidBills = tenantIds.length > 0 ? await prisma.bill.aggregate({
-      where: { tenantId: { in: tenantIds }, status: 'paid' },
-      _sum: { totalAmount: true },
-    }) : { _sum: { totalAmount: 0 } }
-    const monthlyRevenue = Number(paidBills._sum.totalAmount || 0)
+    const leaseTenants = await prisma.tenant.findMany({
+      where: {
+        leases: {
+          some: {
+            OR: [
+              { unit: { propertyId: { in: propertyIds } } },
+              { room: { unit: { propertyId: { in: propertyIds } } } },
+            ],
+          },
+        },
+      },
+      select: { id: true },
+    });
 
-    // Pending bills amount para sa mga tenant niya lang
-    const pendingBills = tenantIds.length > 0 ? await prisma.bill.aggregate({
-      where: { tenantId: { in: tenantIds }, status: 'pending' },
-      _sum: { totalAmount: true },
-    }) : { _sum: { totalAmount: 0 } }
-    const pendingBillsAmount = Number(pendingBills._sum.totalAmount || 0)
+    const tenantIds = Array.from(
+      new Set([
+        ...directTenants.map((t) => t.id),
+        ...leaseTenants.map((t) => t.id),
+      ])
+    );
 
-    // 4. Buuin ang Chart Data para sa nakalipas na 6 na buwan (nakabase sa mga tenant niya)
-    const months = ["Ene", "Peb", "Mar", "Abr", "May", "Hun", "Hul", "Ago", "Set", "Okt", "Nob", "Dis"];
+    // KUNIN ANG PAID BILLS (Monthly Revenue)
+    const paidBills =
+      tenantIds.length > 0
+        ? await prisma.bill.aggregate({
+            where: {
+              tenantId: { in: tenantIds },
+              status: { in: ["paid"] },
+            },
+            _sum: { totalAmount: true },
+          })
+        : { _sum: { totalAmount: 0 } };
+
+    const monthlyRevenue = Number(paidBills._sum.totalAmount || 0);
+
+    // KUNIN ANG PENDING AT DRAFT BILLS AMOUNT
+    const pendingBills =
+      tenantIds.length > 0
+        ? await prisma.bill.aggregate({
+            where: {
+              tenantId: { in: tenantIds },
+              status: { in: ["pending", "draft"] },
+            },
+            _sum: { totalAmount: true },
+          })
+        : { _sum: { totalAmount: 0 } };
+
+    const pendingBillsAmount = Number(pendingBills._sum.totalAmount || 0);
+
+    // 6. Buuin ang Chart Data para sa nakalipas na 6 na buwan
+    const months = [
+      "Ene", "Peb", "Mar", "Abr", "May", "Hun",
+      "Hul", "Ago", "Set", "Okt", "Nob", "Dis"
+    ];
     const currentDate = new Date();
     const chartData = [];
 
     for (let i = 5; i >= 0; i--) {
-      const d = new Date(currentDate.getFullYear(), currentDate.getMonth() - i, 1);
-      const monthName = months[d.getMonth()];
-      const year = d.getFullYear();
-      const monthStr = String(d.getMonth() + 1).padStart(2, '0');
-      
-      const startDate = new Date(`${year}-${monthStr}-01`);
-      const endDate = new Date(year, d.getMonth() + 1, 0, 23, 59, 59);
+      const year = currentDate.getFullYear();
+      const monthIndex = currentDate.getMonth() - i;
+
+      const startDate = new Date(year, monthIndex, 1, 0, 0, 0, 0);
+      const endDate = new Date(year, monthIndex + 1, 0, 23, 59, 59, 999);
+
+      const monthName = months[startDate.getMonth()];
 
       let paidNum = 0;
       let pendingNum = 0;
       let overdueNum = 0;
 
       if (tenantIds.length > 0) {
+        // Paid Amount kada buwan
         const paidTotal = await prisma.bill.aggregate({
           where: {
             tenantId: { in: tenantIds },
-            status: 'paid',
+            status: { in: ["paid"] },
             paidAt: { gte: startDate, lte: endDate },
           },
           _sum: { totalAmount: true },
         });
         paidNum = Number(paidTotal._sum.totalAmount || 0);
 
+        // Pending & Draft Amount kada buwan
         const pendingTotal = await prisma.bill.aggregate({
           where: {
             tenantId: { in: tenantIds },
-            status: 'pending',
+            status: { in: ["pending", "draft"] },
             generatedAt: { gte: startDate, lte: endDate },
           },
           _sum: { totalAmount: true },
         });
         pendingNum = Number(pendingTotal._sum.totalAmount || 0);
 
+        // Overdue Amount kada buwan
         const overdueTotal = await prisma.bill.aggregate({
           where: {
             tenantId: { in: tenantIds },
-            status: 'overdue',
+            status: { in: ["overdue"] },
             generatedAt: { gte: startDate, lte: endDate },
           },
           _sum: { totalAmount: true },
@@ -142,8 +191,12 @@ export async function getDashboardData() {
         overdueNum = Number(overdueTotal._sum.totalAmount || 0);
       }
 
-      const formatCurrency = (val: number) => 
-        new Intl.NumberFormat('fil-PH', { style: 'currency', currency: 'PHP', maximumFractionDigits: 0 }).format(val);
+      const formatCurrency = (val: number) =>
+        new Intl.NumberFormat("fil-PH", {
+          style: "currency",
+          currency: "PHP",
+          maximumFractionDigits: 0,
+        }).format(val);
 
       chartData.push({
         month: monthName,
@@ -156,89 +209,96 @@ export async function getDashboardData() {
       });
     }
 
-    // 5. Kunin at i-map ang mga pending na bills/readings para sa Approvals (para sa mga tenant niya lang)
-    const rawPendingBills = tenantIds.length > 0 ? await prisma.bill.findMany({
-      where: { 
-        tenantId: { in: tenantIds },
-        status: 'draft',
-        items: {
-          some: {
-            OR: [
-              { status: { equals: 'pending' } },
-              { proofPhotoUrl: { not: null } },
-              { currentReading: { not: null } }
-            ]
-          }
-        }
-      },
-      orderBy: { generatedAt: 'desc' },
-      take: 10,
-      include: {
-        tenant: {
-          select: {
-            fullName: true,
-            leases: {
-              where: { status: 'active' },
-              include: {
-                room: {
-                  select: {
-                    roomNumber: true,
-                    unit: { select: { name: true } },
+    // 7. Kunin at i-map ang mga Pending/Draft Utility Readings
+    const rawPendingBills =
+      tenantIds.length > 0
+        ? await prisma.bill.findMany({
+            where: {
+              tenantId: { in: tenantIds },
+              status: { in: ["draft", "pending"] },
+              items: {
+                some: {
+                  OR: [
+                    { status: { equals: "pending" } },
+                    { proofPhotoUrl: { not: null } },
+                    { currentReading: { not: null } },
+                  ],
+                },
+              },
+            },
+            orderBy: { generatedAt: "desc" },
+            take: 10,
+            include: {
+              tenant: {
+                select: {
+                  fullName: true,
+                  leases: {
+                    where: { status: "active" },
+                    include: {
+                      room: {
+                        select: {
+                          roomNumber: true,
+                          unit: { select: { name: true } },
+                        },
+                      },
+                    },
+                    take: 1,
                   },
                 },
               },
-              take: 1,
+              items: true,
             },
-          },
-        },
-        items: true,
-      },
-    }) : [];
+          })
+        : [];
 
     const pendingReadings: any[] = [];
 
     rawPendingBills.forEach((bill) => {
-      const tenantName = bill.tenant?.fullName || 'Unknown Tenant';
+      const tenantName = bill.tenant?.fullName || "Unknown Tenant";
       const activeLease = bill.tenant?.leases?.[0];
-      const roomNum = activeLease?.room?.roomNumber || '';
-      const unitName = activeLease?.room?.unit?.name || '';
-      const unitLabel = unitName && roomNum ? `${unitName} - Room ${roomNum}` : (roomNum ? `Room ${roomNum}` : (unitName || 'General'));
+      const roomNum = activeLease?.room?.roomNumber || "";
+      const unitName = activeLease?.room?.unit?.name || "";
+      const unitLabel =
+        unitName && roomNum
+          ? `${unitName} - Bed ${roomNum}`
+          : roomNum
+          ? `Bed ${roomNum}`
+          : unitName || "General";
 
-      const timeAgo = new Intl.DateTimeFormat('fil-PH', {
-        month: 'short',
-        day: 'numeric',
-        hour: 'numeric',
-        minute: 'numeric',
+      const timeAgo = new Intl.DateTimeFormat("fil-PH", {
+        month: "short",
+        day: "numeric",
+        hour: "numeric",
+        minute: "numeric",
       }).format(new Date(bill.generatedAt));
 
       bill.items.forEach((item) => {
-        if (item.status == 'pending' && !item.type.toLowerCase().includes('other')) {
+        if (
+          item.status?.toLowerCase() === "pending" &&
+          !item.type.toLowerCase().includes("other")
+        ) {
           let type: "water" | "electricity" | "amenities" | "other" = "other";
           const itemType = item.type.toLowerCase();
-          
-          if (itemType.includes('water')) {
-            type = "water";
-          } else if (itemType.includes('electric')) {
-            type = "electricity";
-          } else if (itemType.includes('amenities')) {
-            type = "amenities";
-          } else {
-            type = "other";
-          }
 
-          const itemAmountFormatted = new Intl.NumberFormat('fil-PH', {
-            style: 'currency',
-            currency: 'PHP',
+          if (itemType.includes("water")) type = "water";
+          else if (itemType.includes("electric")) type = "electricity";
+          else if (itemType.includes("amenities")) type = "amenities";
+
+          const itemAmountFormatted = new Intl.NumberFormat("fil-PH", {
+            style: "currency",
+            currency: "PHP",
           }).format(Number(item.amount));
 
           pendingReadings.push({
-            id: `${bill.id}-${item.type}`, 
-            billId: bill.id, 
-            utilityType: item.type, 
+            id: `${bill.id}-${item.type}`,
+            billId: bill.id,
+            utilityType: item.type,
             tenantName,
             unitName: unitLabel,
             type,
-            readingOrAmount: `${item.currentReading || 0} ${item.unitLabel || 'units'} (${itemAmountFormatted})`,
+            readingOrAmount: `${item.currentReading || 0} ${
+              item.unitLabel || "units"
+            } (${itemAmountFormatted})`,
             dateSubmitted: timeAgo,
             proofPhotoUrl: item.proofPhotoUrl || undefined,
           });
@@ -246,84 +306,101 @@ export async function getDashboardData() {
       });
     });
 
-    // 6. Kunin ang mga notifications para sa landlord na ito
-    const rawNotifications = await prisma.notification.findMany({
-      where: { recipientUserId: userId },
-      orderBy: { createdAt: 'desc' },
-      take: 5,
-    }).catch(async () => {
-      return await prisma.notification.findMany({
-        orderBy: { createdAt: 'desc' },
+    // 8. Notifications & Recent Activities
+    const rawNotifications = await prisma.notification
+      .findMany({
+        where: { recipientUserId: userId },
+        orderBy: { createdAt: "desc" },
         take: 5,
+      })
+      .catch(async () => {
+        return await prisma.notification.findMany({
+          orderBy: { createdAt: "desc" },
+          take: 5,
+        });
       });
-    });
 
     const recentActivities = rawNotifications.map((notif) => {
       const now = new Date();
-      const diffInMinutes = Math.floor((now.getTime() - new Date(notif.createdAt).getTime()) / (1000 * 60));
-      
+      const diffInMinutes = Math.floor(
+        (now.getTime() - new Date(notif.createdAt).getTime()) / (1000 * 60)
+      );
+
       let timeStr = `${diffInMinutes} mins ago`;
       if (diffInMinutes >= 60 && diffInMinutes < 1440) {
         const hours = Math.floor(diffInMinutes / 60);
-        timeStr = `${hours} hr${hours > 1 ? 's' : ''} ago`;
+        timeStr = `${hours} hr${hours > 1 ? "s" : ""} ago`;
       } else if (diffInMinutes >= 1440) {
         const days = Math.floor(diffInMinutes / 1440);
-        timeStr = `${days} day${days > 1 ? 's' : ''} ago`;
+        timeStr = `${days} day${days > 1 ? "s" : ""} ago`;
       } else if (diffInMinutes < 1) {
-        timeStr = 'Just now';
+        timeStr = "Just now";
       }
 
       let type: "payment" | "tenant" | "maintenance" = "tenant";
       const notifType = notif.type.toLowerCase();
-      if (notifType.includes('payment') || notifType.includes('bayad') || notifType.includes('bill')) {
+      if (
+        notifType.includes("payment") ||
+        notifType.includes("bayad") ||
+        notifType.includes("bill")
+      ) {
         type = "payment";
-      } else if (notifType.includes('maintenance') || notifType.includes('repair') || notifType.includes('sira')) {
+      } else if (
+        notifType.includes("maintenance") ||
+        notifType.includes("repair") ||
+        notifType.includes("sira")
+      ) {
         type = "maintenance";
       }
 
       return {
         id: notif.id,
-        title: notif.title || 'Notification',
+        title: notif.title || "Notification",
         description: notif.message,
         time: timeStr,
         type,
       };
     });
 
-    // 7. Kunin ang audit logs na ginawa lamang ng landlord na ito
+    // 9. Audit Logs
     const rawAuditLogs = await prisma.auditLog.findMany({
       where: { actorId: userId },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
       take: 5,
       include: {
         actor: {
           select: { fullName: true, role: true },
         },
       },
-    })
+    });
 
     const auditLogs = rawAuditLogs.map((log) => {
-      const timeAgo = new Intl.DateTimeFormat('fil-PH', {
-        month: 'short',
-        day: 'numeric',
-        hour: 'numeric',
-        minute: 'numeric',
-      }).format(new Date(log.createdAt))
+      const timeAgo = new Intl.DateTimeFormat("fil-PH", {
+        month: "short",
+        day: "numeric",
+        hour: "numeric",
+        minute: "numeric",
+      }).format(new Date(log.createdAt));
 
       return {
         id: log.id,
-        adminName: log.actor?.fullName ? `${log.actor.fullName} (${log.actor.role})` : 'Sistema',
+        adminName: log.actor?.fullName
+          ? `${log.actor.fullName} (${log.actor.role})`
+          : "Sistema",
         action: log.action,
-        target: log.entityType || 'General',
+        target: log.entityType || "General",
         timestamp: timeAgo,
-      }
-    })
+      };
+    });
 
     return {
       adminName,
       stats: {
         totalProperties,
         totalUnits,
+        occupiedUnits,
+        vacantUnits,
+        reservedUnits,
         totalRooms,
         occupiedRooms,
         vacantRooms,
@@ -334,37 +411,58 @@ export async function getDashboardData() {
       },
       roomsSummary: {
         totalUnits,
-        availableRooms,
-        occupiedRooms,
+        vacantUnits,
+        reservedUnits,
+        occupiedUnits,
         totalRooms,
+        availableRooms,
+        reservedRooms,
+        occupiedRooms,
       },
       chartData,
       pendingReadings,
       recentActivities,
       auditLogs,
-    }
+    };
   } catch (error) {
-    console.error('Error fetching dashboard data:', error)
-    return {
-      adminName: 'Admin',
-      stats: { 
-        totalProperties: 0, 
-        totalUnits: 0, 
-        totalRooms: 0, 
-        occupiedRooms: 0, 
-        vacantRooms: 0, 
-        reservedRooms: 0,
-        monthlyRevenue: 0, 
-        pendingBillsAmount: 0, 
-        occupancyRate: 0 
-      },
-      roomsSummary: { totalUnits: 0, availableRooms: 0, occupiedRooms: 0, totalRooms: 0 },
-      chartData: [],
-      pendingReadings: [],
-      recentActivities: [],
-      auditLogs: [],
-    }
+    console.error("Error fetching dashboard data:", error);
+    return getEmptyDashboardData();
   }
+}
+
+// Fallback empty data helper
+function getEmptyDashboardData() {
+  return {
+    adminName: "Admin",
+    stats: {
+      totalProperties: 0,
+      totalUnits: 0,
+      occupiedUnits: 0,
+      vacantUnits: 0,
+      reservedUnits: 0,
+      totalRooms: 0,
+      occupiedRooms: 0,
+      vacantRooms: 0,
+      reservedRooms: 0,
+      monthlyRevenue: 0,
+      pendingBillsAmount: 0,
+      occupancyRate: 0,
+    },
+    roomsSummary: {
+      totalUnits: 0,
+      vacantUnits: 0,
+      reservedUnits: 0,
+      occupiedUnits: 0,
+      totalRooms: 0,
+      availableRooms: 0,
+      reservedRooms: 0,
+      occupiedRooms: 0,
+    },
+    chartData: [],
+    pendingReadings: [],
+    recentActivities: [],
+    auditLogs: [],
+  };
 }
 
 export async function handleApprovalAction(compositeId: string, actionType: "approve" | "reject") {
@@ -498,88 +596,132 @@ export async function handleApprovalAction(compositeId: string, actionType: "app
 }
 
 export async function getRevenueChartData(filter: "3M" | "6M" | "1Y" | "ALL" = "6M") {
-  'use server'
-  const cookieStore = await cookies();
-  const userId = cookieStore.get("session_user_id")?.value;
+  try {
+    const cookieStore = await cookies();
+    const userId = cookieStore.get("session_user_id")?.value;
 
-  const months = ["Ene", "Peb", "Mar", "Abr", "May", "Hun", "Hul", "Ago", "Set", "Okt", "Nob", "Dis"];
-  const currentDate = new Date();
-  const chartData = [];
-  
-  // Tinukoy natin ang limit base sa bagong filters
-  let limit = 6;
-  if (filter === "3M") limit = 3;
-  else if (filter === "6M") limit = 6;
-  else if (filter === "1Y") limit = 12;
-  else if (filter === "ALL") limit = 24; // Halimbawa: huling 2 taon para sa 'Lahat'
+    if (!userId) {
+      return [];
+    }
 
-  let tenantIds: string[] = [];
-  if (userId) {
-    const landlordTenants = await prisma.tenant.findMany({
+    // 1. Kunin ang mga Property ID ng landlord
+    const landlordProperties = await prisma.property.findMany({
+      where: { landlordId: userId },
+      select: { id: true },
+    });
+    const propertyIds = landlordProperties.map((p) => p.id);
+
+    // 2. KUNIN LAHAT NG TENANT IDS (Direct + Leased Tenants)
+    const directTenants = await prisma.tenant.findMany({
       where: { userId: userId },
       select: { id: true },
     });
-    tenantIds = landlordTenants.map((t) => t.id);
-  }
 
-  for (let i = limit - 1; i >= 0; i--) {
-    const d = new Date(currentDate.getFullYear(), currentDate.getMonth() - i, 1);
-    const monthName = months[d.getMonth()];
-    const year = d.getFullYear();
-    const monthStr = String(d.getMonth() + 1).padStart(2, '0');
-    
-    const startDate = new Date(`${year}-${monthStr}-01`);
-    const endDate = new Date(year, d.getMonth() + 1, 0, 23, 59, 59);
-
-    let paidNum = 0;
-    let pendingNum = 0;
-    let overdueNum = 0;
-
-    if (tenantIds.length > 0) {
-      const paidTotal = await prisma.bill.aggregate({
-        where: {
-          tenantId: { in: tenantIds },
-          status: 'paid',
-          paidAt: { gte: startDate, lte: endDate },
+    const leaseTenants = await prisma.tenant.findMany({
+      where: {
+        leases: {
+          some: {
+            OR: [
+              { unit: { propertyId: { in: propertyIds } } },
+              { room: { unit: { propertyId: { in: propertyIds } } } },
+            ],
+          },
         },
-        _sum: { totalAmount: true },
-      });
-      paidNum = Number(paidTotal._sum.totalAmount || 0);
+      },
+      select: { id: true },
+    });
 
-      const pendingTotal = await prisma.bill.aggregate({
-        where: {
-          tenantId: { in: tenantIds },
-          status: 'pending',
-          generatedAt: { gte: startDate, lte: endDate },
-        },
-        _sum: { totalAmount: true },
-      });
-      pendingNum = Number(pendingTotal._sum.totalAmount || 0);
+    const tenantIds = Array.from(
+      new Set([
+        ...directTenants.map((t) => t.id),
+        ...leaseTenants.map((t) => t.id),
+      ])
+    );
 
-      const overdueTotal = await prisma.bill.aggregate({
-        where: {
-          tenantId: { in: tenantIds },
-          status: 'overdue',
-          generatedAt: { gte: startDate, lte: endDate },
-        },
-        _sum: { totalAmount: true },
+    // 3. I-determine ang month limit base sa napiling filter
+    let limit = 6;
+    if (filter === "3M") limit = 3;
+    else if (filter === "6M") limit = 6;
+    else if (filter === "1Y") limit = 12;
+    else if (filter === "ALL") limit = 24;
+
+    const months = [
+      "Ene", "Peb", "Mar", "Abr", "May", "Hun",
+      "Hul", "Ago", "Set", "Okt", "Nob", "Dis"
+    ];
+    const currentDate = new Date();
+    const chartData = [];
+
+    // 4. KUNIN ANG DATA KADA BUWAN
+    for (let i = limit - 1; i >= 0; i--) {
+      const year = currentDate.getFullYear();
+      const monthIndex = currentDate.getMonth() - i;
+
+      const startDate = new Date(year, monthIndex, 1, 0, 0, 0, 0);
+      const endDate = new Date(year, monthIndex + 1, 0, 23, 59, 59, 999);
+
+      const monthName = months[startDate.getMonth()];
+
+      let paidNum = 0;
+      let pendingNum = 0;
+      let overdueNum = 0;
+
+      if (tenantIds.length > 0) {
+        // Paid Total
+        const paidTotal = await prisma.bill.aggregate({
+          where: {
+            tenantId: { in: tenantIds },
+            status: { in: ["paid"] },
+            paidAt: { gte: startDate, lte: endDate },
+          },
+          _sum: { totalAmount: true },
+        });
+        paidNum = Number(paidTotal._sum.totalAmount || 0);
+
+        // Pending & Draft Total
+        const pendingTotal = await prisma.bill.aggregate({
+          where: {
+            tenantId: { in: tenantIds },
+            status: { in: ["pending", "draft"] },
+            generatedAt: { gte: startDate, lte: endDate },
+          },
+          _sum: { totalAmount: true },
+        });
+        pendingNum = Number(pendingTotal._sum.totalAmount || 0);
+
+        // Overdue Total
+        const overdueTotal = await prisma.bill.aggregate({
+          where: {
+            tenantId: { in: tenantIds },
+            status: { in: ["overdue"] },
+            generatedAt: { gte: startDate, lte: endDate },
+          },
+          _sum: { totalAmount: true },
+        });
+        overdueNum = Number(overdueTotal._sum.totalAmount || 0);
+      }
+
+      const formatCurrency = (val: number) =>
+        new Intl.NumberFormat("fil-PH", {
+          style: "currency",
+          currency: "PHP",
+          maximumFractionDigits: 0,
+        }).format(val);
+
+      chartData.push({
+        month: monthName,
+        paid: paidNum,
+        pending: pendingNum,
+        overdue: overdueNum,
+        paidFormatted: formatCurrency(paidNum),
+        pendingFormatted: formatCurrency(pendingNum),
+        overdueFormatted: formatCurrency(overdueNum),
       });
-      overdueNum = Number(overdueTotal._sum.totalAmount || 0);
     }
 
-    const formatCurrency = (val: number) => 
-      new Intl.NumberFormat('fil-PH', { style: 'currency', currency: 'PHP', maximumFractionDigits: 0 }).format(val);
-
-    chartData.push({
-      month: monthName,
-      paid: paidNum,
-      pending: pendingNum,
-      overdue: overdueNum,
-      paidFormatted: formatCurrency(paidNum),
-      pendingFormatted: formatCurrency(pendingNum),
-      overdueFormatted: formatCurrency(overdueNum),
-    });
+    return chartData;
+  } catch (error) {
+    console.error("Error fetching revenue chart data:", error);
+    return [];
   }
-
-  return chartData;
 }

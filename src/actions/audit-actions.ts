@@ -57,7 +57,7 @@ export async function getUserAuditLogs(userId: string) {
         id: log.id,
         action: log.action,
         timestamp: timeAgo,
-        category: log.entityType === 'AUTH' ? ('Security' as const) : ('Tenant' as const),
+        category: log.entityType,
       }
     })
   } catch (error) {

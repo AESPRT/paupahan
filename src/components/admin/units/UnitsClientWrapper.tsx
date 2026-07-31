@@ -1,12 +1,11 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Unit, Room } from "@/src/types/admin/unit";
+import { Unit, Room, UnitType, UnitFloor } from "@/src/types/admin/unit";
 import { UnitsHeader } from "./UnitsHeader";
 import { UnitCard } from "./UnitCard";
 import { AddRoomModal } from "./AddRoomModal";
 import { AddUnitModal } from "./AddUnitModal";
-// 👈 I-import ang Edit Unit Modal kung mayroon kang hiwalay na component para rito (palitan kung iba ang pangalan o path)
 import { EditUnitModal } from "@/src/components/admin/units/EditUnitModal";
 import { Footer } from "@/src/components/landing/Footer";
 import { addRoomAction, addUnitAction } from "@/src/actions/units-actions";
@@ -20,7 +19,7 @@ export default function UnitsClientWrapper({
 }: UnitsClientWrapperProps) {
   const [units, setUnits] = useState<Unit[]>(initialUnits);
   const [selectedUnitForRoom, setSelectedUnitForRoom] = useState<Unit | null>(null);
-  const [selectedUnitForEdit, setSelectedUnitForEdit] = useState<Unit | null>(null); // 👈 State para sa pag-edit ng unit
+  const [selectedUnitForEdit, setSelectedUnitForEdit] = useState<Unit | null>(null);
   const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
 
   const [searchQuery, setSearchQuery] = useState("");
@@ -112,17 +111,30 @@ export default function UnitsClientWrapper({
     }
   };
 
-  const handleAddUnit = async (unitData: { unitName: string; monthlyRent: number }) => {
+  // 👈 In-update para tanggapin at i-save ang floor at type
+  const handleAddUnit = async (unitData: {
+    unitName: string;
+    monthlyRent: number;
+    floor: UnitFloor;
+    type: UnitType;
+  }) => {
     const result = await addUnitAction(unitData);
 
     if (result.success && result.unit) {
+      // 👈 Siguraduhing may fallback string para sa address
+      const propertyAddress = result.unit.property?.addressLine
+        ? `${result.unit.property.addressLine}${result.unit.property.city ? `, ${result.unit.property.city}` : ""}`
+        : "Pangunahing Lokasyon";
+
       const newUnit: Unit = {
         id: result.unit.id,
         name: result.unit.name,
-        address: "Pangunahing Lokasyon",
+        address: propertyAddress, // 👈 TypeScript safe (Laging string ito)
         totalRooms: 0,
         rooms: [],
-        monthlyRent: Number(result.unit.monthlyRent || 0),
+        monthlyRent: Number(result.unit.monthlyRent || unitData.monthlyRent || 0),
+        floor: (result.unit.floor as UnitFloor) || unitData.floor,
+        type: (result.unit.type as UnitType) || unitData.type,
       };
 
       setUnits((prev) => [newUnit, ...prev]);
@@ -133,7 +145,6 @@ export default function UnitsClientWrapper({
     }
   };
 
-  // 👈 Handler kapag na-update na ang unit (I-update ang state list)
   const handleUpdateUnit = (updatedUnitData: Unit) => {
     setUnits((prevUnits) =>
       prevUnits.map((unit) => (unit.id === updatedUnitData.id ? updatedUnitData : unit))
@@ -206,7 +217,7 @@ export default function UnitsClientWrapper({
                   key={unit.id}
                   unit={unit}
                   onOpenAddRoom={(unitToEdit) => setSelectedUnitForRoom(unitToEdit)}
-                  onOpenEditUnit={(unitToEdit) => setSelectedUnitForEdit(unitToEdit)} // 👈 Ipinasa ang handler para magbukas ang Edit Modal
+                  onOpenEditUnit={(unitToEdit) => setSelectedUnitForEdit(unitToEdit)}
                 />
               ))}
             </div>
@@ -277,7 +288,7 @@ export default function UnitsClientWrapper({
         onAddUnit={handleAddUnit}
       />
 
-      {/* 👉 Edit Unit Modal Dialog (I-enable kung mayroon ka nang EditUnitModal component) */}
+      {/* Edit Unit Modal Dialog */}
       {selectedUnitForEdit && (
         <EditUnitModal
           isOpen={!!selectedUnitForEdit}

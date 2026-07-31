@@ -49,8 +49,8 @@ export default function BillingsPage() {
           getBillingsData(),
           getDashboardData(),
         ]);
-        setInvoices(billingsData.invoices as Invoice[]);
-        setPendingReadings(dashboardData.pendingReadings || []);
+        setInvoices((billingsData?.invoices || []) as Invoice[]);
+        setPendingReadings(dashboardData?.pendingReadings || []);
       } catch (error) {
         console.error("Nabigong i-load ang billings data:", error);
       } finally {
@@ -63,33 +63,42 @@ export default function BillingsPage() {
   const handleOpenModal = async () => {
     const result = await getOccupiedRoomsForBilling();
     if (result.success) {
-      setOccupiedRooms(result.roomsWithTenants as ActiveTenantRoom[]);
+      setOccupiedRooms((result.roomsWithTenants || []) as ActiveTenantRoom[]);
     }
     setIsModalOpen(true);
   };
 
-  // ✨ Kasama na rito ang 'payment_submitted' sa pagkuha ng totalCollected at totalPending
+  // 1. Total Collected: Case-insensitive match para sa "paid"
   const totalCollected = invoices
-    .filter((inv) => inv.status === "Paid")
-    .reduce((sum, inv) => sum + inv.totalAmount, 0);
+    .filter((inv) => inv.status?.toLowerCase() === "paid")
+    .reduce((sum, inv) => sum + (Number(inv.totalAmount) || 0), 0);
 
+  // 2. Total Pending: Inalign sa dashboard logic
+  // Kasama rito ang "pending", "draft", "payment_submitted", o kung may paymentDetails na hindi pa ganap na nababayaran
   const totalPending = invoices
-    .filter((inv) => 
-      inv.status === "Pending" || 
-      (inv as any).paymentDetails != null
-    )
-    .reduce((sum, inv) => sum + inv.totalAmount, 0);
+    .filter((inv) => {
+      const status = inv.status?.toLowerCase();
+      const hasPaymentDetails = (inv as any).paymentDetails != null;
+      return (
+        status === "pending" ||
+        status === "draft" ||
+        status === "payment_submitted" ||
+        (hasPaymentDetails && status !== "paid")
+      );
+    })
+    .reduce((sum, inv) => sum + (Number(inv.totalAmount) || 0), 0);
 
+  // 3. Total Overdue: Case-insensitive match para sa "overdue"
   const totalOverdue = invoices
-    .filter((inv) => inv.status === "Overdue")
-    .reduce((sum, inv) => sum + inv.totalAmount, 0);
+    .filter((inv) => inv.status?.toLowerCase() === "overdue")
+    .reduce((sum, inv) => sum + (Number(inv.totalAmount) || 0), 0);
 
   const handleCreateInvoice = async (newInvoiceData: Omit<Invoice, "id" | "invoiceNumber">) => {
     startTransition(async () => {
       const result = await createInvoiceAction(newInvoiceData);
       if (result.success) {
         const data = await getBillingsData();
-        setInvoices(data.invoices as Invoice[]);
+        setInvoices((data?.invoices || []) as Invoice[]);
         setIsModalOpen(false);
       } else {
         alert(result.error);
@@ -107,7 +116,7 @@ export default function BillingsPage() {
       if (!result.success) {
         alert(result.error);
         const data = await getBillingsData();
-        setInvoices(data.invoices as Invoice[]);
+        setInvoices((data?.invoices || []) as Invoice[]);
       }
     });
   };
@@ -136,8 +145,8 @@ export default function BillingsPage() {
         getDashboardData(),
         getBillingsData(),
       ]);
-      setPendingReadings(dashboardData.pendingReadings || []);
-      setInvoices(billingsData.invoices as Invoice[]);
+      setPendingReadings(dashboardData?.pendingReadings || []);
+      setInvoices((billingsData?.invoices || []) as Invoice[]);
     });
   };
 
