@@ -11,7 +11,7 @@ services:
       - PORT=3000
       - DATABASE_URL=postgresql://aedev_admin:admin123@fold_go_postgres:5432/paupahan_db?schema=public
       - NEXT_PUBLIC_API_URL=https://api.aesprt.com
-      - REDIS_HOST=paupahan-redis
+      - REDIS_HOST=paupahan_redis
       - REDIS_PORT=6379
     depends_on:
       - paupahan-redis
@@ -29,7 +29,7 @@ services:
       - NODE_ENV=production
       - DATABASE_URL=postgresql://aedev_admin:admin123@fold_go_postgres:5432/paupahan_db?schema=public
       - NEXT_PUBLIC_API_URL=https://api.aesprt.com
-      - REDIS_HOST=paupahan-redis
+      - REDIS_HOST=paupahan_redis
       - REDIS_PORT=6379
     depends_on:
       - paupahan-redis
