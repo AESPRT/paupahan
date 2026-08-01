@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import prisma from '@/src/lib/prisma'; // Siguraduhing tama ang path sa iyong Prisma client instance
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -25,8 +26,38 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  // 3. Pag-verify ng Session at Roles para sa mga Protected Routes
+  // 3. Pag-verify ng Session, Roles, at DB Existence para sa mga Protected Routes
   if (sessionUserId) {
+    let userExists = false;
+
+    try {
+      // 🔍 I-verify sa database kung nage-exist pa talaga ang user na ito (dahil baka nag-reset ng DB)
+      // I-adjust ang model name mo kung 'User', 'Admin', o 'Tenant' man ang tawag sa Prisma schema mo
+      const dbUser = await prisma.user.findUnique({
+        where: { id: sessionUserId },
+        select: { id: true, role: true }, // Kunin lang ang kailangan para mabilis
+      });
+
+      if (dbUser) {
+        userExists = true;
+      }
+    } catch (error) {
+      console.error('Middleware DB verification error:', error);
+      // Kung may error sa DB (hal. offline), pwede mong i-allow muna o i-fail safe
+    }
+
+    // 🔴 KUNG WALA NA SA DB (Ibig sabihin nag-reset ng DB o nabura ang user)
+    if (!userExists) {
+      const loginPath = isAdminDashboard ? '/admin/login' : '/tenant/login';
+      const response = NextResponse.redirect(new URL(loginPath, request.url));
+      
+      // 🧹 Burahin/I-expire ang mga cookies para ma-force logout
+      response.cookies.set('session_user_id', '', { maxAge: 0, path: '/' });
+      response.cookies.set('user_role', '', { maxAge: 0, path: '/' });
+      
+      return response;
+    }
+
     // 🔴 KUNG TENANT ANG NAKA-LOGIN
     if (userRoleCookie === 'tenant') {
       if (isAdminDashboard) {
@@ -39,7 +70,7 @@ export async function proxy(request: NextRequest) {
         return NextResponse.redirect(new URL('/admin/dashboard/home', request.url));
       }
     } 
-    // 🔴 KUNG MAY COOKIE PERO WALANG TAMANG ROLE (O orphaned session)
+    // 🔴 KUNG MAY COOKIE PERO WALANG TAMANG ROLE
     else {
       if (isTenantDashboard) {
         return NextResponse.redirect(new URL('/tenant/login', request.url));
