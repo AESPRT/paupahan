@@ -134,29 +134,24 @@ export function BillDetailModal({
             <div className="rounded-2xl bg-paper p-3.5 border border-line/60 space-y-2">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  {/* Lightning SVG Icon */}
                   <svg className="h-4 w-4 text-amber-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                   </svg>
                   <span className="text-xs font-bold text-forest-deep">Kuryente (Submeter)</span>
                 </div>
                 
-                {/* Utility Input Action / Status */}
-                {bill.electricity.status === "Pending Tenant Input" && (
+                {/* ✨ KUNG PENDING TENANT INPUT O REJECTED: Pwede silang mag-upload */}
+                {(bill.electricity.status === "Pending Tenant Input" || bill.electricity.status === "Rejected") && (
                   <button
                     onClick={() => setUploadUtilityType("electricity")}
                     className="rounded-xl bg-forest px-3 py-1 font-mono-brand text-[10px] font-bold text-white hover:bg-forest-deep shadow-xs"
                   >
-                    + Input Reading & Photo
+                    {bill.electricity.status === "Rejected" ? "🔄 Mag-submit Muli (Re-upload)" : "+ Input Reading & Photo"}
                   </button>
                 )}
 
                 {bill.electricity.status === "Pending Landlord Approval" && (
                   <span className="flex items-center gap-1 rounded-md border border-amber-300 bg-amber-50 px-2 py-0.5 font-mono-brand text-[10px] font-bold text-amber-800">
-                    {/* Clock SVG Icon */}
-                    <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
                     Waiting Approval
                   </span>
                 )}
@@ -168,26 +163,21 @@ export function BillDetailModal({
                 )}
               </div>
 
+              {/* Kung na-reject, magpakita ng alert text */}
+              {bill.electricity.status === "Rejected" && (
+                <p className="text-[11px] text-red-600 font-medium bg-red-50 p-2 rounded-xl border border-red-200">
+                  ⚠️ Tinanggihan ng landlord ang iyong nakaraang reading o litrato. Mangyaring kumuha ng bagong litrato at ilagay ang tamang reading.
+                </p>
+              )}
+
               {/* Utility Reading Details */}
-              {bill.electricity.currentReading && (
+              {bill.electricity.currentReading && bill.electricity.status !== "Rejected" && (
                 <div className="flex justify-between items-center pt-1 border-t border-line/40 font-mono-brand text-[11px] text-muted">
                   <span className="flex items-center gap-1">
-                    Reading: {bill.electricity.previousReading}
-                    {/* Arrow Right SVG */}
-                    <svg className="h-3 w-3 inline text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                    </svg>
-                    {bill.electricity.currentReading} kWh ({elecUsed} kWh)
+                    Reading: {bill.electricity.previousReading} ➜ {bill.electricity.currentReading} kWh ({elecUsed} kWh)
                   </span>
                   {bill.electricity.proofPhotoUrl && (
-                    <span className="text-forest font-bold flex items-center gap-1">
-                      {/* Camera SVG Icon */}
-                      <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                      </svg>
-                      May Litrato
-                    </span>
+                    <span className="text-forest font-bold">May Litrato</span>
                   )}
                 </div>
               )}
@@ -197,29 +187,23 @@ export function BillDetailModal({
             <div className="rounded-2xl bg-paper p-3.5 border border-line/60 space-y-2">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  {/* Water Drop SVG Icon */}
                   <svg className="h-4 w-4 text-blue-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
                   </svg>
                   <span className="text-xs font-bold text-forest-deep">Tubig (Submeter)</span>
                 </div>
                 
-                {/* Utility Input Action / Status */}
-                {bill.water.status === "Pending Tenant Input" && (
+                {(bill.water.status === "Pending Tenant Input" || bill.water.status === "Rejected") && (
                   <button
                     onClick={() => setUploadUtilityType("water")}
                     className="rounded-xl bg-forest px-3 py-1 font-mono-brand text-[10px] font-bold text-white hover:bg-forest-deep shadow-xs"
                   >
-                    + Input Reading & Photo
+                    {bill.water.status === "Rejected" ? "🔄 Mag-submit Muli (Re-upload)" : "+ Input Reading & Photo"}
                   </button>
                 )}
 
                 {bill.water.status === "Pending Landlord Approval" && (
                   <span className="flex items-center gap-1 rounded-md border border-amber-300 bg-amber-50 px-2 py-0.5 font-mono-brand text-[10px] font-bold text-amber-800">
-                    {/* Clock SVG Icon */}
-                    <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
                     Waiting Approval
                   </span>
                 )}
@@ -231,26 +215,19 @@ export function BillDetailModal({
                 )}
               </div>
 
-              {/* Utility Reading Details */}
-              {bill.water.currentReading && (
+              {bill.water.status === "Rejected" && (
+                <p className="text-[11px] text-red-600 font-medium bg-red-50 p-2 rounded-xl border border-red-200">
+                  ⚠️ Tinanggihan ng landlord ang iyong nakaraang reading o litrato sa tubig. Mangyaring ulitin ito.
+                </p>
+              )}
+
+              {bill.water.currentReading && bill.water.status !== "Rejected" && (
                 <div className="flex justify-between items-center pt-1 border-t border-line/40 font-mono-brand text-[11px] text-muted">
                   <span className="flex items-center gap-1">
-                    Reading: {bill.water.previousReading}
-                    {/* Arrow Right SVG */}
-                    <svg className="h-3 w-3 inline text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                    </svg>
-                    {bill.water.currentReading} m³ ({waterUsed} m³)
+                    Reading: {bill.water.previousReading} ➜ {bill.water.currentReading} m³ ({waterUsed} m³)
                   </span>
                   {bill.water.proofPhotoUrl && (
-                    <span className="text-forest font-bold flex items-center gap-1">
-                      {/* Camera SVG Icon */}
-                      <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                      </svg>
-                      May Litrato
-                    </span>
+                    <span className="text-forest font-bold">May Litrato</span>
                   )}
                 </div>
               )}

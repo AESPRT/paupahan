@@ -18,11 +18,18 @@ export async function getBillDetailsForPayment(billId: string) {
         items: true,
         lease: {
           include: {
+            // 1. Posibilidad A: Unit-level lease (direktang nakakonekta ang unit sa lease)
+            unit: {
+              include: {
+                property: true,
+              },
+            },
+            // 2. Posibilidad B: Room-level lease (nakakonekta sa room, tapos unit, tapos property)
             room: {
               include: {
                 unit: {
                   include: {
-                    property: true, // Kunin muna ang property para makuha ang landlordId
+                    property: true,
                   },
                 },
               },
@@ -30,19 +37,23 @@ export async function getBillDetailsForPayment(billId: string) {
           },
         },
       },
-    });
+    }) as any;
 
     if (!bill) {
+      console.log(`[DEBUG] Bill hindi nahanap para sa ID: ${billId}`);
       return null;
     }
 
-    // Kunin ang landlordId mula sa property ng lease/room/unit
-    const landlordId = bill.lease?.room?.unit?.property?.landlordId;
+    // 🛠️ Kunin ang landlordId mula sa alinman sa dalawang tamang landas batay sa schema
+    const landlordId = 
+      bill.lease?.unit?.property?.landlordId || 
+      bill.lease?.room?.unit?.property?.landlordId;
+
+    console.log("[DEBUG] Natukoy na Landlord ID:", landlordId);
 
     let landlordSettings = null;
 
     if (landlordId) {
-      // Direktang hanapin ang landlord sa User table gamit ang landlordId para sigurado
       const landlordUser = await prisma.user.findUnique({
         where: { id: landlordId },
         select: { paymentSettings: true },
@@ -51,7 +62,6 @@ export async function getBillDetailsForPayment(billId: string) {
       if (landlordUser?.paymentSettings) {
         landlordSettings = landlordUser.paymentSettings;
         
-        // I-parse kung sakaling string ang pagkakaseed/pagkaka-store sa database
         if (typeof landlordSettings === "string") {
           try {
             landlordSettings = JSON.parse(landlordSettings);
@@ -91,7 +101,20 @@ export async function submitPaymentAction(formData: FormData) {
     const paymentMethod = formData.get("paymentMethod") as string;
     const referenceNo = formData.get("referenceNo") as string;
     const amount = Number(formData.get("amount"));
-    const receiptUrl = formData.get("receiptUrl") as string;
+    
+    // 🛠️ Kinuha ang File mula sa FormData
+    const receiptFile = formData.get("receipt") as File | null;
+    let receiptUrl = formData.get("receiptUrl") as string;
+
+    // 🛠️ I-convert ang File object patungong Base64 string dito sa Server Action
+    if (receiptFile && receiptFile instanceof File && receiptFile.size > 0 && !receiptUrl) {
+      const bytes = await receiptFile.arrayBuffer();
+      const buffer = Buffer.from(bytes);
+      const mimeType = receiptFile.type || "image/jpeg";
+      receiptUrl = `data:${mimeType};base64,${buffer.toString("base64")}`;
+    }
+
+    console.log("🔍 [DEBUG] Receipt URL length:", receiptUrl ? receiptUrl.length : "Walaang resibo");
 
     if (!billId || !tenantId || !amount) {
       return { success: false, error: "Kulang ang mga kinakailangang impormasyon." };
@@ -105,10 +128,11 @@ export async function submitPaymentAction(formData: FormData) {
         amount,
         paymentMethod,
         referenceNo: referenceNo || null,
+        receiptUrl: receiptUrl || null,
       },
     });
 
-    // 2. I-update ang status ng bill at i-save ang receipt URL
+    // 2. I-update ang status ng bill
     await prisma.bill.update({
       where: { id: billId },
       data: {
@@ -117,7 +141,7 @@ export async function submitPaymentAction(formData: FormData) {
       },
     });
 
-    // 3. Hanapin ang Landlord User ID at detalye para mapadalhan ng notification (fullName ang ginamit sa halip na name)
+    // 3. Hanapin ang Landlord User ID at detalye
     const billDetails = await prisma.bill.findUnique({
       where: { id: billId },
       include: {
@@ -152,7 +176,6 @@ export async function submitPaymentAction(formData: FormData) {
     const billingMonth = billDetails?.billingMonthYear || "buwan na ito";
 
     if (landlordId) {
-      // 4. Gumawa ng In-App Notification para sa Landlord
       await prisma.notification.create({
         data: {
           recipientUserId: landlordId,
@@ -167,8 +190,8 @@ export async function submitPaymentAction(formData: FormData) {
       });
     }
 
-    // --- PAGPAPADALA NG EMAIL AT SMS NOTIFICATION KAY LANDLORD (GAMIT ANG apiFetch) ---
-    const apiToken = process.env.API_SECRET_TOKEN || process.env.NEXT_PUBLIC_API_SECRET_TOKEN;
+    // --- PAGPAPADALA NG EMAIL ---
+    const apiToken = process.env.NEXT_PUBLIC_API_SECRET_TOKEN;
     const formattedAmount = new Intl.NumberFormat('fil-PH', { style: 'currency', currency: 'PHP' }).format(amount);
 
     if (landlordEmail) {
@@ -183,6 +206,7 @@ export async function submitPaymentAction(formData: FormData) {
             invoiceNumber: billId,
             referenceNumber: referenceNo || 'N/A',
             paymentMethod: paymentMethod,
+            receiptUrl: receiptUrl || null,
           },
           token: apiToken,
         });
@@ -210,7 +234,6 @@ export async function submitPaymentAction(formData: FormData) {
       }
     }
 
-    // I-revalidate ang path para mag-update ang UI
     revalidatePath(`/tenant/payment/${billId}`);
     revalidatePath(`/tenant/dashboard/home`);
 

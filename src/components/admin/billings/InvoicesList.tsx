@@ -9,11 +9,12 @@ import {
   FileText, 
   CreditCard, 
   CheckCircle2, 
-  Clock, 
   ArrowLeft, 
   ArrowRight, 
-  ExternalLink 
-} from "lucide-react"; // ✨ Na-import ang mga Lucide icons
+  ExternalLink,
+  Zap,
+  Droplets
+} from "lucide-react";
 
 interface InvoicesListProps {
   invoices: Invoice[];
@@ -33,6 +34,10 @@ export function InvoicesList({
   // State para sa pagination (limit na 3 bawat pahina)
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 3;
+
+  // ✨ State para sa pagbubukas ng resibo modal ng tenant
+  const [selectedReceiptUrl, setSelectedReceiptUrl] = useState<string | null>(null);
+  const [selectedReceiptMeta, setSelectedReceiptMeta] = useState<{ tenantName: string; invoiceNumber: string } | null>(null);
 
   // I-filter ang mga invoices batay sa search query at status filter
   const filteredInvoices = useMemo(() => {
@@ -138,11 +143,32 @@ export function InvoicesList({
               const isOverdue = inv.status === "Overdue";
               const hasPaymentSubmitted = inv.paymentDetails != null;
 
+              // Hanapin kung may utility items (kuryente / tubig) sa bill items
+              const electricityItem = inv.lineItems?.find((item: any) => item.type === 'electricity' || item.description?.toLowerCase().includes('kuryente') || item.description?.toLowerCase().includes('electricity'));
+              const waterItem = inv.lineItems?.find((item: any) => item.type === 'water' || item.description?.toLowerCase().includes('tubig') || item.description?.toLowerCase().includes('water'));
+
               return (
                 <div
                   key={inv.id}
-                  className="perforated relative flex flex-col justify-between rounded-2xl border border-line bg-paper-card p-5 pb-6 shadow-[0_8px_24px_rgba(27,58,52,0.08)] transition-all hover:-translate-y-1"
+                  className="perforated relative flex flex-col justify-between rounded-2xl border border-line bg-paper-card p-5 pb-6 shadow-[0_8px_24px_rgba(27,58,52,0.08)] transition-all hover:-translate-y-1 overflow-hidden"
                 >
+                  {/* ✨ Malaki at Mas Mababang Transparency na Watermark Stamp sa Gitna */}
+                  {isPaid && (
+                    <div className="stamp-anim pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
+                      <div className="rotate-[-14deg] rounded-3xl border-[5px] border-coral/35 bg-transparent px-8 py-3 font-display text-[34px] font-black tracking-widest text-coral/35 shadow-none select-none">
+                        BAYAD NA!
+                      </div>
+                    </div>
+                  )}
+
+                  {isOverdue && (
+                    <div className="stamp-anim pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
+                      <div className="rotate-[-14deg] rounded-3xl border-[5px] border-coral-deep/35 bg-transparent px-8 py-3 font-display text-[34px] font-black tracking-widest text-coral-deep/35 shadow-none select-none">
+                        OVERDUE!
+                      </div>
+                    </div>
+                  )}
+
                   <div>
                     <div className="mb-3.5 flex items-start justify-between border-b-[1.5px] border-dashed border-line pb-3.5">
                       <div>
@@ -177,6 +203,51 @@ export function InvoicesList({
                       ))}
                     </div>
 
+                    {/* UTILITY READINGS BREAKDOWN (Kuryente at Tubig) */}
+                    {(electricityItem || waterItem) && (
+                      <div className="mt-3 rounded-xl bg-forest/5 p-3 border border-forest/10 space-y-2.5">
+                        <div className="font-mono-brand text-[10px] font-bold text-forest-deep uppercase tracking-wider flex items-center gap-1.5 border-b border-forest/10 pb-1.5">
+                          <span>Submeter Readings Breakdown</span>
+                        </div>
+
+                        {/* Kuryente Breakdown */}
+                        {electricityItem && (
+                          <div className="space-y-1 font-mono-brand text-[11px]">
+                            <div className="flex items-center justify-between font-bold text-ink">
+                              <span className="flex items-center gap-1 text-amber-600">
+                                <Zap className="w-3.5 h-3.5" /> Kuryente ({electricityItem.unitLabel || 'kWh'}):
+                              </span>
+                              <span className="text-forest-deep font-extrabold">
+                                {Number(electricityItem.consumed || (Number(electricityItem.currentReading || 0) - Number(electricityItem.previousReading || 0))).toLocaleString()} {electricityItem.unitLabel || 'kWh'} consumed
+                              </span>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2 text-[10.5px] text-muted bg-paper p-1.5 rounded-lg border border-line/40">
+                              <div>Prev: <span className="text-ink font-bold">{Number(electricityItem.previousReading || 0).toLocaleString()}</span></div>
+                              <div className="text-right">Curr: <span className="text-ink font-bold">{Number(electricityItem.currentReading || 0).toLocaleString()}</span></div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Tubig Breakdown */}
+                        {waterItem && (
+                          <div className="space-y-1 font-mono-brand text-[11px] pt-1">
+                            <div className="flex items-center justify-between font-bold text-ink">
+                              <span className="flex items-center gap-1 text-sky-600">
+                                <Droplets className="w-3.5 h-3.5" /> Tubig ({waterItem.unitLabel || 'm³'}):
+                              </span>
+                              <span className="text-forest-deep font-extrabold">
+                                {Number(waterItem.consumed || (Number(waterItem.currentReading || 0) - Number(waterItem.previousReading || 0))).toLocaleString()} {waterItem.unitLabel || 'm³'} consumed
+                              </span>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2 text-[10.5px] text-muted bg-paper p-1.5 rounded-lg border border-line/40">
+                              <div>Prev: <span className="text-ink font-bold">{Number(waterItem.previousReading || 0).toLocaleString()}</span></div>
+                              <div className="text-right">Curr: <span className="text-ink font-bold">{Number(waterItem.currentReading || 0).toLocaleString()}</span></div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
                     {/* Total Amount */}
                     <div className="mt-3.5 flex items-center justify-between border-t-[1.5px] border-dashed border-line pt-3 font-mono-brand font-semibold">
                       <span className="text-xs text-muted uppercase">Kabuuan</span>
@@ -204,44 +275,42 @@ export function InvoicesList({
                           </div>
                         )}
 
-                        {inv.paymentDetails.receiptUrl && (
-                          <div className="space-y-1 pt-1 border-t border-forest/10">
-                            <span className="text-muted block">Larawan ng Resibo / Proof:</span>
-                            <div className="relative group rounded-lg overflow-hidden border border-line bg-paper h-32 w-full flex items-center justify-center">
-                              <Image 
-                                src={inv.paymentDetails.receiptUrl} 
-                                alt="Payment Proof" 
-                                fill
-                                sizes="(max-width: 768px) 100vw, 33vw"
-                                className="object-cover rounded-md transition-transform group-hover:scale-105"
-                              />
-                              <a 
-                                href={inv.paymentDetails.receiptUrl} 
-                                target="_blank" 
-                                rel="noopener noreferrer"
-                                className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1 text-white font-bold text-xs z-10"
+                        {/* Resibo Thumbnail na nagti-trigger ng Modal */}
+                        {(() => {
+                          const activeReceiptUrl = 
+                            inv.paymentDetails.receiptUrl || 
+                            inv.paymentDetails.paymentReceiptUrl || 
+                            inv.paymentDetails.receipt;
+
+                          if (!activeReceiptUrl) return null;
+
+                          return (
+                            <div className="space-y-1 pt-1 border-t border-forest/10">
+                              <span className="text-muted block">Larawan ng Resibo / Proof:</span>
+                              <div 
+                                onClick={() => {
+                                  setSelectedReceiptUrl(activeReceiptUrl);
+                                  setSelectedReceiptMeta({ tenantName: inv.tenantName, invoiceNumber: inv.invoiceNumber });
+                                }}
+                                className="relative group rounded-xl overflow-hidden border border-line bg-paper h-32 w-full flex items-center justify-center cursor-pointer transition-all hover:border-forest"
                               >
-                                Tignan nang Buo <ExternalLink className="w-3.5 h-3.5" />
-                              </a>
+                                <Image 
+                                  src={activeReceiptUrl} 
+                                  alt="Payment Proof" 
+                                  fill
+                                  sizes="(max-width: 768px) 100vw, 33vw"
+                                  className="object-cover rounded-lg transition-transform group-hover:scale-105"
+                                />
+                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1 text-white font-bold text-xs z-10">
+                                  Tignan nang Buo <ExternalLink className="w-3.5 h-3.5" />
+                                </div>
+                              </div>
                             </div>
-                          </div>
-                        )}
+                          );
+                        })()}
                       </div>
                     )}
                   </div>
-
-                  {/* Status Stamps */}
-                  {isPaid && (
-                    <div className="stamp-anim pointer-events-none absolute right-[10px] top-[35%] rotate-[-8deg] rounded-[10px] border-[3px] border-coral bg-paper-card/95 px-3 py-1 font-display text-[16px] font-extrabold tracking-wide text-coral shadow-sm">
-                      BAYAD NA!
-                    </div>
-                  )}
-
-                  {isOverdue && (
-                    <div className="stamp-anim pointer-events-none absolute right-[10px] top-[35%] rotate-[6deg] rounded-[10px] border-[3px] border-coral bg-paper-card/95 px-3 py-1 font-display text-[15px] font-extrabold tracking-wide text-coral-deep shadow-sm">
-                      OVERDUE!
-                    </div>
-                  )}
 
                   {/* Action Buttons */}
                   <div className="mt-5 border-t border-line/60 pt-3">
@@ -316,6 +385,70 @@ export function InvoicesList({
             </div>
           )}
         </>
+      )}
+
+      {/* ✨ MODERN MINIMALIST RECEIPT PREVIEW MODAL */}
+      {selectedReceiptUrl && (
+        <div 
+          onClick={() => setSelectedReceiptUrl(null)}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 sm:p-6 backdrop-blur-md animate-in fade-in duration-200"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()} 
+            className="relative w-full max-w-2xl rounded-3xl border border-line/80 bg-paper-card p-5 sm:p-6 shadow-2xl flex flex-col space-y-4 animate-in zoom-in-95 duration-200"
+          >
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-line/60 pb-3">
+              <div className="space-y-0.5">
+                <div className="flex items-center gap-2">
+                  <div className="h-2 w-2 rounded-full bg-forest animate-pulse" />
+                  <h4 className="font-display text-sm font-bold text-forest-deep tracking-wide">
+                    Patunay ng Pagbabayad (Payment Proof)
+                  </h4>
+                </div>
+                {selectedReceiptMeta && (
+                  <p className="font-mono-brand text-[11px] text-muted">
+                    Tenant: <span className="text-ink font-bold">{selectedReceiptMeta.tenantName}</span> • Resibo: <span className="text-ink font-bold">{selectedReceiptMeta.invoiceNumber}</span>
+                  </p>
+                )}
+              </div>
+              <button 
+                onClick={() => setSelectedReceiptUrl(null)}
+                className="group flex h-8 w-8 items-center justify-center rounded-full bg-paper text-muted hover:bg-coral/10 hover:text-coral-deep transition-all border border-line/60"
+                title="Isara"
+              >
+                <ArrowLeft className="w-4 h-4 rotate-180 transition-transform group-hover:rotate-90" />
+              </button>
+            </div>
+            
+            {/* Image Container with Full Preview */}
+            <div className="relative w-full h-[65vh] bg-forest-deep/5 rounded-2xl overflow-hidden border border-line/40 flex items-center justify-center">
+              <Image 
+                src={selectedReceiptUrl} 
+                alt="Full Payment Proof Preview" 
+                fill
+                sizes="(max-width: 1024px) 100vw, 700px"
+                className="object-contain p-2" 
+              />
+            </div>
+
+            {/* Modal Footer Actions */}
+            <div className="flex items-center justify-between pt-1 border-t border-line/50">
+              <span className="font-mono-brand text-[10px] text-muted">
+                I-click sa labas ng kahon para isara.
+              </span>
+              <a
+                href={selectedReceiptUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 rounded-xl bg-forest/10 px-3.5 py-2 font-mono-brand text-xs font-bold text-forest hover:bg-forest hover:text-white transition-all"
+              >
+                <span>Buksan sa Bagong Tab</span>
+                <ExternalLink className="w-3.5 h-3.5" />
+              </a>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

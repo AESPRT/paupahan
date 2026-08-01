@@ -289,6 +289,11 @@ export async function getDashboardData() {
             currency: "PHP",
           }).format(Number(item.amount));
 
+          // ✨ Kunin ang mga numerong kailangan para sa utilityDetails
+          const previousReading = Number(item.previousReading || 0);
+          const currentReading = Number(item.currentReading || 0);
+          const unitsUsed = Math.max(0, currentReading - previousReading);
+
           pendingReadings.push({
             id: `${bill.id}-${item.type}`,
             billId: bill.id,
@@ -296,11 +301,17 @@ export async function getDashboardData() {
             tenantName,
             unitName: unitLabel,
             type,
-            readingOrAmount: `${item.currentReading || 0} ${
+            readingOrAmount: `${currentReading} ${
               item.unitLabel || "units"
             } (${itemAmountFormatted})`,
             dateSubmitted: timeAgo,
             proofPhotoUrl: item.proofPhotoUrl || undefined,
+            // ✨ Idinagdag ito rito para maipasa nang diretso sa PendingApprovals component
+            utilityDetails: {
+              previousReading,
+              currentReading,
+              unitsUsed,
+            },
           });
         }
       });

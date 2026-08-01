@@ -26,7 +26,7 @@ export async function getTenantPaymentHistory() {
       where: {
         tenantId: tenant.id,
         status: {
-          in: ["paid"], // 👈 Sinisigurong sasalo anuman ang casing sa database
+          in: ["paid"],
         },
       },
       include: {
@@ -38,20 +38,53 @@ export async function getTenantPaymentHistory() {
       },
     });
 
-    // I-map patungong frontend format na inaasahan ng PaidBillHistory type
+    // I-map patungong frontend format na may tiyak na uri (Type-safe)
     const history = paidBills.map((bill) => {
-      // Hanapin ang kaukulang payment record kung mayroon
       const payment = bill.payments[0];
 
-      // Kalkulahin o kunin ang halaga ng utilities mula sa items
       let electricityAmount = 0;
       let waterAmount = 0;
 
+      let electricityItemData: {
+        amount: number;
+        consumed?: number;
+        previousReading?: number;
+        currentReading?: number;
+        unitLabel: string;
+      } | undefined = undefined;
+
+      let waterItemData: {
+        amount: number;
+        consumed?: number;
+        previousReading?: number;
+        currentReading?: number;
+        unitLabel: string;
+      } | undefined = undefined;
+
       bill.items.forEach((item) => {
+        const itemAmount = Number(item.amount);
+        const prev = item.previousReading != null ? Number(item.previousReading) : null;
+        const curr = item.currentReading != null ? Number(item.currentReading) : null;
+        const consumedVal = prev !== null && curr !== null ? curr - prev : undefined;
+
         if (item.type === "electricity") {
-          electricityAmount += Number(item.amount);
+          electricityAmount += itemAmount;
+          electricityItemData = {
+            amount: itemAmount,
+            consumed: consumedVal,
+            previousReading: prev !== null ? prev : undefined,
+            currentReading: curr !== null ? curr : undefined,
+            unitLabel: item.unitLabel || "kWh",
+          };
         } else if (item.type === "water") {
-          waterAmount += Number(item.amount);
+          waterAmount += itemAmount;
+          waterItemData = {
+            amount: itemAmount,
+            consumed: consumedVal,
+            previousReading: prev !== null ? prev : undefined,
+            currentReading: curr !== null ? curr : undefined,
+            unitLabel: item.unitLabel || "m³",
+          };
         }
       });
 
@@ -62,12 +95,14 @@ export async function getTenantPaymentHistory() {
 
       return {
         id: `BILL-${bill.id.slice(0, 8).toUpperCase()}`,
-        billingMonth: bill.billingMonthYear, // Halimbawa: "Hunyo 2026" o katumbas na format
+        billingMonth: bill.billingMonthYear,
         paidDate: paidDateFormatted,
         totalAmount: Number(bill.totalAmount),
         rentAmount: Number(bill.rentAmount),
         electricityAmount,
         waterAmount,
+        electricity: electricityItemData,
+        water: waterItemData,
         paymentMethod: payment?.paymentMethod ?? "Online Payment",
         referenceNumber: payment?.referenceNo ?? "N/A",
         receiptUrl: bill.paymentReceiptUrl || undefined,

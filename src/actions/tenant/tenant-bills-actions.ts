@@ -17,7 +17,6 @@ export async function getTenantBillsData() {
       where: { tenantId },
       include: {
         items: true,
-        // 👇 Kunin ang aktibong lease at ang mga nakatalagang amenities nito para sa tenant na ito
         tenant: {
           select: {
             leases: {
@@ -36,18 +35,40 @@ export async function getTenantBillsData() {
           },
         },
       },
-      orderBy: { generatedAt: "desc" },
+      orderBy: { generatedAt: "asc" },
     });
 
-    const formattedBills = tenantBills.map((bill) => {
+    if (tenantBills.length === 0) {
+      return { success: true, bills: [] };
+    }
+
+    // ✨ Ginawa nating synchronous map dahil wala namang async sa loob
+    const formattedBills = tenantBills.map((bill, index) => {
       const electricityItem = bill.items.find((i) => i.type === "electricity");
       const waterItem = bill.items.find((i) => i.type === "water");
 
-      // ✨ Kunin ang mga active lease amenities ng tenant
+      let prevElectricityReading = electricityItem?.previousReading ? Number(electricityItem.previousReading) : 0;
+      let prevWaterReading = waterItem?.previousReading ? Number(waterItem.previousReading) : 0;
+
+      if ((!prevElectricityReading || prevElectricityReading === 0) && index > 0) {
+        const previousBill = tenantBills[index - 1];
+        const prevElecItem = previousBill.items.find((i) => i.type === "electricity");
+        if (prevElecItem?.currentReading) {
+          prevElectricityReading = Number(prevElecItem.currentReading);
+        }
+      }
+
+      if ((!prevWaterReading || prevWaterReading === 0) && index > 0) {
+        const previousBill = tenantBills[index - 1];
+        const prevWaterItem = previousBill.items.find((i) => i.type === "water");
+        if (prevWaterItem?.currentReading) {
+          prevWaterReading = Number(prevWaterItem.currentReading);
+        }
+      }
+
       const activeLease = bill.tenant?.leases?.[0];
       const leaseAmenities = activeLease?.amenities || [];
 
-      // Kalkulahin ang kabuuang halaga ng amenities mula sa lease, o mag-fallback sa bill.amenitiesFee kung meron man
       const calculatedAmenitiesFee = leaseAmenities.length > 0
         ? leaseAmenities.reduce((sum, item) => sum + Number(item.amount), 0)
         : Number(bill.amenitiesFee);
@@ -75,8 +96,8 @@ export async function getTenantBillsData() {
         dueDate: new Date(bill.dueDate).toLocaleDateString("fil-PH", { year: 'numeric', month: 'long', day: 'numeric' }),
         status: uiStatus,
         rentAmount: Number(bill.rentAmount),
-        amenitiesFee: calculatedAmenitiesFee, // 👈 Dynamic na kabuuang halaga ng amenities
-        amenitiesList: leaseAmenities.map((item) => ({             // 👈 Detalyadong listahan kung gusto mong i-display sa UI
+        amenitiesFee: calculatedAmenitiesFee,
+        amenitiesList: leaseAmenities.map((item) => ({
           name: item.amenity.name,
           amount: Number(item.amount),
           frequency: item.amenity.frequency,
@@ -85,30 +106,31 @@ export async function getTenantBillsData() {
         paidAt: bill.paidAt ? new Date(bill.paidAt).toLocaleDateString("fil-PH", { year: 'numeric', month: 'long', day: 'numeric' }) : undefined,
         electricity: {
           type: "electricity" as const,
-          previousReading: electricityItem?.previousReading ? Number(electricityItem.previousReading) : 0,
+          previousReading: prevElectricityReading,
           currentReading: electricityItem?.currentReading ? Number(electricityItem.currentReading) : undefined,
           ratePerUnit: electricityItem ? Number(electricityItem.ratePerUnit) : 12.5,
           unitLabel: electricityItem?.unitLabel || "kWh",
           proofPhotoUrl: electricityItem?.proofPhotoUrl || undefined,
+          // ✨ Dito natin binabasa ang status ng item mula sa database
           status: electricityItem?.status === "approved" ? "Approved" 
-            : electricityItem?.status === "rejected" ? "Rejected (Mag-submit muli)" 
+            : electricityItem?.status === "rejected" ? "Rejected" 
             : electricityItem?.currentReading ? "Pending Landlord Approval" 
             : "Pending Tenant Input",
         },
         water: {
           type: "water" as const,
-          previousReading: waterItem?.previousReading ? Number(waterItem.previousReading) : 0,
+          previousReading: prevWaterReading,
           currentReading: waterItem?.currentReading ? Number(waterItem.currentReading) : undefined,
           ratePerUnit: waterItem ? Number(waterItem.ratePerUnit) : 45.0,
           unitLabel: waterItem?.unitLabel || "m³",
           proofPhotoUrl: waterItem?.proofPhotoUrl || undefined,
           status: waterItem?.status === "approved" ? "Approved" 
-            : waterItem?.status === "rejected" ? "Rejected (Mag-submit muli)" 
+            : waterItem?.status === "rejected" ? "Rejected" 
             : waterItem?.currentReading ? "Pending Landlord Approval" 
             : "Pending Tenant Input",
         },
       };
-    });
+    }).reverse(); // 👈 Diretso nang nai-reverse pagkatapos i-map
 
     return { success: true, bills: formattedBills };
   } catch (error) {
@@ -143,11 +165,13 @@ export async function updateTenantUtilityReadingAction(
     const ratePerUnit = utilityRateConfig ? Number(utilityRateConfig.ratePerUnit) : (utilityType === "electricity" ? 12.5 : 45.0);
     const unitLabel = utilityRateConfig ? utilityRateConfig.unitLabel : (utilityType === "electricity" ? "kWh" : "m³");
 
+    // 💡 Kunin ang tamang previous reading
     let previousReading = 0;
 
-    if (billItem) {
-      previousReading = Number(billItem.previousReading || 0);
+    if (billItem && billItem.previousReading !== null && Number(billItem.previousReading) > 0) {
+      previousReading = Number(billItem.previousReading);
     } else {
+      // Hanapin ang huling reading mula sa nakaraang bill kung wala pa sa kasalukuyang item
       const previousBillItem = await prisma.billItem.findFirst({
         where: {
           type: utilityType,
@@ -168,16 +192,19 @@ export async function updateTenantUtilityReadingAction(
     const newUtilityAmount = unitsUsed * ratePerUnit;
 
     if (billItem) {
+      // ✨ I-update pati ang previousReading para nakasulat na ito nang tuwiran sa database
       await prisma.billItem.update({
         where: { id: billItem.id },
         data: {
+          previousReading,
           currentReading,
           amount: newUtilityAmount,
           proofPhotoUrl,
-          // ✨ Tinanggal ang status dito para hindi mag-error sa DB schema
+          status: "pending", // 👈 I-reset ang status mula rejected patungong pending para ma-review ulit ni landlord
         },
       });
     } else {
+      // ✨ Isama ang previousReading sa pag-create ng bagong billItem
       await prisma.billItem.create({
         data: {
           billId,
@@ -188,7 +215,7 @@ export async function updateTenantUtilityReadingAction(
           unitLabel,
           proofPhotoUrl,
           amount: newUtilityAmount,
-          // ✨ Tinanggal din ang status dito
+          status: "pending", // 👈 Bagong item ay pending din
         },
       });
     }

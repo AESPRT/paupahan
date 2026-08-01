@@ -27,7 +27,7 @@ export async function getUnitsData() {
       return [];
     }
 
-    // 2. Kunin ang mga unit kasama ang rooms, leases, at ang mga detalye (floor, type, description)
+    // 2. Kunin ang mga unit kasama ang rooms, leases, at bills/bill items para sa utility readings
     const unitsList = await prisma.unit.findMany({
       where: { propertyId: { in: propertyIds } },
       include: {
@@ -38,6 +38,14 @@ export async function getUnitsData() {
           },
           include: {
             tenant: { select: { fullName: true } },
+            // ✨ Kunin ang mga bills na may kasamang bill items para sa mga utility readings
+            bills: {
+              orderBy: { generatedAt: 'desc' },
+              take: 1,
+              include: {
+                items: true,
+              },
+            },
           },
           take: 1,
         },
@@ -87,6 +95,11 @@ export async function getUnitsData() {
       const standardizedFloor = unit.floor && unit.floor.trim() !== "" ? unit.floor : "1st Floor";
       const standardizedType = unit.type && unit.type.trim() !== "" ? unit.type : "Studio";
 
+      // ✨ Hanapin ang pinakabagong bill at ang mga utility items nito (electricity at water)
+      const latestBill = activeOrPendingUnitLease?.bills?.[0];
+      const electricityItem = latestBill?.items?.find((item) => item.type === 'electricity');
+      const waterItem = latestBill?.items?.find((item) => item.type === 'water');
+
       return {
         id: unit.id,
         name: unit.name,
@@ -100,10 +113,26 @@ export async function getUnitsData() {
           : ("Vacant" as const),
         unitTenantName: activeOrPendingUnitLease?.tenant?.fullName,
 
-        // ✨ Siguradong standard at consistent ang mga values na ito sa UI
+        // Standard at consistent values
         floor: standardizedFloor,
         type: standardizedType,
         description: unit.description || "",
+
+        // ✨ I-map ang nakuha mula sa Bill Items patungo sa utilityReadings ng Modal
+        utilityReadings: (electricityItem || waterItem) ? {
+          electricity: electricityItem ? {
+            previous: Number(electricityItem.previousReading || 0),
+            current: Number(electricityItem.currentReading || 0),
+            consumed: Number(Number(electricityItem.currentReading || 0) - Number(electricityItem.previousReading || 0)),
+            unitLabel: electricityItem.unitLabel || "kWh"
+          } : undefined,
+          water: waterItem ? {
+            previous: Number(waterItem.previousReading || 0),
+            current: Number(waterItem.currentReading || 0),
+            consumed: Number(Number(waterItem.currentReading || 0) - Number(waterItem.previousReading || 0)),
+            unitLabel: waterItem.unitLabel || "m³"
+          } : undefined,
+        } : undefined,
       };
     });
 

@@ -4,7 +4,8 @@ export type BillStatus =
 | "Paid" 
 | "Overdue" 
 | "Pending Landlord Approval"
-| "Pending Verification";
+| "Pending Verification"
+| "Rejected";
 
 export interface UtilityItem {
   type: "electricity" | "water";
@@ -13,7 +14,7 @@ export interface UtilityItem {
   ratePerUnit: number;
   unitLabel: string; // "kWh" o "m³"
   proofPhotoUrl?: string;
-  status: "Pending Tenant Input" | "Pending Landlord Approval" | "Approved";
+  status: "Pending Tenant Input" | "Pending Landlord Approval" | "Approved"| "Rejected";
 }
 
 // ✨ Idagdag ang AmenityItem interface para sa listahan

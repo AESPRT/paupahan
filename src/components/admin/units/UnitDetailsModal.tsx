@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { Unit } from "@/src/types/admin/unit";
-import { MapPin, User, Building2, Search, X, Lock, Edit3, Layers, Tag, FileText } from "lucide-react";
+import { MapPin, User, Building2, Search, X, Lock, Edit3, Layers, Tag, FileText, Zap, Droplet } from "lucide-react";
 
 interface UnitDetailsModalProps {
     isOpen: boolean;
@@ -12,6 +12,10 @@ interface UnitDetailsModalProps {
         floor?: string;
         type?: string;
         description?: string;
+        utilityReadings?: {
+            electricity?: { previous: number; current: number; consumed: number; unitLabel: string };
+            water?: { previous: number; current: number; consumed: number; unitLabel: string };
+        };
     }) | null;
     onClose: () => void;
     onOpenAddRoom: (unit: Unit) => void;
@@ -26,14 +30,28 @@ export function UnitDetailsModal({
     onOpenEditUnit
 }: UnitDetailsModalProps) {
     const [searchQuery, setSearchQuery] = useState("");
-    const [selectedStatus, setSelectedStatus] = useState<string>("All");
+    const [selectedStatus] = useState<string>("All");
 
-    if (!isOpen || !unit) return null;
-
+    // ✨ INAYOS DITO: Inilipat ang useMemo bago ang early return check
     const isWholeUnitLease = Boolean(
-        unit.unitTenantName ||
-        (unit.unitLeaseStatus && unit.unitLeaseStatus !== "Vacant" && (!unit.rooms || unit.rooms.length === 0))
+        unit?.unitTenantName ||
+        (unit?.unitLeaseStatus && unit?.unitLeaseStatus !== "Vacant" && (!unit?.rooms || unit.rooms.length === 0))
     );
+
+    const filteredRooms = useMemo(() => {
+        if (!unit || isWholeUnitLease || !unit.rooms) return [];
+        return unit.rooms.filter((room) => {
+            const matchesSearch =
+                room.roomNumber?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                room.tenantName?.toLowerCase().includes(searchQuery.toLowerCase());
+
+            if (selectedStatus === "All") return matchesSearch;
+            return matchesSearch && room.status === selectedStatus;
+        });
+    }, [unit, searchQuery, selectedStatus, isWholeUnitLease]);
+
+    // Early return pagkatapos tawagin ang lahat ng Hooks
+    if (!isOpen || !unit) return null;
 
     const getStatusBadge = (status: string) => {
         switch (status) {
@@ -49,18 +67,6 @@ export function UnitDetailsModal({
                 return "bg-gray-100 text-gray-600 border-gray-200";
         }
     };
-
-    const filteredRooms = useMemo(() => {
-        if (isWholeUnitLease || !unit.rooms) return [];
-        return unit.rooms.filter((room) => {
-            const matchesSearch =
-                room.roomNumber?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                room.tenantName?.toLowerCase().includes(searchQuery.toLowerCase());
-
-            if (selectedStatus === "All") return matchesSearch;
-            return matchesSearch && room.status === selectedStatus;
-        });
-    }, [unit.rooms, searchQuery, selectedStatus, isWholeUnitLease]);
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm animate-in fade-in duration-200">
@@ -95,7 +101,6 @@ export function UnitDetailsModal({
 
                     {/* Unit Summary & Detailed Info Grid */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 bg-forest/5 p-4 rounded-2xl border border-forest/10">
-                        {/* Buwanang Renta */}
                         <div>
                             <span className="text-[10px] uppercase font-mono-brand text-muted tracking-wide block mb-1">Buwanang Renta</span>
                             <span className="font-mono-brand text-base font-bold text-forest">
@@ -103,7 +108,6 @@ export function UnitDetailsModal({
                             </span>
                         </div>
 
-                        {/* Floor / Palapag */}
                         <div>
                             <span className="text-[10px] uppercase font-mono-brand text-muted tracking-wide block mb-1 flex items-center gap-1">
                                 <Layers className="h-3 w-3" /> Palapag (Floor)
@@ -113,7 +117,6 @@ export function UnitDetailsModal({
                             </span>
                         </div>
 
-                        {/* Unit Type */}
                         <div>
                             <span className="text-[10px] uppercase font-mono-brand text-muted tracking-wide block mb-1 flex items-center gap-1">
                                 <Tag className="h-3 w-3" /> Uri ng Unit
@@ -123,7 +126,6 @@ export function UnitDetailsModal({
                             </span>
                         </div>
 
-                        {/* Tenant ng Buong Unit (Kung meron man) */}
                         {unit.unitTenantName && (
                             <div className="sm:col-span-2 md:col-span-3 pt-2 border-t border-forest/10 flex items-center justify-between">
                                 <span className="text-[10px] uppercase font-mono-brand text-muted tracking-wide">Tenant ng Buong Unit:</span>
@@ -135,7 +137,72 @@ export function UnitDetailsModal({
                         )}
                     </div>
 
-                    {/* Deskripsyon ng Unit (Kung nakalagay) */}
+                    {/* Utility Meters Section */}
+                    {unit.utilityReadings && (
+                        <div className="space-y-3">
+                            <h4 className="font-mono-brand text-xs font-bold uppercase tracking-wider text-muted">
+                                Mga Readings ng Submeter (Utilities)
+                            </h4>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div className="rounded-2xl border border-line bg-paper p-4 space-y-3 shadow-xs">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-100 text-amber-700">
+                                                <Zap className="h-4 w-4" />
+                                            </div>
+                                            <span className="font-display text-sm font-bold text-forest-deep">Kuryente (Electricity)</span>
+                                        </div>
+                                        <span className="font-mono-brand text-[10px] uppercase bg-amber-50 text-amber-700 px-2 py-0.5 rounded-md font-bold">
+                                            {unit.utilityReadings.electricity?.unitLabel || "kWh"}
+                                        </span>
+                                    </div>
+                                    <div className="grid grid-cols-3 gap-2 pt-2 border-t border-line/60 text-center font-mono-brand">
+                                        <div className="bg-paper-card p-2 rounded-xl border border-line/60">
+                                            <p className="text-[9px] text-muted uppercase">Nakaraan</p>
+                                            <p className="text-xs font-bold text-forest-deep">{unit.utilityReadings.electricity?.previous ?? 0}</p>
+                                        </div>
+                                        <div className="bg-paper-card p-2 rounded-xl border border-line/60">
+                                            <p className="text-[9px] text-muted uppercase">Kasalukuyan</p>
+                                            <p className="text-xs font-bold text-forest-deep">{unit.utilityReadings.electricity?.current ?? 0}</p>
+                                        </div>
+                                        <div className="bg-amber-50/60 p-2 rounded-xl border border-amber-200/60">
+                                            <p className="text-[9px] text-amber-800 uppercase font-bold">Konsumo</p>
+                                            <p className="text-xs font-bold text-amber-900">{unit.utilityReadings.electricity?.consumed ?? 0}</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="rounded-2xl border border-line bg-paper p-4 space-y-3 shadow-xs">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-100 text-blue-700">
+                                                <Droplet className="h-4 w-4" />
+                                            </div>
+                                            <span className="font-display text-sm font-bold text-forest-deep">Tubig (Water)</span>
+                                        </div>
+                                        <span className="font-mono-brand text-[10px] uppercase bg-blue-50 text-blue-700 px-2 py-0.5 rounded-md font-bold">
+                                            {unit.utilityReadings.water?.unitLabel || "m³"}
+                                        </span>
+                                    </div>
+                                    <div className="grid grid-cols-3 gap-2 pt-2 border-t border-line/60 text-center font-mono-brand">
+                                        <div className="bg-paper-card p-2 rounded-xl border border-line/60">
+                                            <p className="text-[9px] text-muted uppercase">Nakaraan</p>
+                                            <p className="text-xs font-bold text-forest-deep">{unit.utilityReadings.water?.previous ?? 0}</p>
+                                        </div>
+                                        <div className="bg-paper-card p-2 rounded-xl border border-line/60">
+                                            <p className="text-[9px] text-muted uppercase">Kasalukuyan</p>
+                                            <p className="text-xs font-bold text-forest-deep">{unit.utilityReadings.water?.current ?? 0}</p>
+                                        </div>
+                                        <div className="bg-blue-50/60 p-2 rounded-xl border border-blue-200/60">
+                                            <p className="text-[9px] text-blue-800 uppercase font-bold">Konsumo</p>
+                                            <p className="text-xs font-bold text-blue-900">{unit.utilityReadings.water?.consumed ?? 0}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     {unit.description && (
                         <div className="rounded-2xl border border-line bg-paper p-4 space-y-1.5">
                             <span className="text-[10px] uppercase font-mono-brand text-muted tracking-wide flex items-center gap-1">
@@ -147,7 +214,6 @@ export function UnitDetailsModal({
                         </div>
                     )}
 
-                    {/* Beds / Rooms Section */}
                     {isWholeUnitLease ? (
                         <div className="rounded-2xl border border-dashed border-line/80 bg-paper/50 p-8 text-center space-y-2">
                             <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
@@ -164,7 +230,6 @@ export function UnitDetailsModal({
                                 </h4>
 
                                 <div className="flex flex-col sm:flex-row items-center gap-2">
-                                    {/* Search filter for beds */}
                                     <div className="relative w-full sm:w-48">
                                         <span className="absolute inset-y-0 left-0 flex items-center pl-2.5 text-muted pointer-events-none">
                                             <Search className="w-3.5 h-3.5" />
@@ -178,7 +243,6 @@ export function UnitDetailsModal({
                                         />
                                     </div>
 
-                                    {/* Add Bed Button inside Modal */}
                                     <button
                                         onClick={() => {
                                             onClose();
@@ -191,7 +255,6 @@ export function UnitDetailsModal({
                                 </div>
                             </div>
 
-                            {/* Beds Grid */}
                             {filteredRooms.length === 0 ? (
                                 <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-line p-6 text-center bg-paper">
                                     <Building2 className="w-6 h-6 text-muted mb-2 stroke-[1.5]" />
@@ -220,7 +283,7 @@ export function UnitDetailsModal({
                     )}
                 </div>
 
-                {/* Modal Footer (Kasama na ang Edit button at Isara button) */}
+                {/* Modal Footer */}
                 <div className="border-t border-line px-6 py-3.5 bg-paper flex items-center justify-between">
                     <div>
                         {onOpenEditUnit && (

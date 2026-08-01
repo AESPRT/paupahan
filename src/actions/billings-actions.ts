@@ -57,7 +57,7 @@ export async function getBillingsData() {
           },
         },
         items: true,
-        payments: true,
+        payments: true, // Kasama rito ang Payment records na may dalang receiptUrl
       },
       orderBy: {
         generatedAt: "desc",
@@ -77,7 +77,7 @@ export async function getBillingsData() {
         unitRoomText = `${activeLease.unit.name} (Buong Unit)`;
       }
 
-      const lineItems: { description: string; amount: number }[] = [];
+      const lineItems: any[] = [];
 
       let computedTotalAmount = Number(bill.rentAmount) || 0;
       if (computedTotalAmount > 0) {
@@ -105,7 +105,6 @@ export async function getBillingsData() {
         bill.items.forEach((item) => {
           const itemAmount = Number(item.amount);
           const isUtility = item.type === "electricity" || item.type === "water";
-          const isApproved = item.status === "approved";
 
           if (itemAmount > 0 && item.type) {
             if (!isUtility && item.type !== "other") {
@@ -114,11 +113,21 @@ export async function getBillingsData() {
                 description: `${item.type.toUpperCase()} (${item.currentReading ? `Reading: ${item.currentReading}` : 'Item'})`,
                 amount: itemAmount,
               });
-            } else if (isUtility && isApproved) {
+            } else if (isUtility) {
+              // ✨ Isinama ang kumpletong submeter reading properties para magamit ng InvoicesList UI
+              const prev = Number(item.previousReading || 0);
+              const curr = Number(item.currentReading || 0);
+              const consumed = curr - prev;
+
               computedTotalAmount += itemAmount;
               lineItems.push({
-                description: `${item.type.toUpperCase()} (Reading: ${item.currentReading ?? 'N/A'})`,
+                type: item.type, // 'electricity' o 'water'
+                description: `${item.type.toUpperCase()} (Reading: ${curr})`,
                 amount: itemAmount,
+                previousReading: prev,
+                currentReading: curr,
+                consumed: consumed > 0 ? consumed : 0,
+                unitLabel: item.unitLabel || (item.type === 'electricity' ? 'kWh' : 'm³'),
               });
             }
           }
@@ -153,7 +162,7 @@ export async function getBillingsData() {
         paymentDetails: latestPayment ? {
           method: latestPayment.paymentMethod,
           referenceNo: latestPayment.referenceNo,
-          receiptUrl: bill.paymentReceiptUrl,
+          receiptUrl: latestPayment.receiptUrl || (bill as any).paymentReceiptUrl,
         } : undefined,
       } as any;
     });
@@ -446,6 +455,7 @@ export async function markInvoiceAsPaidAction(id: string) {
             landlordName: landlordName,
             amountPaid: totalAmount,
             paymentDate: formattedDate,
+            referenceNumber: "",
             invoiceNumber: updatedBill.id,
             notes: "Na-verify at tinanggap na ang iyong pagbabayad. Maraming salamat!",
           },
@@ -502,7 +512,13 @@ export async function getOccupiedRoomsForBilling() {
       return { success: true, roomsWithTenants: [] };
     }
 
-    // 💡 1. Kunin ang lahat ng active leases (sumusuporta sa room-level at unit-level)
+    // 💡 Kunin ang kasalukuyang taon at buwan sa format na "YYYY-MM" (Halimbawa: "2026-08")
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = String(now.getMonth() + 1).padStart(2, "0");
+    const currentBillingMonthYear = `${currentYear}-${currentMonth}`;
+
+    // 1. Kunin ang lahat ng active leases
     const activeLeases = await prisma.lease.findMany({
       where: {
         status: "active",
@@ -539,6 +555,17 @@ export async function getOccupiedRoomsForBilling() {
             },
           },
         },
+        // ✨ Isama ang pagkuha ng bills para sa kasalukuyang buwan
+        bills: {
+          where: {
+            billingMonthYear: currentBillingMonthYear,
+          },
+          select: {
+            id: true,
+            status: true, // Halimbawa: "paid", "unpaid", "pending", atbp.
+            billingMonthYear: true,
+          },
+        },
       },
     });
 
@@ -550,13 +577,16 @@ export async function getOccupiedRoomsForBilling() {
         frequency: item.amenity.frequency ?? "Buwanan",
       }));
 
-      // 💡 Kalkulahin ang monthly rent kung ito ba ay galing sa Room o Unit
       const monthlyRent = Number(
         lease.monthlyRent ??
         lease.room?.monthlyRent ??
         lease.unit?.monthlyRent ??
         0
       );
+
+      // ✨ Alamin ang status ng bill para sa buwang ito kung mayroon man
+      const currentBill = lease.bills[0] || null;
+      const billStatus = currentBill ? currentBill.status : "none"; // 'paid', 'unpaid', 'pending', o 'none'
 
       return {
         leaseId: lease.id,
@@ -567,10 +597,11 @@ export async function getOccupiedRoomsForBilling() {
         tenantName: lease.tenant?.fullName ?? "Unknown Tenant",
         monthlyRent: monthlyRent,
         amenities: formattedAmenities,
-
-        // 👈 IDINAGDAG ITO: Ipasa ang startDate at movedInDate para mabasa ng due date utility!
         startDate: lease.startDate ?? null,
         movedInDate: lease.startDate ?? null,
+
+        // 👈 IDINAGDAG: Bill status para magamit sa pag-render ng badge sa UI
+        currentBillStatus: billStatus, 
       };
     });
 

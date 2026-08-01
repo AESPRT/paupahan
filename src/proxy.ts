@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import prisma from '@/src/lib/prisma'; // Siguraduhing tama ang path sa iyong Prisma client instance
+import prisma from '@/src/lib/prisma';
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -11,9 +11,20 @@ export async function proxy(request: NextRequest) {
   const isAdminDashboard = pathname.startsWith('/admin/dashboard');
   const isTenantDashboard = pathname.startsWith('/tenant/dashboard');
   const isTenantLogin = pathname === '/tenant/login';
+  const isAdminLogin = pathname === '/admin/login';
 
-  // 1. Kung naka-login na ang tenant at pumunta ulit sa login page
+  // 1. Kung naka-login na ang tenant at pumunta ulit sa tenant login page
   if (isTenantLogin && sessionUserId && userRoleCookie === 'tenant') {
+    return NextResponse.redirect(new URL('/tenant/dashboard/home', request.url));
+  }
+
+  // 🔴 1.1. SECURITY FIX: Kung naka-login ang Landlord/Admin pero pinilit pumunta sa Tenant Login page
+  if (isTenantLogin && sessionUserId && (userRoleCookie === 'admin' || userRoleCookie === 'landlord')) {
+    return NextResponse.redirect(new URL('/admin/dashboard/home', request.url));
+  }
+
+  // 🔴 1.2. SECURITY FIX: Kung naka-login ang Tenant pero pinilit pumunta sa Admin Login page
+  if (isAdminLogin && sessionUserId && userRoleCookie === 'tenant') {
     return NextResponse.redirect(new URL('/tenant/dashboard/home', request.url));
   }
 
@@ -26,36 +37,52 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  // 3. Pag-verify ng Session, Roles, at DB Existence para sa mga Protected Routes
+  // 3. Pag-verify ng Session, Roles, at DB Existence para sa mga Protected Routes (at login pages kung may cookie)
   if (sessionUserId) {
     let userExists = false;
 
     try {
-      // 🔍 I-verify sa database kung nage-exist pa talaga ang user na ito (dahil baka nag-reset ng DB)
-      // I-adjust ang model name mo kung 'User', 'Admin', o 'Tenant' man ang tawag sa Prisma schema mo
-      const dbUser = await prisma.user.findUnique({
-        where: { id: sessionUserId },
-        select: { id: true, role: true }, // Kunin lang ang kailangan para mabilis
-      });
-
-      if (dbUser) {
-        userExists = true;
+      // 🔍 I-verify sa tamang Prisma table depende sa role ng cookie para hindi mag-fail ang tenant check
+      if (userRoleCookie === 'tenant') {
+        const dbTenant = await prisma.tenant.findUnique({
+          where: { id: sessionUserId },
+          select: { id: true },
+        });
+        if (dbTenant) {
+          userExists = true;
+        }
+      } else if (userRoleCookie === 'admin' || userRoleCookie === 'landlord') {
+        const dbUser = await prisma.user.findUnique({
+          where: { id: sessionUserId },
+          select: { id: true, role: true },
+        });
+        if (dbUser) {
+          userExists = true;
+        }
       }
     } catch (error) {
       console.error('Middleware DB verification error:', error);
-      // Kung may error sa DB (hal. offline), pwede mong i-allow muna o i-fail safe
     }
 
-    // 🔴 KUNG WALA NA SA DB (Ibig sabihin nag-reset ng DB o nabura ang user)
+    // 🔴 KUNG WALA NA SA DB (Na-reset ang DB o nabura ang user/tenant)
     if (!userExists) {
-      const loginPath = isAdminDashboard ? '/admin/login' : '/tenant/login';
+      const loginPath = isAdminDashboard || userRoleCookie === 'admin' || userRoleCookie === 'landlord' 
+        ? '/admin/login' 
+        : '/tenant/login';
       const response = NextResponse.redirect(new URL(loginPath, request.url));
       
-      // 🧹 Burahin/I-expire ang mga cookies para ma-force logout
       response.cookies.set('session_user_id', '', { maxAge: 0, path: '/' });
       response.cookies.set('user_role', '', { maxAge: 0, path: '/' });
       
       return response;
+    }
+
+    // Kung valid ang user at nasa login page siya habang naka-login na
+    if (isTenantLogin || isAdminLogin) {
+      const targetDashboard = (userRoleCookie === 'admin' || userRoleCookie === 'landlord') 
+        ? '/admin/dashboard/home' 
+        : '/tenant/dashboard/home';
+      return NextResponse.redirect(new URL(targetDashboard, request.url));
     }
 
     // 🔴 KUNG TENANT ANG NAKA-LOGIN
@@ -91,5 +118,6 @@ export const config = {
     '/admin/dashboard/:path*',
     '/tenant/dashboard/:path*',
     '/tenant/login',
+    '/admin/login',
   ],
 };
