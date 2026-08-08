@@ -1,3 +1,4 @@
+// src/components/hanap-bahay/search/SearchPageClient.tsx
 "use client";
 
 import { useEffect, useState, useTransition, useCallback } from "react";
@@ -26,19 +27,15 @@ export function SearchPageClient() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  const [filters, setFilters] = useState<SearchFiltersState>(() =>
-    filtersFromParams(searchParams),
-  );
+  // Deriving the initial and reactive filters directly from searchParams
+  // to completely eliminate the need for setFilters inside an effect.
+  const filters = filtersFromParams(searchParams);
+
   const [properties, setProperties] = useState<Property[]>([]);
   const [isMobileFiltersOpen, setIsMobileFiltersOpen] = useState(false);
   const [isLoading, startTransition] = useTransition();
 
-  // URL is the source of truth — re-derive filters whenever it changes
-  // (covers back/forward navigation too)
-  useEffect(() => {
-    setFilters(filtersFromParams(searchParams));
-  }, [searchParams]);
-
+  // Fetch properties whenever the URL searchParams (filters) change
   useEffect(() => {
     startTransition(async () => {
       const data = await getMarketplaceProperties({
@@ -69,7 +66,6 @@ export function SearchPageClient() {
       if (next.sort !== "newest") params.set("sort", next.sort);
 
       router.push(`${pathname}?${params.toString()}`, { scroll: false });
-      setFilters(next);
     },
     [pathname, router],
   );

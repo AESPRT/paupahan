@@ -5,7 +5,8 @@ import { useState, useEffect, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { HeroSection } from "@/src/components/hanap-bahay/HeroSection";
 import { FeaturedCarousel } from "@/src/components/hanap-bahay/FeaturedCarousel";
-import { NewestListings } from "@/src/components/hanap-bahay/NewestListings";
+import { HowItWorks } from "@/src/components/hanap-bahay/HowItWorks";
+import { LatestPropertiesGrid } from "@/src/components/hanap-bahay/LatestPropertiesGrid";
 import { FooterCTA } from "@/src/components/hanap-bahay/FooterCTA";
 import { Property } from "@/src/types/property";
 import { getMarketplaceProperties } from "@/src/actions/hanap-bahay/hanap-bahay-actions";
@@ -14,27 +15,19 @@ export default function HanapBahayPage() {
   const router = useRouter();
 
   const [featuredProperties, setFeaturedProperties] = useState<Property[]>([]);
-  const [newestProperties, setNewestProperties] = useState<Property[]>([]);
+  const [allProperties, setAllProperties] = useState<Property[]>([]);
   const [isFeaturedLoading, startFeaturedTransition] = useTransition();
-  const [isNewestLoading, startNewestTransition] = useTransition();
 
-  // Featured — verified landlords only, small curated set for the carousel
+  // Fetch properties data
   useEffect(() => {
     startFeaturedTransition(async () => {
-      const data = await getMarketplaceProperties({
-        sort: "newest",
-      });
-      setFeaturedProperties(data.filter((p) => p.verifiedLandlord).slice(0, 8));
-    });
-  }, []);
-
-  // Newest — most recently listed, regardless of verification
-  useEffect(() => {
-    startNewestTransition(async () => {
-      const data = await getMarketplaceProperties({
-        sort: "newest",
-      });
-      setNewestProperties(data.slice(0, 6));
+      try {
+        const data = await getMarketplaceProperties({ sort: "newest" });
+        setFeaturedProperties(data.filter((p) => p.verifiedLandlord).slice(0, 8));
+        setAllProperties(data.slice(0, 6));
+      } catch (error) {
+        console.error("Error fetching properties:", error);
+      }
     });
   }, []);
 
@@ -43,18 +36,28 @@ export default function HanapBahayPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#FAF7EF] text-[#153730] font-sans antialiased selection:bg-[#F0A93A] selection:text-[#153730]">
+    <div className="min-h-screen bg-[#FAF7EF] text-[#153730] font-sans antialiased selection:bg-[#F0A93A] selection:text-[#153730] overflow-x-hidden">
+      {/* 1. Hero Section */}
       <HeroSection />
+
+      {/* 2. Featured Carousel */}
       <FeaturedCarousel
         properties={featuredProperties}
         isLoading={isFeaturedLoading}
         onViewDetails={handleViewDetails}
       />
-      <NewestListings
-        properties={newestProperties}
-        isLoading={isNewestLoading}
+
+      {/* 3. How It Works Section */}
+      <HowItWorks />
+
+      {/* 4. Latest Properties Grid */}
+      <LatestPropertiesGrid
+        properties={allProperties}
         onViewDetails={handleViewDetails}
+        onViewAll={() => router.push('/hanap-bahay/search')}
       />
+
+      {/* 5. Footer CTA (Naka-angkla nang tuwid sa dulo nang walang rounded edges) */}
       <FooterCTA />
     </div>
   );

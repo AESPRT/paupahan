@@ -1,6 +1,8 @@
 "use client";
 
-import { Bed, Layers, Tag, ChevronRight, Home } from "lucide-react";
+import Image from "next/image";
+import { useState } from "react";
+import { Bed, Layers, Tag, ChevronRight, Home, Check } from "lucide-react";
 import { UnitDetail } from "@/src/actions/hanap-bahay/property-details-action";
 
 interface AvailableUnitsListProps {
@@ -10,6 +12,16 @@ interface AvailableUnitsListProps {
 
 export function AvailableUnitsList({ units, onSelectUnitToBook }: AvailableUnitsListProps) {
     const defaultPlaceholder = "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&w=800&q=80";
+
+    // Tracks which unit/bed was most recently chosen, purely for the
+    // visual "selected" state (forest border + glow + checkmark).
+    // The actual booking flow still lives in the modal the parent opens.
+    const [selectedId, setSelectedId] = useState<string | null>(null);
+
+    const selectAndBook = (target: { title: string; price: number; type: 'unit' | 'bed'; id: string }) => {
+        setSelectedId(target.id);
+        onSelectUnitToBook(target);
+    };
 
     return (
         <div className="space-y-6">
@@ -26,21 +38,33 @@ export function AvailableUnitsList({ units, onSelectUnitToBook }: AvailableUnits
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {units.map((unit) => {
-                        // Mangolekta ng lahat ng bakanteng beds mula sa unit na ito
-                        const vacantBeds = unit.beds.filter(bed => bed.status === "vacant");
                         const isBedspace = unit.type.toLowerCase().includes("bedspace") || unit.beds.length > 0;
+                        const isUnitSelected = selectedId === unit.id;
 
                         return (
                             <div
                                 key={unit.id}
-                                className="group flex flex-col rounded-3xl border border-[#E4DDC9] bg-[#FFFDF8] overflow-hidden shadow-sm hover:shadow-xl hover:border-[#153730]/30 transition-all duration-300"
+                                className={`group relative flex flex-col rounded-3xl bg-[#FFFDF8] overflow-hidden shadow-sm transition-all duration-300 hover:-translate-y-1 hover:scale-[1.02] hover:shadow-xl ${
+                                    isUnitSelected
+                                        ? "border-2 border-[#153730] shadow-[0_0_0_4px_rgba(21,55,48,0.12),0_16px_32px_-8px_rgba(21,55,48,0.3)]"
+                                        : "border border-[#E4DDC9] hover:border-[#153730]/30"
+                                }`}
                             >
+                                {/* Selected checkmark badge */}
+                                {isUnitSelected && (
+                                    <div className="absolute top-3 right-3 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-[#153730] text-white shadow-lg animate-in zoom-in-50 fade-in duration-300">
+                                        <Check className="h-4 w-4" strokeWidth={3} />
+                                    </div>
+                                )}
+
                                 {/* Unit Image Header */}
                                 <div className="relative h-44 w-full overflow-hidden bg-[#FAF7EF]">
-                                    <img
+                                    <Image
                                         src={defaultPlaceholder}
                                         alt={unit.unitNumber}
-                                        className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-500"
+                                        fill
+                                        sizes="(max-width: 768px) 100vw, 50vw"
+                                        className="object-cover group-hover:scale-105 transition-transform duration-500"
                                     />
                                     <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-60" />
 
@@ -83,20 +107,24 @@ export function AvailableUnitsList({ units, onSelectUnitToBook }: AvailableUnits
                                             </div>
                                         </div>
 
-                                        {/* ✨ Ipakita ang mga kama/rooms sa ilalim ng unit kung meron man */}
+                                        {/* Bakanteng kama, kung meron */}
                                         {unit.beds.length > 0 && (
                                             <div className="mt-3 pt-3 border-t border-[#E4DDC9]/60 space-y-2">
                                                 <span className="text-[11px] font-extrabold text-[#153730] block">Mga Kama (Beds / Room Numbers):</span>
                                                 <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
                                                     {unit.beds.map(bed => {
                                                         const isVacant = bed.status === "vacant";
+                                                        const isBedSelected = selectedId === bed.id;
                                                         return (
                                                             <div
                                                                 key={bed.id}
-                                                                className={`flex items-center justify-between p-2 rounded-xl border text-xs ${isVacant
+                                                                className={`flex items-center justify-between p-2 rounded-xl border text-xs transition-all duration-200 ${
+                                                                    isBedSelected
+                                                                        ? "bg-[#153730]/5 border-[#153730] shadow-[0_0_0_2px_rgba(21,55,48,0.12)]"
+                                                                        : isVacant
                                                                         ? "bg-[#FAF7EF] border-[#E4DDC9] hover:border-[#153730]"
                                                                         : "bg-gray-100 border-gray-200 opacity-60"
-                                                                    }`}
+                                                                }`}
                                                             >
                                                                 <div className="flex items-center gap-2">
                                                                     <Bed className="h-3.5 w-3.5 text-[#1F4B3F]" />
@@ -105,17 +133,23 @@ export function AvailableUnitsList({ units, onSelectUnitToBook }: AvailableUnits
                                                                 <div className="flex items-center gap-2">
                                                                     <span className="font-semibold text-[#153730]">₱{bed.price.toLocaleString()}</span>
                                                                     {isVacant ? (
-                                                                        <button
-                                                                            onClick={() => onSelectUnitToBook({
-                                                                                title: `Unit ${unit.unitNumber} (Kama ${bed.bedNumber})`,
-                                                                                price: bed.price,
-                                                                                type: 'bed',
-                                                                                id: bed.id
-                                                                            })}
-                                                                            className="rounded-lg bg-[#153730] px-2.5 py-1 text-[10px] font-bold text-white hover:bg-[#1F4B3F]"
-                                                                        >
-                                                                            I-book ang Kama
-                                                                        </button>
+                                                                        isBedSelected ? (
+                                                                            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#153730] text-white animate-in zoom-in-50 fade-in duration-300">
+                                                                                <Check className="h-3 w-3" strokeWidth={3} />
+                                                                            </span>
+                                                                        ) : (
+                                                                            <button
+                                                                                onClick={() => selectAndBook({
+                                                                                    title: `Unit ${unit.unitNumber} (Kama ${bed.bedNumber})`,
+                                                                                    price: bed.price,
+                                                                                    type: 'bed',
+                                                                                    id: bed.id
+                                                                                })}
+                                                                                className="rounded-lg bg-[#153730] px-2.5 py-1 text-[10px] font-bold text-white hover:bg-[#1F4B3F] transition-colors active:scale-95"
+                                                                            >
+                                                                                I-book ang Kama
+                                                                            </button>
+                                                                        )
                                                                     ) : (
                                                                         <span className="text-[10px] font-bold text-red-500 uppercase">Occupied</span>
                                                                     )}
@@ -132,16 +166,24 @@ export function AvailableUnitsList({ units, onSelectUnitToBook }: AvailableUnits
                                     <div className="pt-3 border-t border-[#E4DDC9]/60 flex items-center justify-between">
                                         <span className="text-[11px] text-[#6B7B74]">Gusto mo ba ang buong espasyo?</span>
                                         <button
-                                            onClick={() => onSelectUnitToBook({
+                                            onClick={() => selectAndBook({
                                                 title: `Buong Unit ${unit.unitNumber}`,
                                                 price: unit.price,
                                                 type: 'unit',
                                                 id: unit.id
                                             })}
-                                            className="rounded-xl bg-[#153730] px-4 py-2 text-center font-display text-xs font-bold text-white hover:bg-[#1F4B3F] shadow-sm transition-all flex items-center gap-1.5 active:scale-95 cursor-pointer"
+                                            className={`rounded-xl px-4 py-2 text-center font-display text-xs font-bold shadow-sm transition-all flex items-center gap-1.5 active:scale-95 cursor-pointer ${
+                                                isUnitSelected
+                                                    ? "bg-[#1F4B3F] text-white"
+                                                    : "bg-[#153730] text-white hover:bg-[#1F4B3F]"
+                                            }`}
                                         >
-                                            <span>Mag-book ng Buong Unit</span>
-                                            <ChevronRight className="h-3.5 w-3.5" />
+                                            <span>{isUnitSelected ? "Napili" : "Mag-book ng Buong Unit"}</span>
+                                            {isUnitSelected ? (
+                                                <Check className="h-3.5 w-3.5" strokeWidth={3} />
+                                            ) : (
+                                                <ChevronRight className="h-3.5 w-3.5" />
+                                            )}
                                         </button>
                                     </div>
                                 </div>

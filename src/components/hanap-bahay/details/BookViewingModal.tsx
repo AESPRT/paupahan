@@ -12,8 +12,6 @@ import {
     ShieldCheck,
     Sparkles,
     ArrowRight,
-    MapPin,
-    Tag
 } from "lucide-react";
 
 interface BookViewingModalProps {
@@ -30,11 +28,11 @@ export function BookViewingModal({ propertyName, selectedUnit, onClose }: BookVi
     const [submitted, setSubmitted] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    const handleSubmit = async (e: React.SubmitEvent) => {
+    const handleSubmit = (e: React.SubmitEvent<HTMLFormElement>) => {
         e.preventDefault();
         setIsSubmitting(true);
         // Simulate minor smooth transition/network request for production feel
-        setTimeout(() => {
+        window.setTimeout(() => {
             setIsSubmitting(false);
             setSubmitted(true);
         }, 500);
@@ -42,7 +40,7 @@ export function BookViewingModal({ propertyName, selectedUnit, onClose }: BookVi
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md p-4 animate-in fade-in duration-200">
-            <div className="relative w-full max-w-lg rounded-3xl border border-[#E4DDC9] bg-[#FFFDF8] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="relative w-full max-w-lg rounded-3xl border border-[#E4DDC9] bg-[#FFFDF8] shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 fade-in duration-300">
 
                 {/* Modal Header Banner */}
                 <div className="relative bg-[#153730] px-6 py-5 text-white flex items-center justify-between">
@@ -57,7 +55,7 @@ export function BookViewingModal({ propertyName, selectedUnit, onClose }: BookVi
                     </div>
                     <button
                         onClick={onClose}
-                        className="rounded-full bg-white/10 p-2 text-white/80 hover:bg-white/20 hover:text-white transition-all cursor-pointer"
+                        className="rounded-full bg-white/10 p-2 text-white/80 hover:bg-white/20 hover:text-white transition-all cursor-pointer hover:rotate-90 duration-200"
                     >
                         <X className="h-4 w-4" />
                     </button>
@@ -66,19 +64,20 @@ export function BookViewingModal({ propertyName, selectedUnit, onClose }: BookVi
                 {/* Modal Body (Scrollable) */}
                 <div className="p-6 overflow-y-auto space-y-6 flex-1">
                     {submitted ? (
-                        /* Premium Success State */
+                        /* Premium Success State — one-time entrance, no idle looping animation */
                         <div className="text-center py-6 space-y-4">
-                            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-[#1F4B3F]/10 text-[#1F4B3F] animate-bounce">
+                            <div className="relative mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-[#1F4B3F]/10 text-[#1F4B3F] animate-in zoom-in-50 fade-in duration-500">
                                 <CheckCircle2 className="h-9 w-9 text-[#153730]" />
+                                <span className="absolute inset-0 rounded-2xl border-2 border-[#153730]/20 animate-in zoom-in-125 fade-out duration-700" />
                             </div>
-                            <div className="space-y-1">
+                            <div className="space-y-1 animate-in fade-in slide-in-from-bottom-2 duration-500 delay-100">
                                 <h3 className="font-display text-xl font-extrabold text-[#153730]">Tagumpay ang Pag-book!</h3>
                                 <p className="text-xs text-[#6B7B74] max-w-sm mx-auto leading-relaxed">
                                     Naipadala na ang iyong kahilingan para sa viewing sa landlord ng <span className="font-bold text-[#153730]">{propertyName}</span> {selectedUnit ? `(Unit ${selectedUnit.unitNumber})` : ""}. Makikipag-ugnayan sila sa iyo sa lalong madaling panahon.
                                 </p>
                             </div>
 
-                            <div className="rounded-2xl bg-[#FAF7EF] border border-[#E4DDC9] p-4 text-left space-y-2 max-w-sm mx-auto">
+                            <div className="rounded-2xl bg-[#FAF7EF] border border-[#E4DDC9] p-4 text-left space-y-2 max-w-sm mx-auto animate-in fade-in slide-in-from-bottom-2 duration-500 delay-150">
                                 <div className="flex items-center justify-between text-xs text-[#6B7B74]">
                                     <span>Pangalan:</span>
                                     <span className="font-bold text-[#153730]">{name}</span>
@@ -95,7 +94,7 @@ export function BookViewingModal({ propertyName, selectedUnit, onClose }: BookVi
 
                             <button
                                 onClick={onClose}
-                                className="w-full max-w-sm rounded-2xl bg-[#153730] py-3 font-display text-xs font-bold text-white hover:bg-[#1F4B3F] transition-all shadow-md cursor-pointer"
+                                className="w-full max-w-sm rounded-2xl bg-[#153730] py-3 font-display text-xs font-bold text-white hover:bg-[#1F4B3F] transition-all shadow-md cursor-pointer active:scale-[0.98]"
                             >
                                 Tapusin at Isara
                             </button>
@@ -209,8 +208,11 @@ export function BookViewingModal({ propertyName, selectedUnit, onClose }: BookVi
                                     disabled={isSubmitting}
                                     className="rounded-xl bg-[#153730] px-6 py-2.5 font-display text-xs font-bold text-white hover:bg-[#1F4B3F] shadow-md transition-all flex items-center gap-1.5 active:scale-95 cursor-pointer disabled:opacity-50"
                                 >
+                                    {isSubmitting && (
+                                        <span className="h-3.5 w-3.5 rounded-full border-2 border-white/40 border-t-white animate-spin" />
+                                    )}
                                     <span>{isSubmitting ? "Isinusumite..." : "Kumpirmahin ang Booking"}</span>
-                                    <ArrowRight className="h-3.5 w-3.5" />
+                                    {!isSubmitting && <ArrowRight className="h-3.5 w-3.5" />}
                                 </button>
                             </div>
                         </form>

@@ -73,32 +73,49 @@ export function FeaturedCarousel({
   };
 
   return (
-    <section className="relative z-10 py-20 lg:py-28 bg-gradient-to-b from-[var(--paper)] via-[var(--carousel-bg-mid,)] to-[var(--paper)]">
+    <section className="relative z-10 py-12 sm:py-16 bg-gradient-to-b from-[var(--paper)] via-[var(--carousel-bg-mid,)] to-[var(--paper)]">
       {/* Ambient glow */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[350px] rounded-full bg-[var(--marigold-deep)]/5 blur-[140px] pointer-events-none" />
 
+      {/* Header na naka-align sa max-w-7xl container padding */}
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        {/* Header */}
-        <div className="mb-12">
+        <div className="mb-8 sm:mb-10">
           <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[var(--forest-deep)] text-[var(--accent-gold)] text-[11px] font-extrabold uppercase tracking-[0.25em] shadow-sm mb-3.5">
             Mga Eksklusibong Alok
           </div>
-          <h2 className="font-display text-3xl sm:text-5xl font-black text-[var(--ink)] tracking-tight">
-            Tampok na Paupahan
-          </h2>
-          <p className="font-body mt-3 text-base sm:text-lg text-[var(--muted)] max-w-xl font-normal leading-relaxed">
+          <h2 className="font-display text-3xl sm:text-4xl font-black text-[var(--ink)] leading-tight tracking-tight">
+              Tampok na{" "}
+              <span className="relative inline-block">
+                Paupahan
+                <svg
+                  aria-hidden="true"
+                  className="absolute -bottom-1.5 left-0 w-full"
+                  viewBox="0 0 200 8"
+                  fill="none"
+                  preserveAspectRatio="none"
+                >
+                  <path
+                    d="M0 6 Q25 1 50 5 Q75 9 100 4 Q125 -1 150 5 Q175 9 200 4"
+                    stroke="var(--marigold)"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                  />
+                </svg>
+              </span>
+            </h2>
+          <p className="font-body mt-2.5 text-sm sm:text-base text-[var(--muted)] max-w-xl font-normal leading-relaxed">
             Pili at mataas ang kalidad na mga tirahan mula sa aming mga
             pinagkakatiwalaang at beripikadong kasosyong may-ari.
           </p>
         </div>
       </div>
 
-      {/* ── Carousel ── */}
+      {/* ── Carousel (Full width track with edge padding) ── */}
       {isLoading ? (
         /* ── Skeleton row — mirrors the carousel's card sizing so there's no layout jump when real data lands ── */
-        <div className="relative z-10 mt-6">
+        <div className="relative z-10 mt-4">
           <div
-            className="flex gap-6 sm:gap-10 overflow-hidden py-10"
+            className="flex gap-6 sm:gap-10 overflow-hidden py-6"
             style={{
               paddingLeft: "max(1.5rem, calc(50vw - 175px))",
               paddingRight: "max(1.5rem, calc(50vw - 175px))",
@@ -115,7 +132,7 @@ export function FeaturedCarousel({
           </div>
         </div>
       ) : properties.length === 0 ? (
-        <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 mt-8">
+        <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 mt-6">
           <EmptyState
             title="Walang Kasalukuyang Tampok na Paupahan"
             description="Kasalukuyan kaming nagbe-verify ng mga bagong property. Bisitahin muli mamaya!"
@@ -124,14 +141,14 @@ export function FeaturedCarousel({
           />
         </div>
       ) : (
-        <div className="relative z-10 mt-6">
+        <div className="relative z-10 mt-4">
           {/* scroll track is the grid reference for arrows.
               Use a CSS grid so the track and arrow layer share the same cell. */}
           <div className="relative grid grid-cols-1">
             {/* Scroll track — row 1, col 1 */}
             <div
               ref={scrollRef}
-              className="col-start-1 row-start-1 flex gap-6 sm:gap-10 overflow-x-auto no-scrollbar py-10 snap-x snap-mandatory items-center"
+              className="col-start-1 row-start-1 flex gap-6 sm:gap-10 overflow-x-auto no-scrollbar py-6 snap-x snap-mandatory items-center"
               style={{
                 paddingLeft: "max(1.5rem, calc(50vw - 175px))",
                 paddingRight: "max(1.5rem, calc(50vw - 175px))",
@@ -144,12 +161,12 @@ export function FeaturedCarousel({
                     key={property.id}
                     data-index={index}
                     onClick={() => scrollToCard(index)}
-                    className={`newest-card snap-center flex-shrink-0 cursor-pointer
+                    className={`carousel-card snap-center flex-shrink-0 cursor-pointer
                       w-[78vw] sm:w-[360px] lg:w-[400px]
                       transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]
                       ${
                         isCenter
-                          ? "scale-100 opacity-100 z-20"
+                          ? "scale-100 opacity-100 z-25"
                           : "scale-[0.88] opacity-40 blur-[1px] z-10 hover:opacity-60"
                       }`}
                   >
@@ -165,7 +182,7 @@ export function FeaturedCarousel({
             {/* Arrow overlay — row 1, col 1, same cell as track.
                 pointer-events-none on wrapper so it doesn't block scroll;
                 pointer-events-auto on each button to re-enable clicks. */}
-            <div className="col-start-1 row-start-1 pointer-events-none relative z-30 flex items-center justify-between px-3 lg:px-6">
+            <div className="col-start-1 row-start-1 pointer-events-none relative z-30 flex items-center justify-between px-3 lg:px-6 max-w-7xl mx-auto w-full">
               <button
                 onClick={() => handleManualScroll("left")}
                 disabled={activeIndex === 0}

@@ -52,12 +52,9 @@ body {
   left: 0;
   right: 0;
   height: 14px;
-  background: radial-gradient(
-      circle at 10px 50%,
+  background: radial-gradient(circle at 10px 50%,
       transparent 7px,
-      var(--paper) 7.5px
-    )
-    repeat-x;
+      var(--paper) 7.5px) repeat-x;
   background-size: 20px 14px;
 }
 
@@ -94,6 +91,7 @@ body {
 
 /* ── EmptyState scene animations ── */
 @keyframes houseFloat {
+
   0%,
   100% {
     transform: translateY(0px);
@@ -105,6 +103,7 @@ body {
 }
 
 @keyframes houseBreathe {
+
   0%,
   100% {
     transform: scale(1);
@@ -116,6 +115,7 @@ body {
 }
 
 @keyframes shadowPulse {
+
   0%,
   100% {
     opacity: 0.18;
@@ -149,6 +149,7 @@ body {
 }
 
 @keyframes cloud1Drift {
+
   0%,
   100% {
     transform: translateX(0px);
@@ -160,6 +161,7 @@ body {
 }
 
 @keyframes cloud2Drift {
+
   0%,
   100% {
     transform: translateX(0px);
@@ -171,6 +173,7 @@ body {
 }
 
 @keyframes pinBounce {
+
   0%,
   100% {
     transform: translateY(0px);
@@ -190,6 +193,7 @@ body {
 }
 
 @keyframes sparkle1 {
+
   0%,
   100% {
     opacity: 0;
@@ -204,6 +208,7 @@ body {
 }
 
 @keyframes sparkle2 {
+
   0%,
   100% {
     opacity: 0;
@@ -218,6 +223,7 @@ body {
 }
 
 @keyframes sparkle3 {
+
   0%,
   30%,
   100% {
@@ -233,6 +239,7 @@ body {
 }
 
 @keyframes qFadeIn {
+
   0%,
   100% {
     opacity: 0;
@@ -331,6 +338,7 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
+
   .es-house,
   .es-house-body,
   .es-shadow,
@@ -549,15 +557,13 @@ body {
 }
 
 .tahanan-text {
-  background: linear-gradient(
-    110deg,
-    #f0a93a 0%,
-    #fada7a 30%,
-    #f0a93a 45%,
-    #d98f1e 55%,
-    #f0a93a 70%,
-    #fada7a 100%
-  );
+  background: linear-gradient(110deg,
+      #f0a93a 0%,
+      #fada7a 30%,
+      #f0a93a 45%,
+      #d98f1e 55%,
+      #f0a93a 70%,
+      #fada7a 100%);
   background-size: 200% auto;
   -webkit-background-clip: text;
   background-clip: text;
@@ -620,6 +626,7 @@ body {
 }
 
 @layer utilities {
+
   /* Itinatago ang default scrollbar pero pwedeng i-scroll pa rin */
   .no-scrollbar::-webkit-scrollbar {
     display: none;
@@ -654,6 +661,76 @@ body {
     transform: scale(0.95);
     opacity: 0.65;
     z-index: 10;
-    filter: none; /* explicitly no blur */
+    filter: none;
+    /* explicitly no blur */
+  }
+}
+
+@keyframes premium-slider-flow {
+  0% {
+    background-position: 0% 50%;
+  }
+
+  100% {
+    background-position: -200% 50%;
+  }
+}
+
+@keyframes premium-slider-settle {
+  0% {
+    transform: translate(-50%, -50%) scale(1.1);
+  }
+
+  50% {
+    transform: translate(-50%, -50%) scale(0.92);
+  }
+
+  100% {
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-ping {
+    animation: none;
+  }
+}
+
+@keyframes hero-zoom {
+  from {
+    transform: scale(1.08);
+  }
+
+  to {
+    transform: scale(1);
+  }
+}
+
+@keyframes hero-sheen {
+  0% {
+    background-position: 200% 0;
+  }
+
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+@keyframes hero-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
   }
 }
